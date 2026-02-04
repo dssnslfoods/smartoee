@@ -274,12 +274,15 @@ export function PlantManager() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="company">Company</Label>
-              <Select value={formData.company_id} onValueChange={(v) => setFormData({ ...formData, company_id: v })}>
+              <Select 
+                value={formData.company_id || "__none__"} 
+                onValueChange={(v) => setFormData({ ...formData, company_id: v === "__none__" ? "" : v })}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select company" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No company</SelectItem>
+                  <SelectItem value="__none__">No company</SelectItem>
                   {companies?.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name} {company.code && `(${company.code})`}
