@@ -136,7 +136,7 @@ export function UserManager() {
       role: AppRole;
       companyId: string | null;
     }) => {
-      // First, sign up the user via Supabase Auth
+      // Sign up the user with metadata including company_id and role
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -144,23 +144,14 @@ export function UserManager() {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: fullName,
+            role: role,
+            company_id: companyId,
           },
         },
       });
       
       if (signUpError) throw signUpError;
       if (!authData.user) throw new Error('Failed to create user');
-
-      // Wait for trigger to create profile
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Update the role and company
-      const { error: updateError } = await supabase
-        .from('user_profiles')
-        .update({ role, full_name: fullName, company_id: companyId })
-        .eq('user_id', authData.user.id);
-
-      if (updateError) throw updateError;
 
       return authData.user;
     },
