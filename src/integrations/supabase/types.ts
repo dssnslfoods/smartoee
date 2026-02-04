@@ -285,7 +285,7 @@ export type Database = {
       plants: {
         Row: {
           code: string | null
-          company_id: string | null
+          company_id: string
           created_at: string
           id: string
           is_active: boolean
@@ -294,7 +294,7 @@ export type Database = {
         }
         Insert: {
           code?: string | null
-          company_id?: string | null
+          company_id: string
           created_at?: string
           id?: string
           is_active?: boolean
@@ -303,7 +303,7 @@ export type Database = {
         }
         Update: {
           code?: string | null
-          company_id?: string | null
+          company_id?: string
           created_at?: string
           id?: string
           is_active?: boolean
