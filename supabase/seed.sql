@@ -48,13 +48,13 @@ INSERT INTO public.machines (id, line_id, name, code, ideal_cycle_time_seconds) 
     ('e2222222-2222-2222-2222-222222222222', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'Assembly Station 04', 'ASM-004', 90.0);
 
 -- =============================================
--- 4. SHIFTS
+-- 4. SHIFTS (using valid hex UUIDs)
 -- =============================================
 
 INSERT INTO public.shifts (id, name, start_time, end_time) VALUES
-    ('s1111111-1111-1111-1111-111111111111', 'Morning Shift', '06:00:00', '14:00:00'),
-    ('s2222222-2222-2222-2222-222222222222', 'Afternoon Shift', '14:00:00', '22:00:00'),
-    ('s3333333-3333-3333-3333-333333333333', 'Night Shift', '22:00:00', '06:00:00');
+    ('f1111111-1111-1111-1111-111111111111', 'Morning Shift', '06:00:00', '14:00:00'),
+    ('f2222222-2222-2222-2222-222222222222', 'Afternoon Shift', '14:00:00', '22:00:00'),
+    ('f3333333-3333-3333-3333-333333333333', 'Night Shift', '22:00:00', '06:00:00');
 
 -- =============================================
 -- 5. SHIFT CALENDAR (Sample for current week)
@@ -72,16 +72,16 @@ BEGIN
         -- Plant 1 shifts
         INSERT INTO public.shift_calendar (shift_id, shift_date, plant_id, planned_time_minutes)
         VALUES 
-            ('s1111111-1111-1111-1111-111111111111', current_day, '11111111-1111-1111-1111-111111111111', 480),
-            ('s2222222-2222-2222-2222-222222222222', current_day, '11111111-1111-1111-1111-111111111111', 480),
-            ('s3333333-3333-3333-3333-333333333333', current_day, '11111111-1111-1111-1111-111111111111', 480)
+            ('f1111111-1111-1111-1111-111111111111', current_day, '11111111-1111-1111-1111-111111111111', 480),
+            ('f2222222-2222-2222-2222-222222222222', current_day, '11111111-1111-1111-1111-111111111111', 480),
+            ('f3333333-3333-3333-3333-333333333333', current_day, '11111111-1111-1111-1111-111111111111', 480)
         ON CONFLICT DO NOTHING;
         
         -- Plant 2 shifts (no night shift)
         INSERT INTO public.shift_calendar (shift_id, shift_date, plant_id, planned_time_minutes)
         VALUES 
-            ('s1111111-1111-1111-1111-111111111111', current_day, '22222222-2222-2222-2222-222222222222', 480),
-            ('s2222222-2222-2222-2222-222222222222', current_day, '22222222-2222-2222-2222-222222222222', 480)
+            ('f1111111-1111-1111-1111-111111111111', current_day, '22222222-2222-2222-2222-222222222222', 480),
+            ('f2222222-2222-2222-2222-222222222222', current_day, '22222222-2222-2222-2222-222222222222', 480)
         ON CONFLICT DO NOTHING;
     END LOOP;
 END $$;
@@ -92,33 +92,33 @@ END $$;
 
 INSERT INTO public.downtime_reasons (id, code, name, category) VALUES
     -- Planned Downtime
-    ('dt111111-1111-1111-1111-111111111111', 'DT-001', 'Scheduled Maintenance', 'PLANNED'),
-    ('dt222222-2222-2222-2222-222222222222', 'DT-002', 'Scheduled Break', 'PLANNED'),
-    ('dt333333-3333-3333-3333-333333333333', 'DT-003', 'Shift Handover', 'PLANNED'),
+    ('01111111-1111-1111-1111-111111111111', 'DT-001', 'Scheduled Maintenance', 'PLANNED'),
+    ('02222222-2222-2222-2222-222222222222', 'DT-002', 'Scheduled Break', 'PLANNED'),
+    ('03333333-3333-3333-3333-333333333333', 'DT-003', 'Shift Handover', 'PLANNED'),
     -- Unplanned Downtime
-    ('dt444444-4444-4444-4444-444444444444', 'DT-004', 'Machine Breakdown', 'BREAKDOWN'),
-    ('dt555555-5555-5555-5555-555555555555', 'DT-005', 'Tool Failure', 'BREAKDOWN'),
-    ('dt666666-6666-6666-6666-666666666666', 'DT-006', 'Material Shortage', 'UNPLANNED'),
-    ('dt777777-7777-7777-7777-777777777777', 'DT-007', 'Operator Absence', 'UNPLANNED'),
-    ('dt888888-8888-8888-8888-888888888888', 'DT-008', 'Quality Issue', 'UNPLANNED'),
+    ('04444444-4444-4444-4444-444444444444', 'DT-004', 'Machine Breakdown', 'BREAKDOWN'),
+    ('05555555-5555-5555-5555-555555555555', 'DT-005', 'Tool Failure', 'BREAKDOWN'),
+    ('06666666-6666-6666-6666-666666666666', 'DT-006', 'Material Shortage', 'UNPLANNED'),
+    ('07777777-7777-7777-7777-777777777777', 'DT-007', 'Operator Absence', 'UNPLANNED'),
+    ('08888888-8888-8888-8888-888888888888', 'DT-008', 'Quality Issue', 'UNPLANNED'),
     -- Changeover
-    ('dt999999-9999-9999-9999-999999999999', 'DT-009', 'Product Changeover', 'CHANGEOVER'),
-    ('dta00000-0000-0000-0000-000000000000', 'DT-010', 'Tool Changeover', 'CHANGEOVER'),
-    ('dtb00000-0000-0000-0000-000000000000', 'DT-011', 'Setup Adjustment', 'CHANGEOVER');
+    ('09999999-9999-9999-9999-999999999999', 'DT-009', 'Product Changeover', 'CHANGEOVER'),
+    ('0aaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'DT-010', 'Tool Changeover', 'CHANGEOVER'),
+    ('0bbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'DT-011', 'Setup Adjustment', 'CHANGEOVER');
 
 -- =============================================
 -- 7. DEFECT REASONS
 -- =============================================
 
 INSERT INTO public.defect_reasons (id, code, name) VALUES
-    ('df111111-1111-1111-1111-111111111111', 'DF-001', 'Dimensional Out of Spec'),
-    ('df222222-2222-2222-2222-222222222222', 'DF-002', 'Surface Defect'),
-    ('df333333-3333-3333-3333-333333333333', 'DF-003', 'Material Defect'),
-    ('df444444-4444-4444-4444-444444444444', 'DF-004', 'Assembly Error'),
-    ('df555555-5555-5555-5555-555555555555', 'DF-005', 'Machining Error'),
-    ('df666666-6666-6666-6666-666666666666', 'DF-006', 'Coating Defect'),
-    ('df777777-7777-7777-7777-777777777777', 'DF-007', 'Packaging Damage'),
-    ('df888888-8888-8888-8888-888888888888', 'DF-008', 'Other');
+    ('0ccccccc-cccc-cccc-cccc-cccccccccccc', 'DF-001', 'Dimensional Out of Spec'),
+    ('0ddddddd-dddd-dddd-dddd-dddddddddddd', 'DF-002', 'Surface Defect'),
+    ('0eeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'DF-003', 'Material Defect'),
+    ('0fffffff-ffff-ffff-ffff-ffffffffffff', 'DF-004', 'Assembly Error'),
+    ('10000000-0000-0000-0000-000000000001', 'DF-005', 'Machining Error'),
+    ('10000000-0000-0000-0000-000000000002', 'DF-006', 'Coating Defect'),
+    ('10000000-0000-0000-0000-000000000003', 'DF-007', 'Packaging Damage'),
+    ('10000000-0000-0000-0000-000000000004', 'DF-008', 'Other');
 
 -- =============================================
 -- 8. SAMPLE OEE SNAPSHOTS (Historical Data)
