@@ -1,66 +1,74 @@
 -- =============================================
--- PNF OEE System - Seed Data
+-- PNF OEE System - Seed Data (FIXED VERSION)
 -- Run this AFTER schema.sql in Supabase SQL Editor
 -- =============================================
 
--- =============================================
--- 1. PLANTS
--- =============================================
-
+-- STEP 1: PLANTS
 INSERT INTO public.plants (id, name, code) VALUES
     ('11111111-1111-1111-1111-111111111111', 'PNF Plant 1 - Main Factory', 'PLT-001'),
-    ('22222222-2222-2222-2222-222222222222', 'PNF Plant 2 - Assembly', 'PLT-002');
+    ('22222222-2222-2222-2222-222222222222', 'PNF Plant 2 - Assembly', 'PLT-002')
+ON CONFLICT (id) DO NOTHING;
 
--- =============================================
--- 2. PRODUCTION LINES
--- =============================================
-
+-- STEP 2: PRODUCTION LINES
 INSERT INTO public.lines (id, plant_id, name, code) VALUES
-    -- Plant 1 Lines
     ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'CNC Line 1', 'LINE-001'),
     ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111', 'CNC Line 2', 'LINE-002'),
     ('cccccccc-cccc-cccc-cccc-cccccccccccc', '11111111-1111-1111-1111-111111111111', 'Press Line', 'LINE-003'),
-    -- Plant 2 Lines
     ('dddddddd-dddd-dddd-dddd-dddddddddddd', '22222222-2222-2222-2222-222222222222', 'Assembly Line 1', 'LINE-004'),
-    ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '22222222-2222-2222-2222-222222222222', 'Assembly Line 2', 'LINE-005');
+    ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '22222222-2222-2222-2222-222222222222', 'Assembly Line 2', 'LINE-005')
+ON CONFLICT (id) DO NOTHING;
 
--- =============================================
--- 3. MACHINES
--- =============================================
-
+-- STEP 3: MACHINES
 INSERT INTO public.machines (id, line_id, name, code, ideal_cycle_time_seconds) VALUES
-    -- CNC Line 1 Machines
     ('a1111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'CNC Machine 01', 'CNC-001', 45.5),
     ('a2222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'CNC Machine 02', 'CNC-002', 45.5),
     ('a3333333-3333-3333-3333-333333333333', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'CNC Machine 03', 'CNC-003', 60.0),
-    -- CNC Line 2 Machines
     ('b1111111-1111-1111-1111-111111111111', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'CNC Machine 04', 'CNC-004', 30.0),
     ('b2222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'CNC Machine 05', 'CNC-005', 30.0),
-    -- Press Line Machines
     ('c1111111-1111-1111-1111-111111111111', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Press Machine 01', 'PRS-001', 15.0),
     ('c2222222-2222-2222-2222-222222222222', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Press Machine 02', 'PRS-002', 15.0),
     ('c3333333-3333-3333-3333-333333333333', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Press Machine 03', 'PRS-003', 20.0),
-    -- Assembly Line 1 Machines
     ('d1111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'Assembly Station 01', 'ASM-001', 120.0),
     ('d2222222-2222-2222-2222-222222222222', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'Assembly Station 02', 'ASM-002', 120.0),
-    -- Assembly Line 2 Machines
     ('e1111111-1111-1111-1111-111111111111', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'Assembly Station 03', 'ASM-003', 90.0),
-    ('e2222222-2222-2222-2222-222222222222', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'Assembly Station 04', 'ASM-004', 90.0);
+    ('e2222222-2222-2222-2222-222222222222', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'Assembly Station 04', 'ASM-004', 90.0)
+ON CONFLICT (id) DO NOTHING;
 
--- =============================================
--- 4. SHIFTS (using valid hex UUIDs)
--- =============================================
-
+-- STEP 4: SHIFTS
 INSERT INTO public.shifts (id, name, start_time, end_time) VALUES
-    ('f1111111-1111-1111-1111-111111111111', 'Morning Shift', '06:00:00', '14:00:00'),
-    ('f2222222-2222-2222-2222-222222222222', 'Afternoon Shift', '14:00:00', '22:00:00'),
-    ('f3333333-3333-3333-3333-333333333333', 'Night Shift', '22:00:00', '06:00:00');
+    ('fa111111-1111-1111-1111-111111111111', 'Morning Shift', '06:00:00', '14:00:00'),
+    ('fa222222-2222-2222-2222-222222222222', 'Afternoon Shift', '14:00:00', '22:00:00'),
+    ('fa333333-3333-3333-3333-333333333333', 'Night Shift', '22:00:00', '06:00:00')
+ON CONFLICT (id) DO NOTHING;
 
--- =============================================
--- 5. SHIFT CALENDAR (Sample for current week)
--- =============================================
+-- STEP 5: DOWNTIME REASONS
+INSERT INTO public.downtime_reasons (id, code, name, category) VALUES
+    ('da111111-1111-1111-1111-111111111111', 'DT-001', 'Scheduled Maintenance', 'PLANNED'),
+    ('da222222-2222-2222-2222-222222222222', 'DT-002', 'Scheduled Break', 'PLANNED'),
+    ('da333333-3333-3333-3333-333333333333', 'DT-003', 'Shift Handover', 'PLANNED'),
+    ('da444444-4444-4444-4444-444444444444', 'DT-004', 'Machine Breakdown', 'BREAKDOWN'),
+    ('da555555-5555-5555-5555-555555555555', 'DT-005', 'Tool Failure', 'BREAKDOWN'),
+    ('da666666-6666-6666-6666-666666666666', 'DT-006', 'Material Shortage', 'UNPLANNED'),
+    ('da777777-7777-7777-7777-777777777777', 'DT-007', 'Operator Absence', 'UNPLANNED'),
+    ('da888888-8888-8888-8888-888888888888', 'DT-008', 'Quality Issue', 'UNPLANNED'),
+    ('da999999-9999-9999-9999-999999999999', 'DT-009', 'Product Changeover', 'CHANGEOVER'),
+    ('daaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'DT-010', 'Tool Changeover', 'CHANGEOVER'),
+    ('dabbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'DT-011', 'Setup Adjustment', 'CHANGEOVER')
+ON CONFLICT (id) DO NOTHING;
 
--- Generate shift calendar for today and next 7 days
+-- STEP 6: DEFECT REASONS
+INSERT INTO public.defect_reasons (id, code, name) VALUES
+    ('de111111-1111-1111-1111-111111111111', 'DF-001', 'Dimensional Out of Spec'),
+    ('de222222-2222-2222-2222-222222222222', 'DF-002', 'Surface Defect'),
+    ('de333333-3333-3333-3333-333333333333', 'DF-003', 'Material Defect'),
+    ('de444444-4444-4444-4444-444444444444', 'DF-004', 'Assembly Error'),
+    ('de555555-5555-5555-5555-555555555555', 'DF-005', 'Machining Error'),
+    ('de666666-6666-6666-6666-666666666666', 'DF-006', 'Coating Defect'),
+    ('de777777-7777-7777-7777-777777777777', 'DF-007', 'Packaging Damage'),
+    ('de888888-8888-8888-8888-888888888888', 'DF-008', 'Other')
+ON CONFLICT (id) DO NOTHING;
+
+-- STEP 7: SHIFT CALENDAR
 DO $$
 DECLARE
     day_offset INTEGER;
@@ -69,62 +77,18 @@ BEGIN
     FOR day_offset IN 0..7 LOOP
         current_day := CURRENT_DATE + day_offset;
         
-        -- Plant 1 shifts
         INSERT INTO public.shift_calendar (shift_id, shift_date, plant_id, planned_time_minutes)
         VALUES 
-            ('f1111111-1111-1111-1111-111111111111', current_day, '11111111-1111-1111-1111-111111111111', 480),
-            ('f2222222-2222-2222-2222-222222222222', current_day, '11111111-1111-1111-1111-111111111111', 480),
-            ('f3333333-3333-3333-3333-333333333333', current_day, '11111111-1111-1111-1111-111111111111', 480)
-        ON CONFLICT DO NOTHING;
-        
-        -- Plant 2 shifts (no night shift)
-        INSERT INTO public.shift_calendar (shift_id, shift_date, plant_id, planned_time_minutes)
-        VALUES 
-            ('f1111111-1111-1111-1111-111111111111', current_day, '22222222-2222-2222-2222-222222222222', 480),
-            ('f2222222-2222-2222-2222-222222222222', current_day, '22222222-2222-2222-2222-222222222222', 480)
+            ('fa111111-1111-1111-1111-111111111111', current_day, '11111111-1111-1111-1111-111111111111', 480),
+            ('fa222222-2222-2222-2222-222222222222', current_day, '11111111-1111-1111-1111-111111111111', 480),
+            ('fa333333-3333-3333-3333-333333333333', current_day, '11111111-1111-1111-1111-111111111111', 480),
+            ('fa111111-1111-1111-1111-111111111111', current_day, '22222222-2222-2222-2222-222222222222', 480),
+            ('fa222222-2222-2222-2222-222222222222', current_day, '22222222-2222-2222-2222-222222222222', 480)
         ON CONFLICT DO NOTHING;
     END LOOP;
 END $$;
 
--- =============================================
--- 6. DOWNTIME REASONS
--- =============================================
-
-INSERT INTO public.downtime_reasons (id, code, name, category) VALUES
-    -- Planned Downtime
-    ('01111111-1111-1111-1111-111111111111', 'DT-001', 'Scheduled Maintenance', 'PLANNED'),
-    ('02222222-2222-2222-2222-222222222222', 'DT-002', 'Scheduled Break', 'PLANNED'),
-    ('03333333-3333-3333-3333-333333333333', 'DT-003', 'Shift Handover', 'PLANNED'),
-    -- Unplanned Downtime
-    ('04444444-4444-4444-4444-444444444444', 'DT-004', 'Machine Breakdown', 'BREAKDOWN'),
-    ('05555555-5555-5555-5555-555555555555', 'DT-005', 'Tool Failure', 'BREAKDOWN'),
-    ('06666666-6666-6666-6666-666666666666', 'DT-006', 'Material Shortage', 'UNPLANNED'),
-    ('07777777-7777-7777-7777-777777777777', 'DT-007', 'Operator Absence', 'UNPLANNED'),
-    ('08888888-8888-8888-8888-888888888888', 'DT-008', 'Quality Issue', 'UNPLANNED'),
-    -- Changeover
-    ('09999999-9999-9999-9999-999999999999', 'DT-009', 'Product Changeover', 'CHANGEOVER'),
-    ('0aaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'DT-010', 'Tool Changeover', 'CHANGEOVER'),
-    ('0bbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'DT-011', 'Setup Adjustment', 'CHANGEOVER');
-
--- =============================================
--- 7. DEFECT REASONS
--- =============================================
-
-INSERT INTO public.defect_reasons (id, code, name) VALUES
-    ('0ccccccc-cccc-cccc-cccc-cccccccccccc', 'DF-001', 'Dimensional Out of Spec'),
-    ('0ddddddd-dddd-dddd-dddd-dddddddddddd', 'DF-002', 'Surface Defect'),
-    ('0eeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'DF-003', 'Material Defect'),
-    ('0fffffff-ffff-ffff-ffff-ffffffffffff', 'DF-004', 'Assembly Error'),
-    ('10000000-0000-0000-0000-000000000001', 'DF-005', 'Machining Error'),
-    ('10000000-0000-0000-0000-000000000002', 'DF-006', 'Coating Defect'),
-    ('10000000-0000-0000-0000-000000000003', 'DF-007', 'Packaging Damage'),
-    ('10000000-0000-0000-0000-000000000004', 'DF-008', 'Other');
-
--- =============================================
--- 8. SAMPLE OEE SNAPSHOTS (Historical Data)
--- =============================================
-
--- Generate sample OEE data for last 7 days for each machine
+-- STEP 8: SAMPLE OEE SNAPSHOTS
 DO $$
 DECLARE
     machine_rec RECORD;
@@ -139,7 +103,6 @@ BEGIN
         FOR day_offset IN 1..7 LOOP
             sample_date := CURRENT_DATE - day_offset;
             
-            -- Generate random but realistic OEE values
             sample_availability := 80 + (random() * 15)::NUMERIC(5,2);
             sample_performance := 85 + (random() * 12)::NUMERIC(5,2);
             sample_quality := 95 + (random() * 4)::NUMERIC(5,2);
@@ -171,23 +134,12 @@ BEGIN
     END LOOP;
 END $$;
 
--- =============================================
--- 9. VERIFY DATA
--- =============================================
-
--- Show summary of seeded data
+-- VERIFY
 SELECT 'Plants' as table_name, COUNT(*) as count FROM public.plants
-UNION ALL
-SELECT 'Lines', COUNT(*) FROM public.lines
-UNION ALL
-SELECT 'Machines', COUNT(*) FROM public.machines
-UNION ALL
-SELECT 'Shifts', COUNT(*) FROM public.shifts
-UNION ALL
-SELECT 'Shift Calendar', COUNT(*) FROM public.shift_calendar
-UNION ALL
-SELECT 'Downtime Reasons', COUNT(*) FROM public.downtime_reasons
-UNION ALL
-SELECT 'Defect Reasons', COUNT(*) FROM public.defect_reasons
-UNION ALL
-SELECT 'OEE Snapshots', COUNT(*) FROM public.oee_snapshots;
+UNION ALL SELECT 'Lines', COUNT(*) FROM public.lines
+UNION ALL SELECT 'Machines', COUNT(*) FROM public.machines
+UNION ALL SELECT 'Shifts', COUNT(*) FROM public.shifts
+UNION ALL SELECT 'Shift Calendar', COUNT(*) FROM public.shift_calendar
+UNION ALL SELECT 'Downtime Reasons', COUNT(*) FROM public.downtime_reasons
+UNION ALL SELECT 'Defect Reasons', COUNT(*) FROM public.defect_reasons
+UNION ALL SELECT 'OEE Snapshots', COUNT(*) FROM public.oee_snapshots;
