@@ -94,6 +94,25 @@ export default function Supervisor() {
 
   const isSupervisor = hasRole('SUPERVISOR') || hasRole('ADMIN');
 
+  // Redirect or show message if user is not a supervisor
+  if (!isSupervisor) {
+    return (
+      <AppLayout>
+        <div className="container mx-auto p-4">
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <Lock className="h-12 w-12 text-muted-foreground mb-4" />
+              <h2 className="text-xl font-semibold mb-2">ไม่มีสิทธิ์เข้าถึง</h2>
+              <p className="text-muted-foreground">
+                หน้านี้สำหรับ Supervisor และ Admin เท่านั้น
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="container mx-auto p-4 space-y-6">
