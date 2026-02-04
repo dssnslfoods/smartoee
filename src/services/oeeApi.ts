@@ -412,6 +412,251 @@ export async function getLatestOeeByMachine(machineId: string): Promise<OeeSnaps
 }
 
 // =============================================
+// DASHBOARD FUNCTIONS
+// =============================================
+
+export interface DashboardOEEData {
+  availability: number;
+  performance: number;
+  quality: number;
+  oee: number;
+}
+
+export interface MachineWithOEE {
+  id: string;
+  name: string;
+  code: string;
+  line_id: string;
+  line_name?: string;
+  status: 'running' | 'idle' | 'stopped' | 'maintenance';
+  oee: number;
+  currentProduct?: string;
+}
+
+export interface DashboardStats {
+  running: number;
+  idle: number;
+  stopped: number;
+  maintenance: number;
+}
+
+/**
+ * Get aggregated OEE metrics for a company's machines
+ */
+export async function getDashboardOEE(companyId?: string): Promise<DashboardOEEData> {
+  // Get all machines for the company
+  const machines = await getMachines(undefined, companyId);
+  
+  if (machines.length === 0) {
+    return { availability: 0, performance: 0, quality: 0, oee: 0 };
+  }
+
+  // Get latest OEE snapshot for each machine
+  const machineIds = machines.map(m => m.id);
+  
+  const { data: snapshots, error } = await supabase
+    .from('oee_snapshots')
+    .select('*')
+    .eq('scope', 'MACHINE')
+    .in('scope_id', machineIds)
+    .order('period_start', { ascending: false });
+
+  if (error) throw error;
+
+  // Get latest snapshot per machine
+  const latestByMachine = new Map<string, OeeSnapshot>();
+  for (const snap of snapshots || []) {
+    if (!latestByMachine.has(snap.scope_id)) {
+      latestByMachine.set(snap.scope_id, snap);
+    }
+  }
+
+  const latestSnapshots = Array.from(latestByMachine.values());
+  
+  if (latestSnapshots.length === 0) {
+    return { availability: 0, performance: 0, quality: 0, oee: 0 };
+  }
+
+  // Calculate averages
+  const avgAvailability = latestSnapshots.reduce((sum, s) => sum + (Number(s.availability) || 0), 0) / latestSnapshots.length;
+  const avgPerformance = latestSnapshots.reduce((sum, s) => sum + (Number(s.performance) || 0), 0) / latestSnapshots.length;
+  const avgQuality = latestSnapshots.reduce((sum, s) => sum + (Number(s.quality) || 0), 0) / latestSnapshots.length;
+  const avgOee = latestSnapshots.reduce((sum, s) => sum + (Number(s.oee) || 0), 0) / latestSnapshots.length;
+
+  return {
+    availability: Math.round(avgAvailability * 10) / 10,
+    performance: Math.round(avgPerformance * 10) / 10,
+    quality: Math.round(avgQuality * 10) / 10,
+    oee: Math.round(avgOee * 10) / 10,
+  };
+}
+
+/**
+ * Get machines with their current status and OEE for dashboard display
+ */
+export async function getMachinesWithStatus(companyId?: string): Promise<{ machines: MachineWithOEE[]; stats: DashboardStats }> {
+  // Get machines with line info
+  const machines = await getMachines(undefined, companyId);
+  
+  if (machines.length === 0) {
+    return { 
+      machines: [], 
+      stats: { running: 0, idle: 0, stopped: 0, maintenance: 0 } 
+    };
+  }
+
+  const machineIds = machines.map(m => m.id);
+
+  // Get latest OEE snapshots for all machines
+  const { data: snapshots, error: snapshotError } = await supabase
+    .from('oee_snapshots')
+    .select('*')
+    .eq('scope', 'MACHINE')
+    .in('scope_id', machineIds)
+    .order('period_start', { ascending: false });
+
+  if (snapshotError) throw snapshotError;
+
+  // Get current production events (open events)
+  const { data: events, error: eventError } = await supabase
+    .from('production_events')
+    .select('*')
+    .in('machine_id', machineIds)
+    .is('end_ts', null);
+
+  if (eventError) throw eventError;
+
+  // Create lookup maps
+  const latestOeeByMachine = new Map<string, number>();
+  for (const snap of snapshots || []) {
+    if (!latestOeeByMachine.has(snap.scope_id)) {
+      latestOeeByMachine.set(snap.scope_id, Number(snap.oee) || 0);
+    }
+  }
+
+  const eventByMachine = new Map<string, { event_type: string }>();
+  for (const event of events || []) {
+    eventByMachine.set(event.machine_id, event);
+  }
+
+  // Build machine list with status
+  const stats: DashboardStats = { running: 0, idle: 0, stopped: 0, maintenance: 0 };
+  
+  const machinesWithStatus: MachineWithOEE[] = machines.map(machine => {
+    const currentEvent = eventByMachine.get(machine.id);
+    const oee = latestOeeByMachine.get(machine.id) || 0;
+    
+    let status: 'running' | 'idle' | 'stopped' | 'maintenance';
+    
+    if (currentEvent) {
+      switch (currentEvent.event_type) {
+        case 'RUN':
+          status = 'running';
+          stats.running++;
+          break;
+        case 'DOWNTIME':
+          status = 'stopped';
+          stats.stopped++;
+          break;
+        case 'SETUP':
+          status = 'maintenance';
+          stats.maintenance++;
+          break;
+        default:
+          status = 'idle';
+          stats.idle++;
+      }
+    } else {
+      status = 'idle';
+      stats.idle++;
+    }
+
+    return {
+      id: machine.id,
+      name: machine.name,
+      code: machine.code,
+      line_id: machine.line_id,
+      line_name: machine.line?.name,
+      status,
+      oee: Math.round(oee * 10) / 10,
+      currentProduct: undefined, // Would need product tracking to implement
+    };
+  });
+
+  return { machines: machinesWithStatus, stats };
+}
+
+/**
+ * Get OEE trend data for the last 7 days
+ */
+export async function getOEETrend(companyId?: string): Promise<{ date: string; availability: number; performance: number; quality: number; oee: number }[]> {
+  const machines = await getMachines(undefined, companyId);
+  
+  if (machines.length === 0) {
+    return [];
+  }
+
+  const machineIds = machines.map(m => m.id);
+  
+  // Get snapshots for last 7 days
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 6);
+
+  const { data: snapshots, error } = await supabase
+    .from('oee_snapshots')
+    .select('*')
+    .eq('scope', 'MACHINE')
+    .eq('period', 'SHIFT')
+    .in('scope_id', machineIds)
+    .gte('period_start', startDate.toISOString())
+    .lte('period_start', endDate.toISOString())
+    .order('period_start');
+
+  if (error) throw error;
+
+  // Group by date and calculate averages
+  const byDate = new Map<string, { availability: number[]; performance: number[]; quality: number[]; oee: number[] }>();
+  
+  for (const snap of snapshots || []) {
+    const date = new Date(snap.period_start).toLocaleDateString('en-US', { weekday: 'short' });
+    if (!byDate.has(date)) {
+      byDate.set(date, { availability: [], performance: [], quality: [], oee: [] });
+    }
+    const entry = byDate.get(date)!;
+    entry.availability.push(Number(snap.availability) || 0);
+    entry.performance.push(Number(snap.performance) || 0);
+    entry.quality.push(Number(snap.quality) || 0);
+    entry.oee.push(Number(snap.oee) || 0);
+  }
+
+  // Calculate averages per day
+  const result: { date: string; availability: number; performance: number; quality: number; oee: number }[] = [];
+  
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    const dayName = days[d.getDay()];
+    
+    const entry = byDate.get(dayName);
+    if (entry && entry.oee.length > 0) {
+      result.push({
+        date: dayName,
+        availability: Math.round(entry.availability.reduce((a, b) => a + b, 0) / entry.availability.length),
+        performance: Math.round(entry.performance.reduce((a, b) => a + b, 0) / entry.performance.length),
+        quality: Math.round(entry.quality.reduce((a, b) => a + b, 0) / entry.quality.length),
+        oee: Math.round(entry.oee.reduce((a, b) => a + b, 0) / entry.oee.length),
+      });
+    } else {
+      result.push({ date: dayName, availability: 0, performance: 0, quality: 0, oee: 0 });
+    }
+  }
+
+  return result;
+}
+
+// =============================================
 // QUERY FUNCTIONS - Views
 // =============================================
 
@@ -585,6 +830,11 @@ const oeeApi = {
   // OEE Snapshots
   getOeeSnapshots,
   getLatestOeeByMachine,
+
+  // Dashboard
+  getDashboardOEE,
+  getMachinesWithStatus,
+  getOEETrend,
 
   // Views
   getCurrentShiftByMachine,
