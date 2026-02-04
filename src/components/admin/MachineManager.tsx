@@ -40,6 +40,7 @@ interface Machine {
   name: string;
   code: string;
   line_id: string;
+  company_id: string;
   ideal_cycle_time_seconds: number;
   is_active: boolean;
 }
@@ -48,7 +49,14 @@ interface Line {
   id: string;
   name: string;
   plant_id: string;
+  company_id: string;
   plants: { name: string } | null;
+}
+
+interface Company {
+  id: string;
+  name: string;
+  code: string | null;
 }
 
 export function MachineManager() {
@@ -61,18 +69,39 @@ export function MachineManager() {
     name: '', 
     code: '', 
     line_id: '', 
+    company_id: '',
     ideal_cycle_time_seconds: 60, 
     is_active: true 
   });
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
 
-  const { data: lines } = useQuery({
-    queryKey: ['admin-lines-lookup'],
+  const { data: companies } = useQuery({
+    queryKey: ['admin-companies-lookup'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('lines')
-        .select('id, name, plant_id, plants(name)')
+        .from('companies')
+        .select('id, name, code')
         .eq('is_active', true)
         .order('name');
+      if (error) throw error;
+      return data as Company[];
+    },
+  });
+
+  const { data: lines } = useQuery({
+    queryKey: ['admin-lines-lookup', selectedCompanyId],
+    queryFn: async () => {
+      let query = supabase
+        .from('lines')
+        .select('id, name, plant_id, company_id, plants(name)')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (selectedCompanyId) {
+        query = query.eq('company_id', selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as Line[];
     },
@@ -83,7 +112,7 @@ export function MachineManager() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('machines')
-        .select('*, lines(name, plants(name))')
+        .select('*, lines(name, plants(name)), companies(name)')
         .order('name');
       if (error) throw error;
       return data;
@@ -98,6 +127,7 @@ export function MachineManager() {
           name: data.name, 
           code: data.code, 
           line_id: data.line_id, 
+          company_id: data.company_id,
           ideal_cycle_time_seconds: data.ideal_cycle_time_seconds,
           is_active: data.is_active 
         });
@@ -118,7 +148,8 @@ export function MachineManager() {
         .update({ 
           name: data.name, 
           code: data.code, 
-          line_id: data.line_id, 
+          line_id: data.line_id,
+          company_id: data.company_id, 
           ideal_cycle_time_seconds: data.ideal_cycle_time_seconds,
           is_active: data.is_active 
         })
@@ -149,16 +180,19 @@ export function MachineManager() {
 
   const handleOpenCreate = () => {
     setEditingMachine(null);
-    setFormData({ name: '', code: '', line_id: lines?.[0]?.id || '', ideal_cycle_time_seconds: 60, is_active: true });
+    setSelectedCompanyId(companies?.[0]?.id || '');
+    setFormData({ name: '', code: '', line_id: '', company_id: companies?.[0]?.id || '', ideal_cycle_time_seconds: 60, is_active: true });
     setIsDialogOpen(true);
   };
 
   const handleOpenEdit = (machine: Machine) => {
     setEditingMachine(machine);
+    setSelectedCompanyId(machine.company_id);
     setFormData({ 
       name: machine.name, 
       code: machine.code, 
       line_id: machine.line_id, 
+      company_id: machine.company_id,
       ideal_cycle_time_seconds: machine.ideal_cycle_time_seconds,
       is_active: machine.is_active 
     });
@@ -168,20 +202,30 @@ export function MachineManager() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingMachine(null);
-    setFormData({ name: '', code: '', line_id: '', ideal_cycle_time_seconds: 60, is_active: true });
+    setSelectedCompanyId('');
+    setFormData({ name: '', code: '', line_id: '', company_id: '', ideal_cycle_time_seconds: 60, is_active: true });
+  };
+
+  const handleCompanyChange = (companyId: string) => {
+    setSelectedCompanyId(companyId);
+    setFormData({ ...formData, company_id: companyId, line_id: '' });
   };
 
   const handleSubmit = () => {
+    if (!formData.company_id) {
+      toast.error('Company is required');
+      return;
+    }
+    if (!formData.line_id) {
+      toast.error('Line is required');
+      return;
+    }
     if (!formData.name.trim()) {
       toast.error('Machine name is required');
       return;
     }
     if (!formData.code.trim()) {
       toast.error('Machine code is required');
-      return;
-    }
-    if (!formData.line_id) {
-      toast.error('Line is required');
       return;
     }
     if (editingMachine) {
@@ -197,7 +241,7 @@ export function MachineManager() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Machines</h3>
-        <Button onClick={handleOpenCreate} size="sm" disabled={!lines?.length}>
+        <Button onClick={handleOpenCreate} size="sm" disabled={!companies?.length}>
           <Plus className="h-4 w-4 mr-2" />
           Add Machine
         </Button>
@@ -213,6 +257,7 @@ export function MachineManager() {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Code</TableHead>
+              <TableHead>Company</TableHead>
               <TableHead>Line</TableHead>
               <TableHead>Cycle Time (s)</TableHead>
               <TableHead>Status</TableHead>
@@ -222,10 +267,12 @@ export function MachineManager() {
           <TableBody>
             {machines?.map((machine) => {
               const line = machine.lines as { name: string; plants: { name: string } | null } | null;
+              const company = machine.companies as { name: string } | null;
               return (
                 <TableRow key={machine.id}>
                   <TableCell className="font-medium">{machine.name}</TableCell>
                   <TableCell>{machine.code}</TableCell>
+                  <TableCell>{company?.name || '-'}</TableCell>
                   <TableCell>
                     {line?.name} ({line?.plants?.name || '-'})
                   </TableCell>
@@ -250,7 +297,7 @@ export function MachineManager() {
             })}
             {machines?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   No machines found
                 </TableCell>
               </TableRow>
@@ -270,10 +317,29 @@ export function MachineManager() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="line_id">Line *</Label>
-              <Select value={formData.line_id} onValueChange={(value) => setFormData({ ...formData, line_id: value })}>
+              <Label htmlFor="company_id">Company *</Label>
+              <Select value={formData.company_id} onValueChange={handleCompanyChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select line" />
+                  <SelectValue placeholder="Select company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies?.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name} {company.code && `(${company.code})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="line_id">Line *</Label>
+              <Select 
+                value={formData.line_id} 
+                onValueChange={(value) => setFormData({ ...formData, line_id: value })}
+                disabled={!formData.company_id}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={formData.company_id ? "Select line" : "Select company first"} />
                 </SelectTrigger>
                 <SelectContent>
                   {lines?.map((line) => (
