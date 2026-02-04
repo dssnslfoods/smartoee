@@ -285,12 +285,16 @@ export function UserManager() {
       toast.error('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
       return;
     }
+    if (!newCompanyId) {
+      toast.error('กรุณาเลือกบริษัท');
+      return;
+    }
     createUserMutation.mutate({ 
       email: newEmail, 
       password: newPassword, 
       fullName: newFullName, 
       role: newRole,
-      companyId: newCompanyId || null,
+      companyId: newCompanyId,
     });
   };
 
@@ -497,13 +501,12 @@ export function UserManager() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="company">บริษัท</Label>
+              <Label htmlFor="company">บริษัท *</Label>
               <Select value={newCompanyId} onValueChange={setNewCompanyId}>
-                <SelectTrigger>
+                <SelectTrigger className={!newCompanyId ? "border-destructive" : ""}>
                   <SelectValue placeholder="เลือกบริษัท" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">ไม่ระบุ</SelectItem>
                   {companies?.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name} {company.code && `(${company.code})`}
@@ -511,6 +514,9 @@ export function UserManager() {
                   ))}
                 </SelectContent>
               </Select>
+              {!newCompanyId && (
+                <p className="text-xs text-destructive">กรุณาเลือกบริษัท</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
