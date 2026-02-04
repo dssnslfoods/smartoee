@@ -21,25 +21,28 @@ export default function Dashboard() {
   const companyId = company?.id;
   const companyName = company?.name;
 
-  // Fetch OEE summary data
+  // Fetch OEE summary data (auto-refresh every 30 seconds)
   const { data: oeeData, isLoading: isLoadingOEE } = useQuery({
     queryKey: ['dashboardOEE', companyId],
     queryFn: () => getDashboardOEE(companyId),
     enabled: !!companyId || !isAdmin(),
+    refetchInterval: 30000,
   });
 
-  // Fetch machines with status
+  // Fetch machines with status (auto-refresh every 30 seconds)
   const { data: machineData, isLoading: isLoadingMachines } = useQuery({
     queryKey: ['dashboardMachines', companyId],
     queryFn: () => getMachinesWithStatus(companyId),
     enabled: !!companyId || !isAdmin(),
+    refetchInterval: 30000,
   });
 
-  // Fetch OEE trend data
+  // Fetch OEE trend data (auto-refresh every 30 seconds)
   const { data: trendData, isLoading: isLoadingTrend } = useQuery({
     queryKey: ['dashboardTrend', companyId],
     queryFn: () => getOEETrend(companyId),
     enabled: !!companyId || !isAdmin(),
+    refetchInterval: 30000,
   });
 
   // Fetch lines for filter
