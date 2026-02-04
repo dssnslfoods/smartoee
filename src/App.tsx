@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Shopfloor from "./pages/Shopfloor";
 import Supervisor from "./pages/Supervisor";
 import Executive from "./pages/Executive";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/shopfloor" element={<Shopfloor />} />
             <Route path="/supervisor" element={<Supervisor />} />
             <Route path="/executive" element={<Executive />} />
+            <Route path="/admin" element={<Admin />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
