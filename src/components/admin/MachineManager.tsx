@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,6 +62,7 @@ interface Company {
 
 export function MachineManager() {
   const queryClient = useQueryClient();
+  const { company } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
@@ -73,7 +75,18 @@ export function MachineManager() {
     ideal_cycle_time_seconds: 60, 
     is_active: true 
   });
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  const [selectedCompanyIdForForm, setSelectedCompanyIdForForm] = useState<string>('');
+
+  // Use the admin's selected company context
+  const selectedCompanyId = company?.id;
+
+  // Set default company_id when company changes
+  useEffect(() => {
+    if (selectedCompanyId) {
+      setSelectedCompanyIdForForm(selectedCompanyId);
+      setFormData(prev => ({ ...prev, company_id: selectedCompanyId }));
+    }
+  }, [selectedCompanyId]);
 
   const { data: companies } = useQuery({
     queryKey: ['admin-companies-lookup'],
@@ -89,7 +102,7 @@ export function MachineManager() {
   });
 
   const { data: lines } = useQuery({
-    queryKey: ['admin-lines-lookup', selectedCompanyId],
+    queryKey: ['admin-lines-lookup', selectedCompanyIdForForm || selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from('lines')
@@ -97,8 +110,9 @@ export function MachineManager() {
         .eq('is_active', true)
         .order('name');
       
-      if (selectedCompanyId) {
-        query = query.eq('company_id', selectedCompanyId);
+      const companyToFilter = selectedCompanyIdForForm || selectedCompanyId;
+      if (companyToFilter) {
+        query = query.eq('company_id', companyToFilter);
       }
       
       const { data, error } = await query;
@@ -108,12 +122,19 @@ export function MachineManager() {
   });
 
   const { data: machines, isLoading } = useQuery({
-    queryKey: ['admin-machines'],
+    queryKey: ['admin-machines', selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('machines')
         .select('*, lines(name, plants(name)), companies(name)')
         .order('name');
+      
+      // Filter by selected company if available
+      if (selectedCompanyId) {
+        query = query.eq('company_id', selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -180,14 +201,14 @@ export function MachineManager() {
 
   const handleOpenCreate = () => {
     setEditingMachine(null);
-    setSelectedCompanyId(companies?.[0]?.id || '');
-    setFormData({ name: '', code: '', line_id: '', company_id: companies?.[0]?.id || '', ideal_cycle_time_seconds: 60, is_active: true });
+    setSelectedCompanyIdForForm(selectedCompanyId || companies?.[0]?.id || '');
+    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || companies?.[0]?.id || '', ideal_cycle_time_seconds: 60, is_active: true });
     setIsDialogOpen(true);
   };
 
   const handleOpenEdit = (machine: Machine) => {
     setEditingMachine(machine);
-    setSelectedCompanyId(machine.company_id);
+    setSelectedCompanyIdForForm(machine.company_id);
     setFormData({ 
       name: machine.name, 
       code: machine.code, 
@@ -202,12 +223,12 @@ export function MachineManager() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingMachine(null);
-    setSelectedCompanyId('');
-    setFormData({ name: '', code: '', line_id: '', company_id: '', ideal_cycle_time_seconds: 60, is_active: true });
+    setSelectedCompanyIdForForm(selectedCompanyId || '');
+    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || '', ideal_cycle_time_seconds: 60, is_active: true });
   };
 
   const handleCompanyChange = (companyId: string) => {
-    setSelectedCompanyId(companyId);
+    setSelectedCompanyIdForForm(companyId);
     setFormData({ ...formData, company_id: companyId, line_id: '' });
   };
 

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Loader2, Building2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,13 +53,24 @@ interface Plant {
 
 export function PlantManager() {
   const queryClient = useQueryClient();
+  const { company, isAdmin } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingPlant, setEditingPlant] = useState<Plant | null>(null);
   const [deletingPlant, setDeletingPlant] = useState<Plant | null>(null);
   const [formData, setFormData] = useState({ name: '', code: '', is_active: true, company_id: '' });
 
-  // Fetch companies for dropdown
+  // Use the admin's selected company context
+  const selectedCompanyId = company?.id;
+
+  // Set default company_id when company changes
+  useEffect(() => {
+    if (selectedCompanyId && !formData.company_id) {
+      setFormData(prev => ({ ...prev, company_id: selectedCompanyId }));
+    }
+  }, [selectedCompanyId]);
+
+  // Fetch companies for dropdown (only needed if admin wants to see all)
   const { data: companies } = useQuery({
     queryKey: ['admin-companies-dropdown'],
     queryFn: async () => {
@@ -73,12 +85,19 @@ export function PlantManager() {
   });
 
   const { data: plants, isLoading } = useQuery({
-    queryKey: ['admin-plants'],
+    queryKey: ['admin-plants', selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('plants')
         .select('*, companies(id, name, code)')
         .order('name');
+      
+      // Filter by selected company if available
+      if (selectedCompanyId) {
+        query = query.eq('company_id', selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as Plant[];
     },
@@ -141,7 +160,7 @@ export function PlantManager() {
 
   const handleOpenCreate = () => {
     setEditingPlant(null);
-    setFormData({ name: '', code: '', is_active: true, company_id: '' });
+    setFormData({ name: '', code: '', is_active: true, company_id: selectedCompanyId || '' });
     setIsDialogOpen(true);
   };
 

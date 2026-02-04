@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -58,12 +59,24 @@ interface Company {
 
 export function LineManager() {
   const queryClient = useQueryClient();
+  const { company } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingLine, setEditingLine] = useState<Line | null>(null);
   const [deletingLine, setDeletingLine] = useState<Line | null>(null);
   const [formData, setFormData] = useState({ name: '', code: '', plant_id: '', company_id: '', is_active: true });
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  const [selectedCompanyIdForForm, setSelectedCompanyIdForForm] = useState<string>('');
+
+  // Use the admin's selected company context
+  const selectedCompanyId = company?.id;
+
+  // Set default company_id when company changes
+  useEffect(() => {
+    if (selectedCompanyId) {
+      setSelectedCompanyIdForForm(selectedCompanyId);
+      setFormData(prev => ({ ...prev, company_id: selectedCompanyId }));
+    }
+  }, [selectedCompanyId]);
 
   const { data: companies } = useQuery({
     queryKey: ['admin-companies-lookup'],
@@ -79,7 +92,7 @@ export function LineManager() {
   });
 
   const { data: plants } = useQuery({
-    queryKey: ['admin-plants-lookup', selectedCompanyId],
+    queryKey: ['admin-plants-lookup', selectedCompanyIdForForm || selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from('plants')
@@ -87,8 +100,9 @@ export function LineManager() {
         .eq('is_active', true)
         .order('name');
       
-      if (selectedCompanyId) {
-        query = query.eq('company_id', selectedCompanyId);
+      const companyToFilter = selectedCompanyIdForForm || selectedCompanyId;
+      if (companyToFilter) {
+        query = query.eq('company_id', companyToFilter);
       }
       
       const { data, error } = await query;
@@ -98,12 +112,19 @@ export function LineManager() {
   });
 
   const { data: lines, isLoading } = useQuery({
-    queryKey: ['admin-lines'],
+    queryKey: ['admin-lines', selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('lines')
         .select('*, plants(name), companies(name)')
         .order('name');
+      
+      // Filter by selected company if available
+      if (selectedCompanyId) {
+        query = query.eq('company_id', selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -156,14 +177,14 @@ export function LineManager() {
 
   const handleOpenCreate = () => {
     setEditingLine(null);
-    setSelectedCompanyId(companies?.[0]?.id || '');
-    setFormData({ name: '', code: '', plant_id: '', company_id: companies?.[0]?.id || '', is_active: true });
+    setSelectedCompanyIdForForm(selectedCompanyId || companies?.[0]?.id || '');
+    setFormData({ name: '', code: '', plant_id: '', company_id: selectedCompanyId || companies?.[0]?.id || '', is_active: true });
     setIsDialogOpen(true);
   };
 
   const handleOpenEdit = (line: Line) => {
     setEditingLine(line);
-    setSelectedCompanyId(line.company_id);
+    setSelectedCompanyIdForForm(line.company_id);
     setFormData({ name: line.name, code: line.code || '', plant_id: line.plant_id, company_id: line.company_id, is_active: line.is_active });
     setIsDialogOpen(true);
   };
@@ -171,12 +192,12 @@ export function LineManager() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingLine(null);
-    setSelectedCompanyId('');
-    setFormData({ name: '', code: '', plant_id: '', company_id: '', is_active: true });
+    setSelectedCompanyIdForForm(selectedCompanyId || '');
+    setFormData({ name: '', code: '', plant_id: '', company_id: selectedCompanyId || '', is_active: true });
   };
 
   const handleCompanyChange = (companyId: string) => {
-    setSelectedCompanyId(companyId);
+    setSelectedCompanyIdForForm(companyId);
     setFormData({ ...formData, company_id: companyId, plant_id: '' });
   };
 

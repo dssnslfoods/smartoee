@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Plus, Trash2, Loader2, Pencil, UserPlus, Shield, Mail, 
   Search, MoreHorizontal, UserCog, Building2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -84,11 +85,15 @@ const getRoleBadgeVariant = (role: AppRole): "default" | "secondary" | "destruct
 
 export function UserManager() {
   const queryClient = useQueryClient();
+  const { company } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  
+  // Use the admin's selected company context
+  const selectedCompanyId = company?.id;
   
   // Form states
   const [newEmail, setNewEmail] = useState('');
@@ -99,6 +104,13 @@ export function UserManager() {
   const [editFullName, setEditFullName] = useState('');
   const [editRole, setEditRole] = useState<AppRole>('STAFF');
   const [editCompanyId, setEditCompanyId] = useState<string>('');
+
+  // Set default company_id when company changes
+  useEffect(() => {
+    if (selectedCompanyId) {
+      setNewCompanyId(selectedCompanyId);
+    }
+  }, [selectedCompanyId]);
 
   // Fetch companies for dropdown
   const { data: companies } = useQuery({
@@ -114,14 +126,21 @@ export function UserManager() {
     },
   });
 
-  // Fetch all users with company info
+  // Fetch users filtered by company
   const { data: users, isLoading } = useQuery({
-    queryKey: ['admin-all-users'],
+    queryKey: ['admin-all-users', selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('user_profiles')
         .select('*, companies(id, name, code)')
         .order('created_at', { ascending: false });
+      
+      // Filter by selected company if available
+      if (selectedCompanyId) {
+        query = query.eq('company_id', selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as UserProfile[];
     },
@@ -233,7 +252,7 @@ export function UserManager() {
     setNewPassword('');
     setNewFullName('');
     setNewRole('STAFF');
-    setNewCompanyId('');
+    setNewCompanyId(selectedCompanyId || '');
     setIsCreateDialogOpen(true);
   };
 

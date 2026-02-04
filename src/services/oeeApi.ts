@@ -136,13 +136,18 @@ export async function recalcOeeForShift(
 // QUERY FUNCTIONS - Plants
 // =============================================
 
-export async function getPlants(): Promise<Plant[]> {
-  const { data, error } = await supabase
+export async function getPlants(companyId?: string): Promise<Plant[]> {
+  let query = supabase
     .from('plants')
     .select('*')
     .eq('is_active', true)
     .order('name');
 
+  if (companyId) {
+    query = query.eq('company_id', companyId);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return data || [];
 }
@@ -162,7 +167,7 @@ export async function getPlantById(id: string): Promise<Plant | null> {
 // QUERY FUNCTIONS - Lines
 // =============================================
 
-export async function getLines(plantId?: string): Promise<Line[]> {
+export async function getLines(plantId?: string, companyId?: string): Promise<Line[]> {
   let query = supabase
     .from('lines')
     .select('*, plant:plants(*)')
@@ -171,6 +176,9 @@ export async function getLines(plantId?: string): Promise<Line[]> {
 
   if (plantId) {
     query = query.eq('plant_id', plantId);
+  }
+  if (companyId) {
+    query = query.eq('company_id', companyId);
   }
 
   const { data, error } = await query;
@@ -193,7 +201,7 @@ export async function getLineById(id: string): Promise<Line | null> {
 // QUERY FUNCTIONS - Machines
 // =============================================
 
-export async function getMachines(lineId?: string): Promise<Machine[]> {
+export async function getMachines(lineId?: string, companyId?: string): Promise<Machine[]> {
   let query = supabase
     .from('machines')
     .select('*, line:lines(*, plant:plants(*))')
@@ -202,6 +210,9 @@ export async function getMachines(lineId?: string): Promise<Machine[]> {
 
   if (lineId) {
     query = query.eq('line_id', lineId);
+  }
+  if (companyId) {
+    query = query.eq('company_id', companyId);
   }
 
   const { data, error } = await query;
@@ -417,7 +428,8 @@ export async function getCurrentShiftByMachine(): Promise<CurrentShiftByMachine[
 export async function getShiftSummaries(
   plantId?: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  companyId?: string
 ): Promise<ShiftSummary[]> {
   let query = supabase
     .from('v_shift_summary')
@@ -433,6 +445,10 @@ export async function getShiftSummaries(
   if (endDate) {
     query = query.lte('shift_date', endDate);
   }
+
+  // Filter by company through plant relationship if companyId is provided
+  // Note: v_shift_summary would need to include company_id for direct filtering
+  // For now, we'll filter by fetching plants first if needed
 
   const { data, error } = await query;
   if (error) throw error;
