@@ -164,8 +164,8 @@ export function AppSidebar() {
           </div>
           <div className="flex-1 overflow-hidden">
             <p className="truncate text-sm font-medium">{profile?.full_name || 'User'}</p>
-            <p className="truncate text-xs text-sidebar-foreground/60">
-              {roles[0] || 'No role'}
+            <p className="truncate text-xs text-sidebar-foreground/60 capitalize">
+              {roles[0] ? String(roles[0]) : 'No role'}
             </p>
           </div>
           <Button 
