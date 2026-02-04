@@ -14,16 +14,433 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      defect_reasons: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
+      downtime_reasons: {
+        Row: {
+          category: Database["public"]["Enums"]["downtime_category"]
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["downtime_category"]
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["downtime_category"]
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
+      lines: {
+        Row: {
+          code: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          plant_id: string
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          plant_id: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          plant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lines_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machines: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          ideal_cycle_time_seconds: number
+          is_active: boolean
+          line_id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          ideal_cycle_time_seconds?: number
+          is_active?: boolean
+          line_id: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          ideal_cycle_time_seconds?: number
+          is_active?: boolean
+          line_id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machines_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oee_snapshots: {
+        Row: {
+          availability: number | null
+          created_at: string
+          downtime_minutes: number | null
+          good_qty: number | null
+          id: string
+          oee: number | null
+          performance: number | null
+          period: Database["public"]["Enums"]["oee_period"]
+          period_end: string
+          period_start: string
+          planned_time_minutes: number | null
+          quality: number | null
+          reject_qty: number | null
+          run_time_minutes: number | null
+          scope: Database["public"]["Enums"]["oee_scope"]
+          scope_id: string
+        }
+        Insert: {
+          availability?: number | null
+          created_at?: string
+          downtime_minutes?: number | null
+          good_qty?: number | null
+          id?: string
+          oee?: number | null
+          performance?: number | null
+          period: Database["public"]["Enums"]["oee_period"]
+          period_end: string
+          period_start: string
+          planned_time_minutes?: number | null
+          quality?: number | null
+          reject_qty?: number | null
+          run_time_minutes?: number | null
+          scope: Database["public"]["Enums"]["oee_scope"]
+          scope_id: string
+        }
+        Update: {
+          availability?: number | null
+          created_at?: string
+          downtime_minutes?: number | null
+          good_qty?: number | null
+          id?: string
+          oee?: number | null
+          performance?: number | null
+          period?: Database["public"]["Enums"]["oee_period"]
+          period_end?: string
+          period_start?: string
+          planned_time_minutes?: number | null
+          quality?: number | null
+          reject_qty?: number | null
+          run_time_minutes?: number | null
+          scope?: Database["public"]["Enums"]["oee_scope"]
+          scope_id?: string
+        }
+        Relationships: []
+      }
+      plants: {
+        Row: {
+          code: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      shift_calendar: {
+        Row: {
+          created_at: string
+          id: string
+          planned_time_minutes: number
+          plant_id: string
+          shift_date: string
+          shift_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          planned_time_minutes?: number
+          plant_id: string
+          shift_date: string
+          shift_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          planned_time_minutes?: number
+          plant_id?: string
+          shift_date?: string
+          shift_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_calendar_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_calendar_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shifts: {
+        Row: {
+          created_at: string
+          end_time: string
+          id: string
+          is_active: boolean
+          name: string
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          end_time: string
+          id?: string
+          is_active?: boolean
+          name: string
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          end_time?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          start_time?: string
+        }
+        Relationships: []
+      }
+      user_line_permissions: {
+        Row: {
+          created_at: string
+          id: string
+          line_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_line_permissions_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_machine_permissions: {
+        Row: {
+          created_at: string
+          id: string
+          machine_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          machine_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          machine_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_machine_permissions_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_plant_permissions: {
+        Row: {
+          created_at: string
+          id: string
+          plant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          plant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          plant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_plant_permissions_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_profiles: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_line_permission: {
+        Args: { _line_id: string; _user_id: string }
+        Returns: boolean
+      }
+      has_machine_permission: {
+        Args: { _machine_id: string; _user_id: string }
+        Returns: boolean
+      }
+      has_plant_permission: {
+        Args: { _plant_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "STAFF" | "SUPERVISOR" | "EXECUTIVE" | "ADMIN"
+      approval_status: "DRAFT" | "APPROVED" | "LOCKED"
+      downtime_category: "PLANNED" | "UNPLANNED" | "BREAKDOWN" | "CHANGEOVER"
+      event_type: "RUN" | "DOWNTIME" | "SETUP"
+      oee_period: "SHIFT" | "DAY"
+      oee_scope: "MACHINE" | "LINE" | "PLANT"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +567,13 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["STAFF", "SUPERVISOR", "EXECUTIVE", "ADMIN"],
+      approval_status: ["DRAFT", "APPROVED", "LOCKED"],
+      downtime_category: ["PLANNED", "UNPLANNED", "BREAKDOWN", "CHANGEOVER"],
+      event_type: ["RUN", "DOWNTIME", "SETUP"],
+      oee_period: ["SHIFT", "DAY"],
+      oee_scope: ["MACHINE", "LINE", "PLANT"],
+    },
   },
 } as const
