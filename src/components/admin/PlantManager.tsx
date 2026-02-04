@@ -167,6 +167,10 @@ export function PlantManager() {
       toast.error('Plant name is required');
       return;
     }
+    if (!formData.company_id) {
+      toast.error('Company is required');
+      return;
+    }
     if (editingPlant) {
       updateMutation.mutate({ id: editingPlant.id, data: formData });
     } else {
@@ -273,16 +277,15 @@ export function PlantManager() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="company">Company</Label>
+              <Label htmlFor="company">Company *</Label>
               <Select 
-                value={formData.company_id || "__none__"} 
-                onValueChange={(v) => setFormData({ ...formData, company_id: v === "__none__" ? "" : v })}
+                value={formData.company_id} 
+                onValueChange={(v) => setFormData({ ...formData, company_id: v })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select company" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">No company</SelectItem>
                   {companies?.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name} {company.code && `(${company.code})`}
