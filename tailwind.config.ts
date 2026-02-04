@@ -57,6 +57,28 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // OEE Metric Colors
+        oee: {
+          availability: "hsl(var(--oee-availability))",
+          performance: "hsl(var(--oee-performance))",
+          quality: "hsl(var(--oee-quality))",
+          overall: "hsl(var(--oee-overall))",
+        },
+        // Machine Status Colors
+        status: {
+          running: "hsl(var(--status-running))",
+          idle: "hsl(var(--status-idle))",
+          stopped: "hsl(var(--status-stopped))",
+          maintenance: "hsl(var(--status-maintenance))",
+        },
+        // Chart Colors
+        chart: {
+          1: "hsl(var(--chart-1))",
+          2: "hsl(var(--chart-2))",
+          3: "hsl(var(--chart-3))",
+          4: "hsl(var(--chart-4))",
+          5: "hsl(var(--chart-5))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -65,25 +87,22 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "pulse-slow": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.7" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-slow": "pulse-slow 2s ease-in-out infinite",
       },
     },
   },
