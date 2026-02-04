@@ -10,6 +10,7 @@ import {
   ComposedChart,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface DowntimeData {
   reason: string;
@@ -24,17 +25,37 @@ interface ParetoChartProps {
   isLoading?: boolean;
 }
 
+function ChartSkeleton() {
+  return (
+    <div className="h-[300px] flex flex-col">
+      <div className="flex-1 flex items-end gap-2 px-8 pb-8">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex-1 flex flex-col justify-end">
+            <Skeleton 
+              className="w-full rounded-t" 
+              style={{ height: `${90 - i * 12}%` }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 px-8">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="flex-1 h-3" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ParetoChart({ data, title = 'Pareto Downtime Analysis', isLoading }: ParetoChartProps) {
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">{title}</CardTitle>
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-3 bg-muted/30">
+          <CardTitle className="text-base sm:text-lg font-semibold">{title}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="h-[300px] flex items-center justify-center">
-            <div className="animate-pulse text-muted-foreground">Loading...</div>
-          </div>
+        <CardContent className="pt-5">
+          <ChartSkeleton />
         </CardContent>
       </Card>
     );
@@ -42,11 +63,11 @@ export function ParetoChart({ data, title = 'Pareto Downtime Analysis', isLoadin
 
   if (!data || data.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">{title}</CardTitle>
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-3 bg-muted/30">
+          <CardTitle className="text-base sm:text-lg font-semibold">{title}</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-5">
           <div className="h-[300px] flex items-center justify-center text-muted-foreground">
             No downtime data available
           </div>
@@ -56,11 +77,11 @@ export function ParetoChart({ data, title = 'Pareto Downtime Analysis', isLoadin
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">{title}</CardTitle>
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-3 bg-muted/30">
+        <CardTitle className="text-base sm:text-lg font-semibold">{title}</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-5">
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>

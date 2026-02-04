@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
+import { TimelineSkeleton } from '@/components/ui/skeletons';
 import { Play, Pause, Wrench, Clock, Timer } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 import { th } from 'date-fns/locale';
@@ -14,23 +14,23 @@ interface EventTimelineProps {
 
 const eventTypeConfig = {
   RUN: { 
-    color: 'bg-green-500', 
-    bgColor: 'bg-green-50', 
-    borderColor: 'border-green-200',
+    color: 'bg-status-running', 
+    bgColor: 'bg-status-running/5', 
+    borderColor: 'border-status-running/20',
     icon: Play, 
     label: 'Running' 
   },
   DOWNTIME: { 
-    color: 'bg-red-500', 
-    bgColor: 'bg-red-50', 
-    borderColor: 'border-red-200',
+    color: 'bg-status-stopped', 
+    bgColor: 'bg-status-stopped/5', 
+    borderColor: 'border-status-stopped/20',
     icon: Pause, 
     label: 'Downtime' 
   },
   SETUP: { 
-    color: 'bg-yellow-500', 
-    bgColor: 'bg-yellow-50', 
-    borderColor: 'border-yellow-200',
+    color: 'bg-status-idle', 
+    bgColor: 'bg-status-idle/5', 
+    borderColor: 'border-status-idle/20',
     icon: Wrench, 
     label: 'Setup' 
   },
@@ -38,19 +38,7 @@ const eventTypeConfig = {
 
 export function EventTimeline({ events, isLoading = false }: EventTimelineProps) {
   if (isLoading) {
-    return (
-      <div className="space-y-4">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="flex gap-3">
-            <Skeleton className="h-10 w-10 rounded-full shrink-0" />
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-full" />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+    return <TimelineSkeleton items={4} />;
   }
 
   if (events.length === 0) {

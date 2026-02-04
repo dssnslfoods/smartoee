@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ShiftCardSkeleton } from '@/components/ui/skeletons';
 import { OEEMetricsPanel } from '@/components/supervisor/OEEMetricsPanel';
 import { ApprovalControls } from '@/components/supervisor/ApprovalControls';
 import { AuditLogViewer } from '@/components/supervisor/AuditLogViewer';
@@ -251,14 +252,11 @@ export default function Supervisor() {
 
             <TabsContent value="shifts" className="space-y-4 mt-0">
               {loadingSummaries ? (
-                <Card>
-                  <CardContent className="flex items-center justify-center py-16">
-                    <div className="flex flex-col items-center gap-4">
-                      <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-                      <p className="text-sm text-muted-foreground">กำลังโหลดข้อมูล...</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="space-y-4">
+                  {Array.from({ length: 2 }).map((_, i) => (
+                    <ShiftCardSkeleton key={i} />
+                  ))}
+                </div>
               ) : shiftSummaries.length === 0 ? (
                 <Card className="border-dashed">
                   <CardContent className="flex flex-col items-center justify-center py-16 text-center">

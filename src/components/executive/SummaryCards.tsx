@@ -1,5 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { OEEGauge } from '@/components/dashboard/OEEGauge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -31,6 +32,20 @@ function TrendIndicator({ current, previous }: { current: number; previous?: num
   );
 }
 
+function SummaryCardSkeleton({ borderColor }: { borderColor: string }) {
+  return (
+    <Card className={cn('border-l-4', borderColor)}>
+      <CardContent className="p-6">
+        <div className="flex flex-col items-center space-y-3">
+          <Skeleton className="h-20 w-20 rounded-full" />
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function SummaryCards({ current, previous, isLoading }: SummaryCardsProps) {
   const metrics = [
     { key: 'availability', label: 'Availability', color: 'availability' as const, borderColor: 'border-l-oee-availability' },
@@ -43,14 +58,7 @@ export function SummaryCards({ current, previous, isLoading }: SummaryCardsProps
     return (
       <div className="grid gap-4 md:grid-cols-4">
         {metrics.map((m) => (
-          <Card key={m.key} className={cn('border-l-4', m.borderColor)}>
-            <CardContent className="p-6">
-              <div className="animate-pulse space-y-3">
-                <div className="h-20 w-20 mx-auto rounded-full bg-muted" />
-                <div className="h-4 w-24 mx-auto bg-muted rounded" />
-              </div>
-            </CardContent>
-          </Card>
+          <SummaryCardSkeleton key={m.key} borderColor={m.borderColor} />
         ))}
       </div>
     );
