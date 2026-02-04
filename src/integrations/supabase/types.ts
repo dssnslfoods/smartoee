@@ -128,6 +128,7 @@ export type Database = {
       lines: {
         Row: {
           code: string | null
+          company_id: string
           created_at: string
           id: string
           is_active: boolean
@@ -137,6 +138,7 @@ export type Database = {
         }
         Insert: {
           code?: string | null
+          company_id: string
           created_at?: string
           id?: string
           is_active?: boolean
@@ -146,6 +148,7 @@ export type Database = {
         }
         Update: {
           code?: string | null
+          company_id?: string
           created_at?: string
           id?: string
           is_active?: boolean
@@ -154,6 +157,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lines_plant_id_fkey"
             columns: ["plant_id"]
@@ -180,6 +190,7 @@ export type Database = {
       machines: {
         Row: {
           code: string
+          company_id: string
           created_at: string
           id: string
           ideal_cycle_time_seconds: number
@@ -190,6 +201,7 @@ export type Database = {
         }
         Insert: {
           code: string
+          company_id: string
           created_at?: string
           id?: string
           ideal_cycle_time_seconds?: number
@@ -200,6 +212,7 @@ export type Database = {
         }
         Update: {
           code?: string
+          company_id?: string
           created_at?: string
           id?: string
           ideal_cycle_time_seconds?: number
@@ -209,6 +222,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "machines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "machines_line_id_fkey"
             columns: ["line_id"]
