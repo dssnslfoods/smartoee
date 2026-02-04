@@ -7,9 +7,11 @@ import { OEETrendChart } from '@/components/dashboard/OEETrendChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { OEECardSkeleton, StatsCardSkeleton, MachineCardSkeleton, ChartCardSkeleton } from '@/components/ui/skeletons';
-import { Calendar, Factory, TrendingUp, AlertTriangle, LayoutDashboard, Play, Pause, Wrench } from 'lucide-react';
+import { Calendar, Factory, TrendingUp, AlertTriangle, LayoutDashboard, Play, Pause, Wrench, Building2 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { Badge } from '@/components/ui/badge';
 
-// Mock data - will be replaced with Supabase queries
+// Mock data - will be replaced with Supabase queries filtered by company
 const mockOEEData = {
   availability: 87.5,
   performance: 92.3,
@@ -37,6 +39,12 @@ const mockTrendData = [
 ];
 
 export default function Dashboard() {
+  const { company, isAdmin } = useAuth();
+
+  // Company context for data filtering (will be used when connected to real data)
+  const companyId = company?.id;
+  const companyName = company?.name;
+
   return (
     <AppLayout>
       <div className="page-container space-y-6">
@@ -46,6 +54,13 @@ export default function Dashboard() {
           description="Real-time production performance monitoring"
           icon={LayoutDashboard}
         >
+          {/* Company indicator for admin users */}
+          {isAdmin() && company && (
+            <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary/5 border-primary/20">
+              <Building2 className="h-3.5 w-3.5" />
+              {companyName}
+            </Badge>
+          )}
           <Select defaultValue="today">
             <SelectTrigger className="w-[140px] sm:w-[160px] bg-background">
               <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
