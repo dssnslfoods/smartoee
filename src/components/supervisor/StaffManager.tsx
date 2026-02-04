@@ -80,28 +80,20 @@ export function StaffManager() {
     enabled: !!profile?.company_id,
   });
 
-  // Create staff user mutation
+  // Create staff user mutation via edge function (doesn't affect current session)
   const createStaffMutation = useMutation({
     mutationFn: async ({ email, password, fullName }: { email: string; password: string; fullName: string }) => {
       if (!profile?.company_id) throw new Error('ไม่พบข้อมูลบริษัท');
 
-      // Sign up the user with metadata
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: 'STAFF',
-            company_id: profile.company_id,
-          },
-        },
+      // Call edge function to create user without affecting current session
+      const { data, error } = await supabase.functions.invoke('create-staff-user', {
+        body: { email, password, fullName },
       });
       
-      if (signUpError) throw signUpError;
-      if (!authData.user) throw new Error('ไม่สามารถสร้างผู้ใช้ได้');
+      if (error) throw new Error(error.message);
+      if (!data.success) throw new Error(data.message || 'ไม่สามารถสร้างผู้ใช้ได้');
 
-      return authData.user;
+      return data.user;
     },
     onSuccess: () => {
       toast({ title: 'สำเร็จ', description: 'สร้างผู้ใช้ Staff เรียบร้อยแล้ว' });
