@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { PlantLineSelector } from '@/components/shopfloor/PlantLineSelector';
 import { MachineSelector } from '@/components/shopfloor/MachineSelector';
 import { CurrentShiftBanner } from '@/components/shopfloor/CurrentShiftBanner';
@@ -42,83 +43,71 @@ import type {
 export default function Shopfloor() {
   const queryClient = useQueryClient();
   
-  // Selection state
   const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState('capture');
 
-  // Check authentication
   useEffect(() => {
     getSession().then(session => {
       setIsAuthenticated(!!session);
     });
   }, []);
 
-  // Fetch plants
   const { data: plants = [], isLoading: plantsLoading } = useQuery({
     queryKey: ['plants'],
     queryFn: getPlants,
     enabled: isAuthenticated === true,
   });
 
-  // Fetch lines for selected plant
   const { data: lines = [], isLoading: linesLoading } = useQuery({
     queryKey: ['lines', selectedPlantId],
     queryFn: () => getLines(selectedPlantId!),
     enabled: !!selectedPlantId,
   });
 
-  // Fetch machines for selected line
   const { data: machines = [], isLoading: machinesLoading } = useQuery({
     queryKey: ['machines', selectedLineId],
     queryFn: () => getMachines(selectedLineId!),
     enabled: !!selectedLineId,
   });
 
-  // Fetch today's shift calendar
   const { data: shiftCalendar = [], isLoading: shiftLoading } = useQuery({
     queryKey: ['shiftCalendar', selectedPlantId],
     queryFn: () => getTodayShiftCalendar(selectedPlantId!),
     enabled: !!selectedPlantId,
-    refetchInterval: 60000, // Refresh every minute
+    refetchInterval: 60000,
   });
 
-  // Current shift (first one for today)
   const currentShift = shiftCalendar[0] as ShiftCalendar | undefined;
-  const isLocked = currentShift?.shift?.is_active === false; // TODO: Get from shift_approvals
+  const isLocked = currentShift?.shift?.is_active === false;
 
-  // Fetch current event for selected machine
   const { data: currentEvent, isLoading: eventLoading } = useQuery({
     queryKey: ['currentEvent', selectedMachineId],
     queryFn: () => getCurrentEvent(selectedMachineId!),
     enabled: !!selectedMachineId,
-    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchInterval: 5000,
   });
 
-  // Fetch production events for timeline
   const { data: events = [], isLoading: eventsLoading } = useQuery({
     queryKey: ['productionEvents', selectedMachineId, currentShift?.id],
     queryFn: () => getProductionEvents(selectedMachineId!, currentShift?.id),
     enabled: !!selectedMachineId && !!currentShift?.id,
   });
 
-  // Fetch downtime reasons
   const { data: downtimeReasons = [] } = useQuery({
     queryKey: ['downtimeReasons'],
     queryFn: () => getDowntimeReasons(),
     enabled: isAuthenticated === true,
   });
 
-  // Fetch defect reasons
   const { data: defectReasons = [] } = useQuery({
     queryKey: ['defectReasons'],
     queryFn: () => getDefectReasons(),
     enabled: isAuthenticated === true,
   });
 
-  // Start event mutation
   const startEventMutation = useMutation({
     mutationFn: async ({ eventType, reasonId, notes }: { eventType: EventType; reasonId?: string; notes?: string }) => {
       return startEvent(selectedMachineId!, eventType, reasonId, notes);
@@ -137,7 +126,6 @@ export default function Shopfloor() {
     },
   });
 
-  // Stop event mutation
   const stopEventMutation = useMutation({
     mutationFn: async (notes?: string) => {
       return stopEvent(selectedMachineId!, notes);
@@ -156,7 +144,6 @@ export default function Shopfloor() {
     },
   });
 
-  // Add counts mutation
   const addCountsMutation = useMutation({
     mutationFn: async ({ goodQty, rejectQty, defectReasonId, notes }: { 
       goodQty: number; 
@@ -179,7 +166,6 @@ export default function Shopfloor() {
     },
   });
 
-  // Reset selections when parent changes
   useEffect(() => {
     setSelectedLineId(null);
     setSelectedMachineId(null);
@@ -189,7 +175,6 @@ export default function Shopfloor() {
     setSelectedMachineId(null);
   }, [selectedLineId]);
 
-  // Selected entities
   const selectedPlant = plants.find(p => p.id === selectedPlantId);
   const selectedLine = lines.find(l => l.id === selectedLineId);
   const selectedMachine = machines.find(m => m.id === selectedMachineId);
@@ -197,8 +182,14 @@ export default function Shopfloor() {
   if (isAuthenticated === null) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center h-full">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex items-center justify-center h-full min-h-[400px]">
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative">
+              <div className="h-12 w-12 rounded-full border-4 border-muted" />
+              <div className="absolute inset-0 h-12 w-12 animate-spin rounded-full border-4 border-transparent border-t-primary" />
+            </div>
+            <p className="text-sm font-medium text-muted-foreground">Loading...</p>
+          </div>
         </div>
       </AppLayout>
     );
@@ -207,10 +198,14 @@ export default function Shopfloor() {
   if (isAuthenticated === false) {
     return (
       <AppLayout>
-        <div className="flex flex-col items-center justify-center h-full gap-4">
-          <Factory className="h-16 w-16 text-muted-foreground" />
-          <h2 className="text-xl font-semibold">กรุณาเข้าสู่ระบบ</h2>
-          <p className="text-muted-foreground">คุณต้องเข้าสู่ระบบก่อนใช้งาน Shopfloor</p>
+        <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-6 p-4">
+          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-muted">
+            <Factory className="h-10 w-10 text-muted-foreground" />
+          </div>
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-2">กรุณาเข้าสู่ระบบ</h2>
+            <p className="text-muted-foreground">คุณต้องเข้าสู่ระบบก่อนใช้งาน Shopfloor</p>
+          </div>
         </div>
       </AppLayout>
     );
@@ -218,33 +213,36 @@ export default function Shopfloor() {
 
   return (
     <AppLayout>
-      <div className="container mx-auto p-4 lg:p-6 space-y-4">
+      <div className="page-container space-y-5">
         {/* Header */}
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl lg:text-3xl font-bold flex items-center gap-2">
-            <Factory className="h-7 w-7" />
-            Shopfloor
-          </h1>
-          <p className="text-muted-foreground">
-            บันทึกเหตุการณ์และจำนวนผลิต
-          </p>
-        </div>
+        <PageHeader 
+          title="Shopfloor" 
+          description="บันทึกเหตุการณ์และจำนวนผลิต"
+          icon={Factory}
+        />
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="capture" className="flex items-center gap-2">
+          <TabsList className="bg-muted/50 p-1">
+            <TabsTrigger 
+              value="capture" 
+              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
               <Activity className="h-4 w-4" />
-              บันทึกเหตุการณ์
+              <span className="hidden sm:inline">บันทึกเหตุการณ์</span>
+              <span className="sm:hidden">บันทึก</span>
             </TabsTrigger>
-            <TabsTrigger value="my-machines" className="flex items-center gap-2">
+            <TabsTrigger 
+              value="my-machines" 
+              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
               <Monitor className="h-4 w-4" />
-              เครื่องจักรของฉัน
+              <span className="hidden sm:inline">เครื่องจักรของฉัน</span>
+              <span className="sm:hidden">เครื่องจักร</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="capture" className="space-y-4 mt-4">
-            {/* Locked Banner */}
+          <TabsContent value="capture" className="space-y-5 mt-5">
             {isLocked && <LockedBanner />}
 
             {/* Plant/Line/Machine Selection */}
@@ -267,7 +265,6 @@ export default function Shopfloor() {
               />
             </div>
 
-            {/* Current Shift Banner */}
             {currentShift && (
               <CurrentShiftBanner 
                 shiftCalendar={currentShift} 
@@ -275,25 +272,27 @@ export default function Shopfloor() {
               />
             )}
 
-            {/* Main Content - Only show when machine selected */}
             {selectedMachineId && selectedMachine && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Left Column - Event Controls & Counts */}
-                <div className="space-y-4">
-                  {/* Event Controls */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <Activity className="h-5 w-5" />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div className="space-y-5">
+                  <Card className="overflow-hidden">
+                    <CardHeader className="pb-3 bg-muted/30">
+                      <CardTitle className="flex items-center gap-3 text-base sm:text-lg">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                          <Activity className="h-5 w-5 text-primary" />
+                        </div>
                         สถานะเครื่องจักร
                         {currentEvent && (
-                          <Badge variant={currentEvent.event_type === 'RUN' ? 'default' : 'destructive'}>
+                          <Badge 
+                            variant={currentEvent.event_type === 'RUN' ? 'default' : 'destructive'}
+                            className="font-medium"
+                          >
                             {currentEvent.event_type}
                           </Badge>
                         )}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-5">
                       <EventControls
                         currentEvent={currentEvent}
                         downtimeReasons={downtimeReasons}
@@ -311,15 +310,16 @@ export default function Shopfloor() {
                     </CardContent>
                   </Card>
 
-                  {/* Add Counts */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <Package className="h-5 w-5" />
+                  <Card className="overflow-hidden">
+                    <CardHeader className="pb-3 bg-muted/30">
+                      <CardTitle className="flex items-center gap-3 text-base sm:text-lg">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-running/10">
+                          <Package className="h-5 w-5 text-status-running" />
+                        </div>
                         บันทึกจำนวนผลิต
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-5">
                       <AddCountsForm
                         defectReasons={defectReasons}
                         onSubmit={(data) => addCountsMutation.mutate(data)}
@@ -330,12 +330,11 @@ export default function Shopfloor() {
                   </Card>
                 </div>
 
-                {/* Right Column - Timeline */}
-                <Card className="h-fit">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Timeline เหตุการณ์วันนี้</CardTitle>
+                <Card className="h-fit overflow-hidden">
+                  <CardHeader className="pb-3 bg-muted/30">
+                    <CardTitle className="text-base sm:text-lg">Timeline เหตุการณ์วันนี้</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="pt-5">
                     <EventTimeline
                       events={events}
                       isLoading={eventsLoading}
@@ -345,13 +344,14 @@ export default function Shopfloor() {
               </div>
             )}
 
-            {/* Empty State */}
             {!selectedMachineId && (
-              <Card className="py-12">
-                <CardContent className="flex flex-col items-center justify-center text-center">
-                  <Factory className="h-16 w-16 text-muted-foreground mb-4" />
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-6">
+                    <Factory className="h-8 w-8 text-muted-foreground" />
+                  </div>
                   <h3 className="text-lg font-medium mb-2">เลือกเครื่องจักร</h3>
-                  <p className="text-muted-foreground max-w-md">
+                  <p className="text-muted-foreground max-w-sm">
                     กรุณาเลือก Plant, Line และ Machine เพื่อเริ่มบันทึกเหตุการณ์
                   </p>
                 </CardContent>
@@ -359,7 +359,7 @@ export default function Shopfloor() {
             )}
           </TabsContent>
 
-          <TabsContent value="my-machines" className="mt-4">
+          <TabsContent value="my-machines" className="mt-5">
             <MyMachinesViewer />
           </TabsContent>
         </Tabs>

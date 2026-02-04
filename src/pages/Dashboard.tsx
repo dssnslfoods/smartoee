@@ -1,10 +1,11 @@
 import { AppLayout } from '@/components/layout/AppLayout';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { OEEGauge } from '@/components/dashboard/OEEGauge';
 import { MachineStatusCard } from '@/components/dashboard/MachineStatusCard';
 import { OEETrendChart } from '@/components/dashboard/OEETrendChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Factory, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Calendar, Factory, TrendingUp, AlertTriangle, LayoutDashboard, Play, Pause, Wrench } from 'lucide-react';
 
 // Mock data - will be replaced with Supabase queries
 const mockOEEData = {
@@ -36,51 +37,47 @@ const mockTrendData = [
 export default function Dashboard() {
   return (
     <AppLayout>
-      <div className="p-6 space-y-6">
+      <div className="page-container space-y-6">
         {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">OEE Dashboard</h1>
-            <p className="text-sm text-muted-foreground">
-              Real-time production performance monitoring
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Select defaultValue="today">
-              <SelectTrigger className="w-[180px]">
-                <Calendar className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Select period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select defaultValue="all">
-              <SelectTrigger className="w-[180px]">
-                <Factory className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Select line" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Lines</SelectItem>
-                <SelectItem value="line1">Line 1</SelectItem>
-                <SelectItem value="line2">Line 2</SelectItem>
-                <SelectItem value="line3">Line 3</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <PageHeader 
+          title="OEE Dashboard" 
+          description="Real-time production performance monitoring"
+          icon={LayoutDashboard}
+        >
+          <Select defaultValue="today">
+            <SelectTrigger className="w-[140px] sm:w-[160px] bg-background">
+              <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+              <SelectValue placeholder="Select period" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">This Week</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select defaultValue="all">
+            <SelectTrigger className="w-[140px] sm:w-[160px] bg-background">
+              <Factory className="mr-2 h-4 w-4 text-muted-foreground" />
+              <SelectValue placeholder="Select line" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Lines</SelectItem>
+              <SelectItem value="line1">Line 1</SelectItem>
+              <SelectItem value="line2">Line 2</SelectItem>
+              <SelectItem value="line3">Line 3</SelectItem>
+            </SelectContent>
+          </Select>
+        </PageHeader>
 
         {/* OEE Summary Cards */}
-        <div className="grid gap-6 md:grid-cols-4">
-          <Card className="border-l-4 border-l-oee-availability">
-            <CardContent className="flex items-center justify-between p-6">
-              <div className="flex items-center gap-4">
+        <div className="grid gap-4 sm:gap-5 grid-cols-2 lg:grid-cols-4">
+          <Card className="relative overflow-hidden border-l-4 border-l-oee-availability">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-center gap-3 sm:gap-4">
                 <OEEGauge value={mockOEEData.availability} label="" color="availability" size="sm" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Availability</p>
-                  <p className="text-2xl font-bold text-oee-availability">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground">Availability</p>
+                  <p className="text-xl sm:text-2xl font-bold text-oee-availability">
                     {mockOEEData.availability}%
                   </p>
                 </div>
@@ -88,13 +85,13 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-oee-performance">
-            <CardContent className="flex items-center justify-between p-6">
-              <div className="flex items-center gap-4">
+          <Card className="relative overflow-hidden border-l-4 border-l-oee-performance">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-center gap-3 sm:gap-4">
                 <OEEGauge value={mockOEEData.performance} label="" color="performance" size="sm" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Performance</p>
-                  <p className="text-2xl font-bold text-oee-performance">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground">Performance</p>
+                  <p className="text-xl sm:text-2xl font-bold text-oee-performance">
                     {mockOEEData.performance}%
                   </p>
                 </div>
@@ -102,13 +99,13 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-oee-quality">
-            <CardContent className="flex items-center justify-between p-6">
-              <div className="flex items-center gap-4">
+          <Card className="relative overflow-hidden border-l-4 border-l-oee-quality">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-center gap-3 sm:gap-4">
                 <OEEGauge value={mockOEEData.quality} label="" color="quality" size="sm" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Quality</p>
-                  <p className="text-2xl font-bold text-oee-quality">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground">Quality</p>
+                  <p className="text-xl sm:text-2xl font-bold text-oee-quality">
                     {mockOEEData.quality}%
                   </p>
                 </div>
@@ -116,13 +113,13 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-oee-overall bg-gradient-to-br from-card to-accent/20">
-            <CardContent className="flex items-center justify-between p-6">
-              <div className="flex items-center gap-4">
+          <Card className="relative overflow-hidden border-l-4 border-l-oee-overall bg-gradient-to-br from-card to-accent/30">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-center gap-3 sm:gap-4">
                 <OEEGauge value={mockOEEData.oee} label="" color="overall" size="sm" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Overall OEE</p>
-                  <p className="text-2xl font-bold text-oee-overall">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground">Overall OEE</p>
+                  <p className="text-xl sm:text-2xl font-bold text-oee-overall">
                     {mockOEEData.oee}%
                   </p>
                 </div>
@@ -132,65 +129,65 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardContent className="flex items-center gap-4 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-running/10">
-                <Factory className="h-5 w-5 text-status-running" />
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+          <Card className="transition-all hover:shadow-md">
+            <CardContent className="flex items-center gap-3 sm:gap-4 p-4">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-status-running/10">
+                <Play className="h-5 w-5 sm:h-6 sm:w-6 text-status-running" />
               </div>
-              <div>
-                <p className="text-2xl font-bold">4</p>
-                <p className="text-xs text-muted-foreground">Machines Running</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-4 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-idle/10">
-                <TrendingUp className="h-5 w-5 text-status-idle" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">1</p>
-                <p className="text-xs text-muted-foreground">Machines Idle</p>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold">4</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Machines Running</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="flex items-center gap-4 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-stopped/10">
-                <AlertTriangle className="h-5 w-5 text-status-stopped" />
+          <Card className="transition-all hover:shadow-md">
+            <CardContent className="flex items-center gap-3 sm:gap-4 p-4">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-status-idle/10">
+                <Pause className="h-5 w-5 sm:h-6 sm:w-6 text-status-idle" />
               </div>
-              <div>
-                <p className="text-2xl font-bold">1</p>
-                <p className="text-xs text-muted-foreground">Machines Stopped</p>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold">1</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Machines Idle</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="flex items-center gap-4 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-maintenance/10">
-                <AlertTriangle className="h-5 w-5 text-status-maintenance" />
+          <Card className="transition-all hover:shadow-md">
+            <CardContent className="flex items-center gap-3 sm:gap-4 p-4">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-status-stopped/10">
+                <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6 text-status-stopped" />
               </div>
-              <div>
-                <p className="text-2xl font-bold">1</p>
-                <p className="text-xs text-muted-foreground">In Maintenance</p>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold">1</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Machines Stopped</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="transition-all hover:shadow-md">
+            <CardContent className="flex items-center gap-3 sm:gap-4 p-4">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-status-maintenance/10">
+                <Wrench className="h-5 w-5 sm:h-6 sm:w-6 text-status-maintenance" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold">1</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">In Maintenance</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Charts and Machine Grid */}
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-5 lg:gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <OEETrendChart data={mockTrendData} title="Weekly OEE Trend" />
           </div>
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Machine Status</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base sm:text-lg font-semibold">Machine Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {mockMachines.slice(0, 4).map((machine) => (
-                <MachineStatusCard key={machine.code} {...machine} />
+                <MachineStatusCard key={machine.code} {...machine} compact />
               ))}
             </CardContent>
           </Card>
@@ -198,8 +195,8 @@ export default function Dashboard() {
 
         {/* All Machines Grid */}
         <div>
-          <h2 className="mb-4 text-lg font-semibold">All Machines</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <h2 className="text-lg font-semibold mb-4">All Machines</h2>
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {mockMachines.map((machine) => (
               <MachineStatusCard key={machine.code} {...machine} />
             ))}

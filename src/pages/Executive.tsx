@@ -1,13 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
-import { Calendar, RefreshCw } from 'lucide-react';
+import { Calendar, RefreshCw, BarChart3 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { OEETrendChart } from '@/components/dashboard/OEETrendChart';
 import {
   SummaryCards,
@@ -32,7 +33,6 @@ export default function Executive() {
   const currentLevel = drillPath.length === 0 ? 'plant' : drillPath[drillPath.length - 1].level;
   const currentId = drillPath.length === 0 ? undefined : drillPath[drillPath.length - 1].id;
 
-  // Fetch plants
   const { data: plants } = useQuery({
     queryKey: ['plants'],
     queryFn: async () => {
@@ -46,7 +46,6 @@ export default function Executive() {
     },
   });
 
-  // Fetch lines for selected plant
   const { data: lines } = useQuery({
     queryKey: ['lines', currentId],
     queryFn: async () => {
@@ -63,7 +62,6 @@ export default function Executive() {
     enabled: currentLevel === 'plant' && !!currentId,
   });
 
-  // Fetch machines for selected line
   const { data: machines } = useQuery({
     queryKey: ['machines', currentId],
     queryFn: async () => {
@@ -80,7 +78,6 @@ export default function Executive() {
     enabled: currentLevel === 'line' && !!currentId,
   });
 
-  // Fetch OEE snapshots based on drill level
   const { data: oeeData, isLoading: oeeLoading, refetch: refetchOee } = useQuery({
     queryKey: ['oee-snapshots', currentLevel, currentId, dateRange],
     queryFn: async () => {
@@ -90,19 +87,15 @@ export default function Executive() {
       let scopeIds: string[] | undefined;
 
       if (drillPath.length === 0) {
-        // Overview level - get all plants
         scope = 'PLANT';
         scopeIds = plants?.map(p => p.id);
       } else if (currentLevel === 'plant') {
-        // Viewing specific plant - show lines
         scope = 'LINE';
         scopeIds = lines?.map(l => l.id);
       } else if (currentLevel === 'line') {
-        // Viewing specific line - show machines
         scope = 'MACHINE';
         scopeIds = machines?.map(m => m.id);
       } else if (currentLevel === 'machine') {
-        // Viewing specific machine
         scope = 'MACHINE';
         scopeIds = currentId ? [currentId] : undefined;
       }
@@ -121,7 +114,6 @@ export default function Executive() {
 
       if (error) throw error;
 
-      // Calculate summary
       const summary = data && data.length > 0 ? {
         availability: data.reduce((sum, d) => sum + (d.availability || 0), 0) / data.length,
         performance: data.reduce((sum, d) => sum + (d.performance || 0), 0) / data.length,
@@ -134,13 +126,11 @@ export default function Executive() {
     enabled: plants !== undefined,
   });
 
-  // Fetch downtime data for Pareto
   const { data: downtimeData } = useQuery({
     queryKey: ['downtime-pareto', currentId, dateRange],
     queryFn: async () => {
       const startDate = subDays(new Date(), parseInt(dateRange));
       
-      // Get production events with downtime
       let query = supabase
         .from('production_events')
         .select(`
@@ -155,7 +145,6 @@ export default function Executive() {
         .gte('start_ts', startDate.toISOString())
         .not('end_ts', 'is', null);
 
-      // Filter by drill level
       if (currentId) {
         if (currentLevel === 'plant' || drillPath.find(p => p.level === 'plant')) {
           const plantId = drillPath.find(p => p.level === 'plant')?.id || currentId;
@@ -173,7 +162,6 @@ export default function Executive() {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Aggregate by reason
       const reasonMap = new Map<string, number>();
       data?.forEach(event => {
         const reasonName = (event.downtime_reasons as { name: string } | null)?.name || 'Unknown';
@@ -183,7 +171,6 @@ export default function Executive() {
         reasonMap.set(reasonName, (reasonMap.get(reasonName) || 0) + duration);
       });
 
-      // Sort and calculate cumulative
       const sorted = Array.from(reasonMap.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10);
@@ -203,11 +190,9 @@ export default function Executive() {
     },
   });
 
-  // Calculate trend data for chart
   const trendData = useMemo(() => {
     if (!oeeData?.snapshots) return [];
 
-    // Group by date
     const dateMap = new Map<string, { 
       availability: number[]; 
       performance: number[]; 
@@ -244,16 +229,12 @@ export default function Executive() {
     }));
   }, [oeeData?.snapshots]);
 
-  // Handle navigation
   const handleNavigate = (level: DrillLevel, id?: string) => {
     if (level === 'plant' && !id) {
-      // Back to overview
       setDrillPath([]);
     } else {
-      // Find index of level in path
       const index = drillPath.findIndex(p => p.level === level && p.id === id);
       if (index >= 0) {
-        // Navigate to existing path item
         setDrillPath(drillPath.slice(0, index + 1));
       }
     }
@@ -268,7 +249,6 @@ export default function Executive() {
     setDrillPath([...drillPath, { level: nextLevel, id, name }]);
   };
 
-  // Get drill-down items
   const drillItems = useMemo(() => {
     if (drillPath.length === 0 && plants) {
       return plants.map(p => ({ id: p.id, name: p.name, oee: undefined }));
@@ -286,36 +266,33 @@ export default function Executive() {
 
   return (
     <AppLayout>
-      <div className="container mx-auto p-4 space-y-6">
+      <div className="page-container space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Executive Dashboard</h1>
-            <p className="text-muted-foreground">OEE Overview & Analysis</p>
-          </div>
+        <PageHeader 
+          title="Executive Dashboard" 
+          description="OEE Overview & Analysis"
+          icon={BarChart3}
+        >
+          <Select value={dateRange} onValueChange={(v: '7' | '14' | '30') => setDateRange(v)}>
+            <SelectTrigger className="w-[140px] sm:w-[160px] bg-background">
+              <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 Days</SelectItem>
+              <SelectItem value="14">Last 14 Days</SelectItem>
+              <SelectItem value="30">Last 30 Days</SelectItem>
+            </SelectContent>
+          </Select>
 
-          <div className="flex flex-wrap gap-3">
-            <Select value={dateRange} onValueChange={(v: '7' | '14' | '30') => setDateRange(v)}>
-              <SelectTrigger className="w-[160px]">
-                <Calendar className="mr-2 h-4 w-4" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Last 7 Days</SelectItem>
-                <SelectItem value="14">Last 14 Days</SelectItem>
-                <SelectItem value="30">Last 30 Days</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Button variant="outline" onClick={() => refetchOee()}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
-        </div>
+          <Button variant="outline" onClick={() => refetchOee()} className="bg-background">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </PageHeader>
 
         {/* Breadcrumb Navigation */}
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-4">
             <DrillDownBreadcrumb items={drillPath} onNavigate={handleNavigate} />
           </CardContent>
@@ -328,7 +305,7 @@ export default function Executive() {
         />
 
         {/* Charts Row */}
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-5 lg:gap-6 lg:grid-cols-2">
           <OEETrendChart
             data={trendData}
             title={`OEE Trend (${dateRange} Days)`}
@@ -341,15 +318,15 @@ export default function Executive() {
 
         {/* Drill-Down Selector */}
         {drillItems.length > 0 && currentLevel !== 'machine' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3 bg-muted/30">
+              <CardTitle className="text-base sm:text-lg font-semibold">
                 {drillPath.length === 0 ? 'Select Plant' :
                  currentLevel === 'plant' ? 'Select Line' :
                  currentLevel === 'line' ? 'Select Machine' : 'Shifts'}
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-5">
               <DrillDownSelector
                 level={drillPath.length === 0 ? 'plant' : 
                        currentLevel === 'plant' ? 'line' : 
@@ -366,12 +343,12 @@ export default function Executive() {
 
         {/* Shift Details (when at machine level) */}
         {currentLevel === 'machine' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Shift History</CardTitle>
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3 bg-muted/30">
+              <CardTitle className="text-base sm:text-lg font-semibold">Shift History</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-muted-foreground text-center py-8">
+            <CardContent className="pt-5">
+              <div className="text-muted-foreground text-center py-12">
                 Select a shift from the Supervisor Dashboard to view details
               </div>
             </CardContent>
