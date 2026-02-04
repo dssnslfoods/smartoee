@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { CompanySwitcher } from './CompanySwitcher';
 
 interface NavItem {
   title: string;
@@ -58,7 +59,7 @@ const navItems: NavItem[] = [
 
 export function AppSidebar() {
   const { pathname } = useLocation();
-  const { profile, company, roles, signOut } = useAuth();
+  const { profile, company, roles, signOut, isAdmin } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -148,6 +149,16 @@ export function AppSidebar() {
         )}
       </div>
 
+      {/* Company Switcher for Admins */}
+      {isAdmin() && (
+        <div className={cn(
+          'border-b border-sidebar-border/50',
+          isCollapsed ? 'flex justify-center p-2' : 'p-3'
+        )}>
+          <CompanySwitcher isCollapsed={isCollapsed} />
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto p-3 scrollbar-thin">
         <div className="space-y-1">
@@ -192,7 +203,7 @@ export function AppSidebar() {
               <p className="truncate text-xs text-sidebar-foreground/50 font-medium">
                 {roles[0] || 'No role'}
               </p>
-              {company && (
+              {!isAdmin() && company && (
                 <p className="truncate text-xs text-sidebar-foreground/40 mt-0.5">
                   {company.name}
                 </p>
