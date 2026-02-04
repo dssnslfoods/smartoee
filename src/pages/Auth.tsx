@@ -3,7 +3,7 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Factory, Loader2, Mail, Lock, User } from "lucide-react";
+import { Factory, Loader2, Mail, Lock, User, Building2, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { CompanySelector } from "@/components/auth/CompanySelector";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -34,8 +35,9 @@ type SignupForm = z.infer<typeof signupSchema>;
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, isLoading, signIn, signUp } = useAuth();
+  const { user, isLoading, signIn, signUp, signOut, needsCompanySelection, selectCompanyForAdmin, isAdmin, profile } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSelectingCompany, setIsSelectingCompany] = useState(false);
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -55,7 +57,94 @@ export default function Auth() {
     );
   }
 
-  if (user) {
+  // User is logged in and is an admin that needs to select a company
+  if (user && isAdmin() && needsCompanySelection) {
+    return (
+      <div className="flex min-h-screen">
+        {/* Left side - Branding */}
+        <div className="hidden w-1/2 flex-col justify-between bg-sidebar p-12 lg:flex">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary">
+              <Factory className="h-6 w-6 text-sidebar-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-sidebar-foreground">PNF OEE System</h1>
+              <p className="text-xs text-sidebar-foreground/60">Manufacturing Excellence</p>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <h2 className="text-3xl font-bold text-sidebar-foreground">
+              Administrator
+              <br />
+              Access
+            </h2>
+            <p className="text-lg text-sidebar-foreground/80">
+              As an administrator, you can manage multiple companies. Please select which company you'd like to work with.
+            </p>
+            <div className="rounded-lg bg-sidebar-accent p-4">
+              <div className="flex items-center gap-3">
+                <Building2 className="h-8 w-8 text-primary" />
+                <div>
+                  <p className="font-medium text-sidebar-foreground">Multi-Company Access</p>
+                  <p className="text-sm text-sidebar-foreground/60">
+                    Switch between companies anytime from the sidebar
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-sm text-sidebar-foreground/40">
+            © 2026 PNF OEE System. Designed and Developed by Arnon Arpaket. All rights reserved.
+          </p>
+        </div>
+
+        {/* Right side - Company Selection */}
+        <div className="flex w-full items-center justify-center p-8 lg:w-1/2">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <Building2 className="h-6 w-6 text-primary" />
+              </div>
+              <CardTitle className="text-2xl">Select Company</CardTitle>
+              <CardDescription>
+                Welcome, {profile?.full_name || 'Administrator'}! Choose a company to manage.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CompanySelector
+                onSelectCompany={(company) => {
+                  setIsSelectingCompany(true);
+                  // Small delay for visual feedback
+                  setTimeout(() => {
+                    selectCompanyForAdmin(company);
+                    toast.success(`Working as ${company.name}`);
+                    navigate("/dashboard");
+                  }, 300);
+                }}
+                isLoading={isSelectingCompany}
+              />
+              
+              <div className="mt-6 border-t pt-4">
+                <Button
+                  variant="ghost"
+                  className="w-full text-muted-foreground"
+                  onClick={() => signOut()}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Sign out and use different account
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // User is logged in and doesn't need company selection
+  if (user && !needsCompanySelection) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -67,7 +156,8 @@ export default function Auth() {
         toast.error(error.message || "Failed to sign in");
       } else {
         toast.success("Welcome back!");
-        navigate("/dashboard");
+        // Navigation will be handled by the component re-render
+        // when needsCompanySelection is checked
       }
     } catch (error) {
       toast.error("An unexpected error occurred");

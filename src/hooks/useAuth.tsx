@@ -29,14 +29,19 @@ interface AuthContextType {
   company: Company | null;
   roles: AppRole[];
   isLoading: boolean;
+  needsCompanySelection: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  selectCompanyForAdmin: (company: Company) => void;
   hasRole: (role: AppRole) => boolean;
   isAdmin: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Storage key for admin's selected company
+const ADMIN_COMPANY_KEY = 'admin_selected_company';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -45,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [company, setCompany] = useState<Company | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [needsCompanySelection, setNeedsCompanySelection] = useState(false);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -62,6 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(null);
           setCompany(null);
           setRoles([]);
+          setNeedsCompanySelection(false);
+          // Clear admin company selection on logout
+          sessionStorage.removeItem(ADMIN_COMPANY_KEY);
         }
       }
     );
@@ -93,19 +102,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Set roles from profile - role is stored directly in user_profiles
         setRoles([profileData.role as AppRole]);
 
-        // Fetch company if company_id exists
-        if (profileData.company_id) {
-          const { data: companyData } = await supabase
-            .from('companies')
-            .select('id, name, code')
-            .eq('id', profileData.company_id)
-            .maybeSingle();
-          
-          if (companyData) {
-            setCompany(companyData as Company);
+        // Check if user is ADMIN
+        if (profileData.role === 'ADMIN') {
+          // Try to restore previously selected company from session storage
+          const savedCompany = sessionStorage.getItem(ADMIN_COMPANY_KEY);
+          if (savedCompany) {
+            try {
+              const parsedCompany = JSON.parse(savedCompany) as Company;
+              setCompany(parsedCompany);
+              setNeedsCompanySelection(false);
+            } catch {
+              // Invalid saved data, need to select company
+              setNeedsCompanySelection(true);
+              setCompany(null);
+            }
+          } else {
+            // Admin needs to select a company
+            setNeedsCompanySelection(true);
+            setCompany(null);
           }
         } else {
-          setCompany(null);
+          // Non-admin users: fetch company if company_id exists
+          setNeedsCompanySelection(false);
+          if (profileData.company_id) {
+            const { data: companyData } = await supabase
+              .from('companies')
+              .select('id, name, code')
+              .eq('id', profileData.company_id)
+              .maybeSingle();
+            
+            if (companyData) {
+              setCompany(companyData as Company);
+            }
+          } else {
+            setCompany(null);
+          }
         }
       }
     } catch (error) {
@@ -144,6 +175,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setCompany(null);
     setRoles([]);
+    setNeedsCompanySelection(false);
+    sessionStorage.removeItem(ADMIN_COMPANY_KEY);
+  };
+
+  const selectCompanyForAdmin = (selectedCompany: Company) => {
+    setCompany(selectedCompany);
+    setNeedsCompanySelection(false);
+    // Save to session storage for persistence during session
+    sessionStorage.setItem(ADMIN_COMPANY_KEY, JSON.stringify(selectedCompany));
   };
 
   const hasRole = (role: AppRole) => roles.includes(role);
@@ -159,9 +199,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         company,
         roles,
         isLoading,
+        needsCompanySelection,
         signIn,
         signUp,
         signOut,
+        selectCompanyForAdmin,
         hasRole,
         isAdmin,
       }}
