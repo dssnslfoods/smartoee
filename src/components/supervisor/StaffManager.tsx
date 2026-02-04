@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, User, Loader2 } from 'lucide-react';
+import { Plus, Trash2, User, Loader2, Settings } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,9 +32,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { MachinePermissionManager } from './MachinePermissionManager';
 
 interface StaffUser {
   id: string;
@@ -52,6 +54,7 @@ export function StaffManager() {
   
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [permissionUser, setPermissionUser] = useState<{ userId: string; name: string } | null>(null);
   const [newUserForm, setNewUserForm] = useState({
     email: '',
     password: '',
@@ -208,14 +211,33 @@ export function StaffManager() {
                     {new Date(user.created_at).toLocaleDateString('th-TH')}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setDeleteUserId(user.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setPermissionUser({ userId: user.user_id, name: user.full_name })}
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>กำหนดสิทธิเครื่องจักร</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteUserId(user.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>ลบผู้ใช้</TooltipContent>
+                      </Tooltip>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -302,6 +324,16 @@ export function StaffManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Machine Permission Manager */}
+      {permissionUser && (
+        <MachinePermissionManager
+          staffUserId={permissionUser.userId}
+          staffName={permissionUser.name}
+          isOpen={!!permissionUser}
+          onClose={() => setPermissionUser(null)}
+        />
+      )}
     </Card>
   );
 }
