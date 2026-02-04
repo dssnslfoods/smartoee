@@ -91,7 +91,7 @@ export default function Supervisor() {
     },
   });
 
-  const isSupervisor = hasRole('supervisor') || hasRole('admin');
+  const isSupervisor = hasRole('SUPERVISOR') || hasRole('ADMIN');
 
   return (
     <div className="min-h-screen bg-background">

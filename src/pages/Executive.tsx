@@ -285,7 +285,7 @@ export default function Executive() {
     return [];
   }, [drillPath.length, currentLevel, plants, lines, machines]);
 
-  const isExecutive = hasRole('executive') || hasRole('admin');
+  const isExecutive = hasRole('EXECUTIVE') || hasRole('ADMIN');
 
   return (
     <div className="min-h-screen bg-background">
