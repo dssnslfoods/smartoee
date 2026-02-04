@@ -8,10 +8,11 @@ import { EventControls } from '@/components/shopfloor/EventControls';
 import { AddCountsForm } from '@/components/shopfloor/AddCountsForm';
 import { EventTimeline } from '@/components/shopfloor/EventTimeline';
 import { LockedBanner } from '@/components/shopfloor/LockedBanner';
+import { MyMachinesViewer } from '@/components/shopfloor/MyMachinesViewer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Factory, Activity, Package } from 'lucide-react';
+import { Loader2, Factory, Activity, Package, Monitor } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getPlants,
@@ -46,6 +47,7 @@ export default function Shopfloor() {
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [activeTab, setActiveTab] = useState('capture');
 
   // Check authentication
   useEffect(() => {
@@ -221,126 +223,146 @@ export default function Shopfloor() {
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl lg:text-3xl font-bold flex items-center gap-2">
             <Factory className="h-7 w-7" />
-            Shopfloor Event Capture
+            Shopfloor
           </h1>
           <p className="text-muted-foreground">
             บันทึกเหตุการณ์และจำนวนผลิต
           </p>
         </div>
 
-        {/* Locked Banner */}
-        {isLocked && <LockedBanner />}
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="capture" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              บันทึกเหตุการณ์
+            </TabsTrigger>
+            <TabsTrigger value="my-machines" className="flex items-center gap-2">
+              <Monitor className="h-4 w-4" />
+              เครื่องจักรของฉัน
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Plant/Line/Machine Selection */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <PlantLineSelector
-            plants={plants}
-            lines={lines}
-            selectedPlantId={selectedPlantId}
-            selectedLineId={selectedLineId}
-            onPlantChange={setSelectedPlantId}
-            onLineChange={setSelectedLineId}
-            isLoading={plantsLoading || linesLoading}
-          />
-          <MachineSelector
-            machines={machines}
-            selectedMachineId={selectedMachineId}
-            onMachineChange={setSelectedMachineId}
-            isLoading={machinesLoading}
-            disabled={!selectedLineId}
-          />
-        </div>
+          <TabsContent value="capture" className="space-y-4 mt-4">
+            {/* Locked Banner */}
+            {isLocked && <LockedBanner />}
 
-        {/* Current Shift Banner */}
-        {currentShift && (
-          <CurrentShiftBanner 
-            shiftCalendar={currentShift} 
-            isLocked={isLocked}
-          />
-        )}
-
-        {/* Main Content - Only show when machine selected */}
-        {selectedMachineId && selectedMachine && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Left Column - Event Controls & Counts */}
-            <div className="space-y-4">
-              {/* Event Controls */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Activity className="h-5 w-5" />
-                    สถานะเครื่องจักร
-                    {currentEvent && (
-                      <Badge variant={currentEvent.event_type === 'RUN' ? 'default' : 'destructive'}>
-                        {currentEvent.event_type}
-                      </Badge>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <EventControls
-                    currentEvent={currentEvent}
-                    downtimeReasons={downtimeReasons}
-                    onStartRun={() => startEventMutation.mutate({ eventType: 'RUN' })}
-                    onStartDowntime={(reasonId, notes) => 
-                      startEventMutation.mutate({ eventType: 'DOWNTIME', reasonId, notes })
-                    }
-                    onStartSetup={(reasonId, notes) => 
-                      startEventMutation.mutate({ eventType: 'SETUP', reasonId, notes })
-                    }
-                    onStop={(notes) => stopEventMutation.mutate(notes)}
-                    isLoading={startEventMutation.isPending || stopEventMutation.isPending}
-                    isLocked={isLocked}
-                  />
-                </CardContent>
-              </Card>
-
-              {/* Add Counts */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Package className="h-5 w-5" />
-                    บันทึกจำนวนผลิต
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AddCountsForm
-                    defectReasons={defectReasons}
-                    onSubmit={(data) => addCountsMutation.mutate(data)}
-                    isLoading={addCountsMutation.isPending}
-                    isLocked={isLocked}
-                  />
-                </CardContent>
-              </Card>
+            {/* Plant/Line/Machine Selection */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <PlantLineSelector
+                plants={plants}
+                lines={lines}
+                selectedPlantId={selectedPlantId}
+                selectedLineId={selectedLineId}
+                onPlantChange={setSelectedPlantId}
+                onLineChange={setSelectedLineId}
+                isLoading={plantsLoading || linesLoading}
+              />
+              <MachineSelector
+                machines={machines}
+                selectedMachineId={selectedMachineId}
+                onMachineChange={setSelectedMachineId}
+                isLoading={machinesLoading}
+                disabled={!selectedLineId}
+              />
             </div>
 
-            {/* Right Column - Timeline */}
-            <Card className="h-fit">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Timeline เหตุการณ์วันนี้</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <EventTimeline
-                  events={events}
-                  isLoading={eventsLoading}
-                />
-              </CardContent>
-            </Card>
-          </div>
-        )}
+            {/* Current Shift Banner */}
+            {currentShift && (
+              <CurrentShiftBanner 
+                shiftCalendar={currentShift} 
+                isLocked={isLocked}
+              />
+            )}
 
-        {/* Empty State */}
-        {!selectedMachineId && (
-          <Card className="py-12">
-            <CardContent className="flex flex-col items-center justify-center text-center">
-              <Factory className="h-16 w-16 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">เลือกเครื่องจักร</h3>
-              <p className="text-muted-foreground max-w-md">
-                กรุณาเลือก Plant, Line และ Machine เพื่อเริ่มบันทึกเหตุการณ์
-              </p>
-            </CardContent>
-          </Card>
-        )}
+            {/* Main Content - Only show when machine selected */}
+            {selectedMachineId && selectedMachine && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Left Column - Event Controls & Counts */}
+                <div className="space-y-4">
+                  {/* Event Controls */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Activity className="h-5 w-5" />
+                        สถานะเครื่องจักร
+                        {currentEvent && (
+                          <Badge variant={currentEvent.event_type === 'RUN' ? 'default' : 'destructive'}>
+                            {currentEvent.event_type}
+                          </Badge>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <EventControls
+                        currentEvent={currentEvent}
+                        downtimeReasons={downtimeReasons}
+                        onStartRun={() => startEventMutation.mutate({ eventType: 'RUN' })}
+                        onStartDowntime={(reasonId, notes) => 
+                          startEventMutation.mutate({ eventType: 'DOWNTIME', reasonId, notes })
+                        }
+                        onStartSetup={(reasonId, notes) => 
+                          startEventMutation.mutate({ eventType: 'SETUP', reasonId, notes })
+                        }
+                        onStop={(notes) => stopEventMutation.mutate(notes)}
+                        isLoading={startEventMutation.isPending || stopEventMutation.isPending}
+                        isLocked={isLocked}
+                      />
+                    </CardContent>
+                  </Card>
+
+                  {/* Add Counts */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Package className="h-5 w-5" />
+                        บันทึกจำนวนผลิต
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <AddCountsForm
+                        defectReasons={defectReasons}
+                        onSubmit={(data) => addCountsMutation.mutate(data)}
+                        isLoading={addCountsMutation.isPending}
+                        isLocked={isLocked}
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Right Column - Timeline */}
+                <Card className="h-fit">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">Timeline เหตุการณ์วันนี้</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <EventTimeline
+                      events={events}
+                      isLoading={eventsLoading}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!selectedMachineId && (
+              <Card className="py-12">
+                <CardContent className="flex flex-col items-center justify-center text-center">
+                  <Factory className="h-16 w-16 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">เลือกเครื่องจักร</h3>
+                  <p className="text-muted-foreground max-w-md">
+                    กรุณาเลือก Plant, Line และ Machine เพื่อเริ่มบันทึกเหตุการณ์
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="my-machines" className="mt-4">
+            <MyMachinesViewer />
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
