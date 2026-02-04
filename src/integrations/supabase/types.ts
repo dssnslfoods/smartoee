@@ -101,6 +101,20 @@ export type Database = {
             referencedRelation: "plants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "lines_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["plant_id"]
+          },
+          {
+            foreignKeyName: "lines_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "v_shift_summary"
+            referencedColumns: ["plant_id"]
+          },
         ]
       }
       machines: {
@@ -141,6 +155,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "lines"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machines_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["line_id"]
           },
         ]
       }
@@ -228,6 +249,272 @@ export type Database = {
         }
         Relationships: []
       }
+      production_counts: {
+        Row: {
+          created_at: string
+          created_by: string
+          defect_reason_id: string | null
+          good_qty: number
+          id: string
+          machine_id: string
+          notes: string | null
+          reject_qty: number
+          shift_calendar_id: string
+          ts: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          defect_reason_id?: string | null
+          good_qty?: number
+          id?: string
+          machine_id: string
+          notes?: string | null
+          reject_qty?: number
+          shift_calendar_id: string
+          ts?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          defect_reason_id?: string | null
+          good_qty?: number
+          id?: string
+          machine_id?: string
+          notes?: string | null
+          reject_qty?: number
+          shift_calendar_id?: string
+          ts?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_counts_defect_reason_id_fkey"
+            columns: ["defect_reason_id"]
+            isOneToOne: false
+            referencedRelation: "defect_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_counts_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_counts_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["machine_id"]
+          },
+          {
+            foreignKeyName: "production_counts_shift_calendar_id_fkey"
+            columns: ["shift_calendar_id"]
+            isOneToOne: false
+            referencedRelation: "shift_calendar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_counts_shift_calendar_id_fkey"
+            columns: ["shift_calendar_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["shift_calendar_id"]
+          },
+          {
+            foreignKeyName: "production_counts_shift_calendar_id_fkey"
+            columns: ["shift_calendar_id"]
+            isOneToOne: false
+            referencedRelation: "v_shift_summary"
+            referencedColumns: ["shift_calendar_id"]
+          },
+        ]
+      }
+      production_events: {
+        Row: {
+          created_at: string
+          created_by: string
+          end_ts: string | null
+          event_type: Database["public"]["Enums"]["event_type"]
+          id: string
+          line_id: string
+          machine_id: string
+          notes: string | null
+          plant_id: string
+          reason_id: string | null
+          shift_calendar_id: string
+          start_ts: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          end_ts?: string | null
+          event_type: Database["public"]["Enums"]["event_type"]
+          id?: string
+          line_id: string
+          machine_id: string
+          notes?: string | null
+          plant_id: string
+          reason_id?: string | null
+          shift_calendar_id: string
+          start_ts?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          end_ts?: string | null
+          event_type?: Database["public"]["Enums"]["event_type"]
+          id?: string
+          line_id?: string
+          machine_id?: string
+          notes?: string | null
+          plant_id?: string
+          reason_id?: string | null
+          shift_calendar_id?: string
+          start_ts?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_events_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_events_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["line_id"]
+          },
+          {
+            foreignKeyName: "production_events_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_events_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["machine_id"]
+          },
+          {
+            foreignKeyName: "production_events_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_events_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["plant_id"]
+          },
+          {
+            foreignKeyName: "production_events_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "v_shift_summary"
+            referencedColumns: ["plant_id"]
+          },
+          {
+            foreignKeyName: "production_events_reason_id_fkey"
+            columns: ["reason_id"]
+            isOneToOne: false
+            referencedRelation: "downtime_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_events_shift_calendar_id_fkey"
+            columns: ["shift_calendar_id"]
+            isOneToOne: false
+            referencedRelation: "shift_calendar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_events_shift_calendar_id_fkey"
+            columns: ["shift_calendar_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["shift_calendar_id"]
+          },
+          {
+            foreignKeyName: "production_events_shift_calendar_id_fkey"
+            columns: ["shift_calendar_id"]
+            isOneToOne: false
+            referencedRelation: "v_shift_summary"
+            referencedColumns: ["shift_calendar_id"]
+          },
+        ]
+      }
+      shift_approvals: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          id: string
+          locked_at: string | null
+          locked_by: string | null
+          shift_calendar_id: string
+          status: Database["public"]["Enums"]["approval_status"]
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          shift_calendar_id: string
+          status?: Database["public"]["Enums"]["approval_status"]
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          shift_calendar_id?: string
+          status?: Database["public"]["Enums"]["approval_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_approvals_shift_calendar_id_fkey"
+            columns: ["shift_calendar_id"]
+            isOneToOne: true
+            referencedRelation: "shift_calendar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_approvals_shift_calendar_id_fkey"
+            columns: ["shift_calendar_id"]
+            isOneToOne: true
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["shift_calendar_id"]
+          },
+          {
+            foreignKeyName: "shift_approvals_shift_calendar_id_fkey"
+            columns: ["shift_calendar_id"]
+            isOneToOne: true
+            referencedRelation: "v_shift_summary"
+            referencedColumns: ["shift_calendar_id"]
+          },
+        ]
+      }
       shift_calendar: {
         Row: {
           created_at: string
@@ -262,11 +549,32 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "shift_calendar_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["plant_id"]
+          },
+          {
+            foreignKeyName: "shift_calendar_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "v_shift_summary"
+            referencedColumns: ["plant_id"]
+          },
+          {
             foreignKeyName: "shift_calendar_shift_id_fkey"
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "shifts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_calendar_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["shift_id"]
           },
         ]
       }
@@ -324,6 +632,13 @@ export type Database = {
             referencedRelation: "lines"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_line_permissions_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["line_id"]
+          },
         ]
       }
       user_machine_permissions: {
@@ -353,6 +668,13 @@ export type Database = {
             referencedRelation: "machines"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_machine_permissions_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["machine_id"]
+          },
         ]
       }
       user_plant_permissions: {
@@ -381,6 +703,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "plants"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_plant_permissions_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["plant_id"]
+          },
+          {
+            foreignKeyName: "user_plant_permissions_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "v_shift_summary"
+            referencedColumns: ["plant_id"]
           },
         ]
       }
@@ -413,9 +749,54 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_current_shift_by_machine: {
+        Row: {
+          approval_status: Database["public"]["Enums"]["approval_status"] | null
+          end_time: string | null
+          line_id: string | null
+          line_name: string | null
+          machine_code: string | null
+          machine_id: string | null
+          machine_name: string | null
+          planned_time_minutes: number | null
+          plant_id: string | null
+          plant_name: string | null
+          shift_calendar_id: string | null
+          shift_date: string | null
+          shift_id: string | null
+          shift_name: string | null
+          start_time: string | null
+        }
+        Relationships: []
+      }
+      v_shift_summary: {
+        Row: {
+          approval_status: Database["public"]["Enums"]["approval_status"] | null
+          approved_at: string | null
+          approved_by: string | null
+          avg_availability: number | null
+          avg_oee: number | null
+          avg_performance: number | null
+          avg_quality: number | null
+          locked_at: string | null
+          locked_by: string | null
+          machine_count: number | null
+          planned_time_minutes: number | null
+          plant_id: string | null
+          plant_name: string | null
+          shift_calendar_id: string | null
+          shift_date: string | null
+          shift_name: string | null
+          total_downtime: number | null
+          total_good_qty: number | null
+          total_reject_qty: number | null
+          total_run_time: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      get_line_from_machine: { Args: { _machine_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -433,6 +814,12 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_executive: { Args: { _user_id: string }; Returns: boolean }
+      is_shift_locked: {
+        Args: { _shift_calendar_id: string }
+        Returns: boolean
+      }
+      is_supervisor: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "STAFF" | "SUPERVISOR" | "EXECUTIVE" | "ADMIN"
