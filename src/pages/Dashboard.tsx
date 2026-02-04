@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { OEEGauge } from '@/components/dashboard/OEEGauge';
@@ -5,6 +6,7 @@ import { MachineStatusCard } from '@/components/dashboard/MachineStatusCard';
 import { OEETrendChart } from '@/components/dashboard/OEETrendChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { OEECardSkeleton, StatsCardSkeleton, MachineCardSkeleton, ChartCardSkeleton } from '@/components/ui/skeletons';
 import { Calendar, Factory, TrendingUp, AlertTriangle, LayoutDashboard, Play, Pause, Wrench } from 'lucide-react';
 
 // Mock data - will be replaced with Supabase queries

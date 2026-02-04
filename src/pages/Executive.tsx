@@ -6,6 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ChartCardSkeleton, GridSelectorSkeleton } from '@/components/ui/skeletons';
 import { useAuth } from '@/hooks/useAuth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -306,18 +308,26 @@ export default function Executive() {
 
         {/* Charts Row */}
         <div className="grid gap-5 lg:gap-6 lg:grid-cols-2">
-          <OEETrendChart
-            data={trendData}
-            title={`OEE Trend (${dateRange} Days)`}
-          />
-          <ParetoChart
-            data={downtimeData || []}
-            title="Top Downtime Reasons"
-          />
+          {oeeLoading ? (
+            <ChartCardSkeleton title="OEE Trend" />
+          ) : (
+            <OEETrendChart
+              data={trendData}
+              title={`OEE Trend (${dateRange} Days)`}
+            />
+          )}
+          {oeeLoading ? (
+            <ChartCardSkeleton title="Top Downtime" />
+          ) : (
+            <ParetoChart
+              data={downtimeData || []}
+              title="Top Downtime Reasons"
+            />
+          )}
         </div>
 
         {/* Drill-Down Selector */}
-        {drillItems.length > 0 && currentLevel !== 'machine' && (
+        {currentLevel !== 'machine' && (
           <Card className="overflow-hidden">
             <CardHeader className="pb-3 bg-muted/30">
               <CardTitle className="text-base sm:text-lg font-semibold">
@@ -327,16 +337,20 @@ export default function Executive() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-5">
-              <DrillDownSelector
-                level={drillPath.length === 0 ? 'plant' : 
-                       currentLevel === 'plant' ? 'line' : 
-                       currentLevel === 'line' ? 'machine' : 'shift'}
-                items={drillItems}
-                onSelect={(id) => {
-                  const item = drillItems.find(i => i.id === id);
-                  if (item) handleDrillDown(id, item.name);
-                }}
-              />
+              {drillItems.length === 0 ? (
+                <GridSelectorSkeleton items={4} />
+              ) : (
+                <DrillDownSelector
+                  level={drillPath.length === 0 ? 'plant' : 
+                         currentLevel === 'plant' ? 'line' : 
+                         currentLevel === 'line' ? 'machine' : 'shift'}
+                  items={drillItems}
+                  onSelect={(id) => {
+                    const item = drillItems.find(i => i.id === id);
+                    if (item) handleDrillDown(id, item.name);
+                  }}
+                />
+              )}
             </CardContent>
           </Card>
         )}

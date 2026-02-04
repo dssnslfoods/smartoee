@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface TrendData {
   date: string;
@@ -21,15 +22,49 @@ interface TrendData {
 interface OEETrendChartProps {
   data: TrendData[];
   title?: string;
+  isLoading?: boolean;
 }
 
-export function OEETrendChart({ data, title = 'OEE Trend' }: OEETrendChartProps) {
+function TrendChartSkeleton() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">{title}</CardTitle>
+    <div className="h-[300px] flex flex-col">
+      <div className="flex-1 flex items-end gap-4 px-8 pb-8">
+        {Array.from({ length: 7 }).map((_, i) => (
+          <div key={i} className="flex-1 flex flex-col gap-1 items-center">
+            <Skeleton className="w-2 h-2 rounded-full" style={{ marginBottom: `${20 + Math.random() * 40}%` }} />
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 px-8 justify-center">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-3 w-16" />
+      </div>
+    </div>
+  );
+}
+
+export function OEETrendChart({ data, title = 'OEE Trend', isLoading }: OEETrendChartProps) {
+  if (isLoading) {
+    return (
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-3 bg-muted/30">
+          <CardTitle className="text-base sm:text-lg font-semibold">{title}</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-5">
+          <TrendChartSkeleton />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-3 bg-muted/30">
+        <CardTitle className="text-base sm:text-lg font-semibold">{title}</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-5">
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>

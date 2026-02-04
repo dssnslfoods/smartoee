@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Wrench, Play, Pause, AlertTriangle } from 'lucide-react';
 
 interface MachineStatusCardProps {
