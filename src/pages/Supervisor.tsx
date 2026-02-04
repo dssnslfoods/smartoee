@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
+import { format, addDays, subDays } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { CheckCircle2, Lock, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Lock, RefreshCw, CalendarIcon, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -24,7 +27,22 @@ export default function Supervisor() {
   const queryClient = useQueryClient();
   
   const [selectedPlantId, setSelectedPlantId] = useState<string>('');
-  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined); // undefined = show recent shifts
+
+  // Calculate date range - if date selected, use only that date; otherwise fetch recent range
+  const dateRange = useMemo(() => {
+    const today = new Date();
+    if (selectedDate) {
+      // If date is selected, only fetch that date
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      return { startDate: dateStr, endDate: dateStr };
+    } else {
+      // Default: fetch last 2 days and next 2 days to cover ~6 shifts
+      const startDate = format(subDays(today, 2), 'yyyy-MM-dd');
+      const endDate = format(addDays(today, 2), 'yyyy-MM-dd');
+      return { startDate, endDate };
+    }
+  }, [selectedDate]);
 
   // Fetch plants
   const { data: plants = [] } = useQuery({
@@ -32,12 +50,38 @@ export default function Supervisor() {
     queryFn: () => oeeApi.getPlants(),
   });
 
-  // Fetch shift summaries for selected plant and date
+  // Fetch shift summaries for selected plant and date range
   const { data: shiftSummaries = [], isLoading: loadingSummaries, refetch: refetchSummaries } = useQuery({
-    queryKey: ['shiftSummaries', selectedPlantId, selectedDate],
-    queryFn: () => oeeApi.getShiftSummaries(selectedPlantId, selectedDate),
+    queryKey: ['shiftSummaries', selectedPlantId, dateRange.startDate, dateRange.endDate],
+    queryFn: () => oeeApi.getShiftSummaries(selectedPlantId, dateRange.startDate, dateRange.endDate),
     enabled: !!selectedPlantId,
   });
+
+  // Filter to show only ~3 before and ~3 after current time when no date is selected
+  const filteredSummaries = useMemo(() => {
+    if (selectedDate || shiftSummaries.length <= 6) {
+      return shiftSummaries;
+    }
+    
+    // Find the closest shift to now and show 3 before + 3 after
+    const now = new Date();
+    const nowStr = format(now, 'yyyy-MM-dd');
+    
+    // Sort by date descending (already sorted)
+    // Find the index of the current/closest shift
+    let currentIdx = shiftSummaries.findIndex(s => s.shift_date === nowStr);
+    if (currentIdx === -1) {
+      // If today not found, find the first date that's before today
+      currentIdx = shiftSummaries.findIndex(s => s.shift_date && s.shift_date < nowStr);
+      if (currentIdx === -1) currentIdx = 0;
+    }
+    
+    // Take 3 before (which are newer in descending order) and 3 after (older)
+    const start = Math.max(0, currentIdx - 3);
+    const end = Math.min(shiftSummaries.length, currentIdx + 4);
+    
+    return shiftSummaries.slice(start, end);
+  }, [shiftSummaries, selectedDate]);
 
   // Approve mutation
   const approveMutation = useMutation({
@@ -139,13 +183,46 @@ export default function Supervisor() {
               </SelectContent>
             </Select>
 
-            {/* Date Selector */}
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-2 border rounded-md bg-background"
-            />
+            {/* Date Selector with Calendar */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[200px] justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? (
+                    format(selectedDate, 'd MMM yyyy', { locale: th })
+                  ) : (
+                    <span>กะล่าสุด (±3 กะ)</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  initialFocus
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+            
+            {/* Clear date filter button */}
+            {selectedDate && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSelectedDate(undefined)}
+                title="ล้างวันที่"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
 
             <Button
               variant="outline"
@@ -188,7 +265,7 @@ export default function Supervisor() {
                   </CardContent>
                 </Card>
               ) : (
-                shiftSummaries.map((summary) => (
+                filteredSummaries.map((summary) => (
                   <Card key={summary.shift_calendar_id}>
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
@@ -252,7 +329,7 @@ export default function Supervisor() {
             </TabsContent>
 
             <TabsContent value="audit">
-              <AuditLogViewer plantId={selectedPlantId} date={selectedDate} />
+              <AuditLogViewer plantId={selectedPlantId} date={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')} />
             </TabsContent>
           </Tabs>
         )}
