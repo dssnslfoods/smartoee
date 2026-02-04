@@ -55,7 +55,7 @@ const navItems: NavItem[] = [
 
 export function AppSidebar() {
   const { pathname } = useLocation();
-  const { profile, roles, signOut } = useAuth();
+  const { profile, company, roles, signOut } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -146,6 +146,11 @@ export function AppSidebar() {
               <p className="truncate text-xs text-sidebar-foreground/60">
                 {roles[0] || 'No role'}
               </p>
+              {company && (
+                <p className="truncate text-xs text-sidebar-foreground/50 mt-0.5">
+                  {company.name}
+                </p>
+              )}
             </div>
           )}
           <Button 
