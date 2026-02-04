@@ -136,7 +136,7 @@ export default function Auth() {
         </div>
 
         <p className="text-sm text-sidebar-foreground/40">
-          © 2026 PNF OEE System. Created by Arnon Arpaket. All rights reserved.
+          © 2026 PNF OEE System. Designed and Developed by Arnon Arpaket. All rights reserved.
         </p>
       </div>
 
