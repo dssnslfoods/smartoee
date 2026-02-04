@@ -344,6 +344,7 @@ export type Database = {
           run_time_minutes: number | null
           scope: Database["public"]["Enums"]["oee_scope"]
           scope_id: string
+          shift_calendar_id: string | null
         }
         Insert: {
           availability?: number | null
@@ -362,6 +363,7 @@ export type Database = {
           run_time_minutes?: number | null
           scope: Database["public"]["Enums"]["oee_scope"]
           scope_id: string
+          shift_calendar_id?: string | null
         }
         Update: {
           availability?: number | null
@@ -380,8 +382,31 @@ export type Database = {
           run_time_minutes?: number | null
           scope?: Database["public"]["Enums"]["oee_scope"]
           scope_id?: string
+          shift_calendar_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "oee_snapshots_shift_calendar_id_fkey"
+            columns: ["shift_calendar_id"]
+            isOneToOne: false
+            referencedRelation: "shift_calendar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oee_snapshots_shift_calendar_id_fkey"
+            columns: ["shift_calendar_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["shift_calendar_id"]
+          },
+          {
+            foreignKeyName: "oee_snapshots_shift_calendar_id_fkey"
+            columns: ["shift_calendar_id"]
+            isOneToOne: false
+            referencedRelation: "v_shift_summary"
+            referencedColumns: ["shift_calendar_id"]
+          },
+        ]
       }
       plants: {
         Row: {
