@@ -187,6 +187,87 @@ export type Database = {
           },
         ]
       }
+      machine_permission_group_machines: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          machine_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          machine_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          machine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_permission_group_machines_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "machine_permission_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_permission_group_machines_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_permission_group_machines_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["machine_id"]
+          },
+        ]
+      }
+      machine_permission_groups: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_permission_groups_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       machines: {
         Row: {
           code: string
@@ -765,6 +846,35 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_current_shift_by_machine"
             referencedColumns: ["machine_id"]
+          },
+        ]
+      }
+      user_permission_groups: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permission_groups_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "machine_permission_groups"
+            referencedColumns: ["id"]
           },
         ]
       }
