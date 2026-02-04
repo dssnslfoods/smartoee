@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Monitor, Users, Wrench } from 'lucide-react';
+import { Loader2, Monitor, Users, Wrench, Building } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -39,28 +39,30 @@ interface DirectPermission {
 }
 
 export function MyMachinesViewer() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [directPermissions, setDirectPermissions] = useState<DirectPermission[]>([]);
   const [permissionGroups, setPermissionGroups] = useState<PermissionGroup[]>([]);
+  const [companyMachines, setCompanyMachines] = useState<Machine[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const isSupervisor = profile?.role === 'SUPERVISOR' || profile?.role === 'ADMIN';
+
   useEffect(() => {
-    if (user) {
+    if (user && profile) {
       fetchPermissions();
     }
-  }, [user]);
+  }, [user, profile]);
 
   const fetchPermissions = async () => {
-    if (!user) return;
+    if (!user || !profile) return;
     
     setIsLoading(true);
     try {
-      // Fetch direct machine permissions
-      const { data: directData, error: directError } = await supabase
-        .from('user_machine_permissions')
-        .select(`
-          machine_id,
-          machines!inner (
+      // If Supervisor/Admin, fetch all machines in their company
+      if (isSupervisor && profile.company_id) {
+        const { data: machinesData, error: machinesError } = await supabase
+          .from('machines')
+          .select(`
             id,
             name,
             code,
@@ -70,65 +72,100 @@ export function MyMachinesViewer() {
                 name
               )
             )
-          )
-        `)
-        .eq('user_id', user.id);
+          `)
+          .eq('company_id', profile.company_id)
+          .eq('is_active', true)
+          .order('name');
 
-      if (directError) throw directError;
+        if (machinesError) throw machinesError;
 
-      const directMachines: DirectPermission[] = (directData || []).map((item: any) => ({
-        machine: {
-          id: item.machines.id,
-          name: item.machines.name,
-          code: item.machines.code,
-          line_name: item.machines.lines.name,
-          plant_name: item.machines.lines.plants.name,
-        },
-      }));
-      setDirectPermissions(directMachines);
-
-      // Fetch group-based permissions
-      const { data: groupData, error: groupError } = await supabase
-        .from('user_permission_groups')
-        .select(`
-          group_id,
-          machine_permission_groups!inner (
-            id,
-            name,
-            description,
-            machine_permission_group_machines (
-              machine_id,
-              machines!inner (
-                id,
+        const machines: Machine[] = (machinesData || []).map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          code: item.code,
+          line_name: item.lines.name,
+          plant_name: item.lines.plants.name,
+        }));
+        setCompanyMachines(machines);
+        setDirectPermissions([]);
+        setPermissionGroups([]);
+      } else {
+        // For Staff, fetch direct and group-based permissions
+        const { data: directData, error: directError } = await supabase
+          .from('user_machine_permissions')
+          .select(`
+            machine_id,
+            machines!inner (
+              id,
+              name,
+              code,
+              lines!inner (
                 name,
-                code,
-                lines!inner (
+                plants!inner (
+                  name
+                )
+              )
+            )
+          `)
+          .eq('user_id', user.id);
+
+        if (directError) throw directError;
+
+        const directMachines: DirectPermission[] = (directData || []).map((item: any) => ({
+          machine: {
+            id: item.machines.id,
+            name: item.machines.name,
+            code: item.machines.code,
+            line_name: item.machines.lines.name,
+            plant_name: item.machines.lines.plants.name,
+          },
+        }));
+        setDirectPermissions(directMachines);
+
+        // Fetch group-based permissions
+        const { data: groupData, error: groupError } = await supabase
+          .from('user_permission_groups')
+          .select(`
+            group_id,
+            machine_permission_groups!inner (
+              id,
+              name,
+              description,
+              machine_permission_group_machines (
+                machine_id,
+                machines!inner (
+                  id,
                   name,
-                  plants!inner (
-                    name
+                  code,
+                  lines!inner (
+                    name,
+                    plants!inner (
+                      name
+                    )
                   )
                 )
               )
             )
-          )
-        `)
-        .eq('user_id', user.id);
+          `)
+          .eq('user_id', user.id);
 
-      if (groupError) throw groupError;
+        if (groupError) throw groupError;
 
-      const groups: PermissionGroup[] = (groupData || []).map((item: any) => ({
-        id: item.machine_permission_groups.id,
-        name: item.machine_permission_groups.name,
-        description: item.machine_permission_groups.description,
-        machines: (item.machine_permission_groups.machine_permission_group_machines || []).map((gm: any) => ({
-          id: gm.machines.id,
-          name: gm.machines.name,
-          code: gm.machines.code,
-          line_name: gm.machines.lines.name,
-          plant_name: gm.machines.lines.plants.name,
-        })),
-      }));
-      setPermissionGroups(groups);
+        const groups: PermissionGroup[] = (groupData || []).map((item: any) => ({
+          id: item.machine_permission_groups.id,
+          name: item.machine_permission_groups.name,
+          description: item.machine_permission_groups.description,
+          machines: (item.machine_permission_groups.machine_permission_group_machines || []).map((gm: any) => ({
+            id: gm.machines.id,
+            name: gm.machines.name,
+            code: gm.machines.code,
+            line_name: gm.machines.lines.name,
+            plant_name: gm.machines.lines.plants.name,
+          })),
+        }));
+        setPermissionGroups(groups);
+        setCompanyMachines([]);
+      }
 
     } catch (error) {
       console.error('Error fetching permissions:', error);
@@ -137,8 +174,14 @@ export function MyMachinesViewer() {
     }
   };
 
-  // Get all unique machines (combining direct and group-based)
+  // Get all unique machines (combining direct, group-based, or company machines for supervisors)
   const getAllMachines = (): Machine[] => {
+    // For supervisors, return company machines
+    if (isSupervisor) {
+      return companyMachines;
+    }
+    
+    // For staff, combine direct and group-based
     const machineMap = new Map<string, Machine>();
     
     directPermissions.forEach((dp) => {
@@ -184,27 +227,43 @@ export function MyMachinesViewer() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">กลุ่มสิทธิ์</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalGroups}</div>
-            <p className="text-xs text-muted-foreground">กลุ่มที่ได้รับมอบหมาย</p>
-          </CardContent>
-        </Card>
+        {isSupervisor ? (
+          <Card className="md:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">สิทธิ์ระดับ Supervisor</CardTitle>
+              <Building className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-muted-foreground">
+                ในฐานะ Supervisor คุณมีสิทธิ์เข้าถึงเครื่องจักรทุกเครื่องในบริษัทของคุณโดยอัตโนมัติ
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">กลุ่มสิทธิ์</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalGroups}</div>
+                <p className="text-xs text-muted-foreground">กลุ่มที่ได้รับมอบหมาย</p>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">สิทธิ์โดยตรง</CardTitle>
-            <Wrench className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalDirect}</div>
-            <p className="text-xs text-muted-foreground">เครื่องที่ได้รับสิทธิ์โดยตรง</p>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">สิทธิ์โดยตรง</CardTitle>
+                <Wrench className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalDirect}</div>
+                <p className="text-xs text-muted-foreground">เครื่องที่ได้รับสิทธิ์โดยตรง</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* All Machines Table */}
@@ -228,7 +287,7 @@ export function MyMachinesViewer() {
                   <TableHead>ชื่อเครื่องจักร</TableHead>
                   <TableHead>ไลน์</TableHead>
                   <TableHead>โรงงาน</TableHead>
-                  <TableHead>ประเภทสิทธิ์</TableHead>
+                  {!isSupervisor && <TableHead>ประเภทสิทธิ์</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -244,18 +303,20 @@ export function MyMachinesViewer() {
                       <TableCell className="font-medium">{machine.name}</TableCell>
                       <TableCell>{machine.line_name}</TableCell>
                       <TableCell>{machine.plant_name}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {isDirect && (
-                            <Badge variant="default">โดยตรง</Badge>
-                          )}
-                          {fromGroups.map((groupName) => (
-                            <Badge key={groupName} variant="secondary">
-                              {groupName}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
+                      {!isSupervisor && (
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {isDirect && (
+                              <Badge variant="default">โดยตรง</Badge>
+                            )}
+                            {fromGroups.map((groupName) => (
+                              <Badge key={groupName} variant="secondary">
+                                {groupName}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}
