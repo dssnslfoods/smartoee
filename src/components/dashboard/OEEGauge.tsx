@@ -22,9 +22,9 @@ const bgColorClasses = {
 };
 
 const sizeClasses = {
-  sm: { size: 100, stroke: 8, text: 'text-lg', label: 'text-xs' },
-  md: { size: 140, stroke: 10, text: 'text-2xl', label: 'text-sm' },
-  lg: { size: 180, stroke: 12, text: 'text-3xl', label: 'text-base' },
+  sm: { size: 80, stroke: 6, text: 'text-sm', label: 'text-xs' },
+  md: { size: 120, stroke: 8, text: 'text-xl', label: 'text-sm' },
+  lg: { size: 160, stroke: 10, text: 'text-2xl', label: 'text-base' },
 };
 
 export function OEEGauge({ value, label, color, size = 'md' }: OEEGaugeProps) {
@@ -49,7 +49,7 @@ export function OEEGauge({ value, label, color, size = 'md' }: OEEGaugeProps) {
             fill="none"
             stroke="currentColor"
             strokeWidth={stroke}
-            className="text-muted/30"
+            className="text-muted/40"
           />
           {/* Progress circle */}
           <circle
@@ -61,19 +61,21 @@ export function OEEGauge({ value, label, color, size = 'md' }: OEEGaugeProps) {
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
-            className={cn('transition-all duration-500', bgColorClasses[color])}
+            className={cn('transition-all duration-700 ease-out', bgColorClasses[color])}
           />
         </svg>
         {/* Center text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={cn('font-bold', text, colorClasses[color])}>
+          <span className={cn('font-bold tabular-nums', text, colorClasses[color])}>
             {value.toFixed(1)}%
           </span>
         </div>
       </div>
-      <span className={cn('mt-2 font-medium text-muted-foreground', labelSize)}>
-        {label}
-      </span>
+      {label && (
+        <span className={cn('mt-2 font-medium text-muted-foreground', labelSize)}>
+          {label}
+        </span>
+      )}
     </div>
   );
 }

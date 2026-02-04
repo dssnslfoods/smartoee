@@ -1,10 +1,10 @@
 import { Navigate } from 'react-router-dom';
-import { Settings, Factory, Layers, Cpu, AlertTriangle, Ban, Users, UserCog, Building2 } from 'lucide-react';
+import { Settings, Factory, Layers, Cpu, AlertTriangle, Ban, Users, UserCog, Building2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2 } from 'lucide-react';
 import {
   PlantManager,
   LineManager,
@@ -22,7 +22,13 @@ export default function Admin() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="h-12 w-12 rounded-full border-4 border-muted" />
+            <div className="absolute inset-0 h-12 w-12 animate-spin rounded-full border-4 border-transparent border-t-primary" />
+          </div>
+          <p className="text-sm font-medium text-muted-foreground">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -39,57 +45,79 @@ export default function Admin() {
 
   return (
     <AppLayout>
-      <div className="container mx-auto p-4 space-y-6">
+      <div className="page-container space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-            <Settings className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Admin Setup</h1>
-            <p className="text-muted-foreground">Manage master data and permissions</p>
-          </div>
-        </div>
+        <PageHeader 
+          title="Admin Setup" 
+          description="Manage master data and permissions"
+          icon={Settings}
+        />
 
         {/* Main Content */}
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 lg:w-auto lg:inline-flex">
-            <TabsTrigger value="users" className="gap-2">
-              <UserCog className="h-4 w-4 hidden sm:block" />
-              Users
-            </TabsTrigger>
-            <TabsTrigger value="companies" className="gap-2">
-              <Building2 className="h-4 w-4 hidden sm:block" />
-              Companies
-            </TabsTrigger>
-            <TabsTrigger value="plants" className="gap-2">
-              <Factory className="h-4 w-4 hidden sm:block" />
-              Plants
-            </TabsTrigger>
-            <TabsTrigger value="lines" className="gap-2">
-              <Layers className="h-4 w-4 hidden sm:block" />
-              Lines
-            </TabsTrigger>
-            <TabsTrigger value="machines" className="gap-2">
-              <Cpu className="h-4 w-4 hidden sm:block" />
-              Machines
-            </TabsTrigger>
-            <TabsTrigger value="downtime" className="gap-2">
-              <AlertTriangle className="h-4 w-4 hidden sm:block" />
-              Downtime
-            </TabsTrigger>
-            <TabsTrigger value="defects" className="gap-2">
-              <Ban className="h-4 w-4 hidden sm:block" />
-              Defects
-            </TabsTrigger>
-            <TabsTrigger value="permissions" className="gap-2">
-              <Users className="h-4 w-4 hidden sm:block" />
-              Permissions
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <TabsList className="inline-flex h-auto p-1 bg-muted/50 gap-1 min-w-max">
+              <TabsTrigger 
+                value="users" 
+                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <UserCog className="h-4 w-4" />
+                <span className="hidden sm:inline">Users</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="companies" 
+                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Building2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Companies</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="plants" 
+                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Factory className="h-4 w-4" />
+                <span className="hidden sm:inline">Plants</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="lines" 
+                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Layers className="h-4 w-4" />
+                <span className="hidden sm:inline">Lines</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="machines" 
+                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Cpu className="h-4 w-4" />
+                <span className="hidden sm:inline">Machines</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="downtime" 
+                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <AlertTriangle className="h-4 w-4" />
+                <span className="hidden sm:inline">Downtime</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="defects" 
+                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Ban className="h-4 w-4" />
+                <span className="hidden sm:inline">Defects</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="permissions" 
+                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Permissions</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          <Card>
-            <CardContent className="p-6">
+          <Card className="overflow-hidden">
+            <CardContent className="p-4 sm:p-6">
               <TabsContent value="users" className="mt-0">
                 <UserManager />
               </TabsContent>
