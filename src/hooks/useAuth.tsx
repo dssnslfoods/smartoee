@@ -1,17 +1,17 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase, UserRole, UserProfile } from '@/lib/supabase';
+import { supabase, AppRole, UserProfile } from '@/lib/supabase';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: UserProfile | null;
-  roles: UserRole[];
+  roles: AppRole[];
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
-  hasRole: (role: UserRole) => boolean;
+  hasRole: (role: AppRole) => boolean;
   isAdmin: () => boolean;
 }
 
@@ -21,7 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [roles, setRoles] = useState<UserRole[]>([]);
+  const [roles, setRoles] = useState<AppRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('user_id', userId);
       
       if (rolesData) {
-        setRoles(rolesData.map(r => r.role as UserRole));
+        setRoles(rolesData.map(r => r.role as AppRole));
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRoles([]);
   };
 
-  const hasRole = (role: UserRole) => roles.includes(role);
+  const hasRole = (role: AppRole) => roles.includes(role);
   
   const isAdmin = () => roles.includes('admin');
 
