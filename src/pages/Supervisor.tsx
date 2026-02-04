@@ -25,7 +25,7 @@ import oeeApi from '@/services/oeeApi';
 
 export default function Supervisor() {
   const { toast } = useToast();
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, company } = useAuth();
   const queryClient = useQueryClient();
   
   const [selectedPlantId, setSelectedPlantId] = useState<string>('');
@@ -43,9 +43,12 @@ export default function Supervisor() {
     }
   }, [selectedDate]);
 
+  // Get company context from auth
+  const companyId = company?.id;
+
   const { data: plants = [] } = useQuery({
-    queryKey: ['plants'],
-    queryFn: () => oeeApi.getPlants(),
+    queryKey: ['plants', companyId],
+    queryFn: () => oeeApi.getPlants(companyId),
   });
 
   const { data: shiftSummaries = [], isLoading: loadingSummaries, refetch: refetchSummaries } = useQuery({

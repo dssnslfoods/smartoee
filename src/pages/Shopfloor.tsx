@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Factory, Activity, Package, Monitor } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 import {
   getPlants,
   getLines,
@@ -42,6 +43,7 @@ import type {
 
 export default function Shopfloor() {
   const queryClient = useQueryClient();
+  const { company } = useAuth();
   
   const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
@@ -55,21 +57,24 @@ export default function Shopfloor() {
     });
   }, []);
 
+  // Filter by company if user has a company context
+  const companyId = company?.id;
+
   const { data: plants = [], isLoading: plantsLoading } = useQuery({
-    queryKey: ['plants'],
-    queryFn: getPlants,
+    queryKey: ['plants', companyId],
+    queryFn: () => getPlants(companyId),
     enabled: isAuthenticated === true,
   });
 
   const { data: lines = [], isLoading: linesLoading } = useQuery({
-    queryKey: ['lines', selectedPlantId],
-    queryFn: () => getLines(selectedPlantId!),
+    queryKey: ['lines', selectedPlantId, companyId],
+    queryFn: () => getLines(selectedPlantId!, companyId),
     enabled: !!selectedPlantId,
   });
 
   const { data: machines = [], isLoading: machinesLoading } = useQuery({
-    queryKey: ['machines', selectedLineId],
-    queryFn: () => getMachines(selectedLineId!),
+    queryKey: ['machines', selectedLineId, companyId],
+    queryFn: () => getMachines(selectedLineId!, companyId),
     enabled: !!selectedLineId,
   });
 
