@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Plus, Trash2, Loader2, Pencil, UserPlus, Shield, Mail, 
-  Search, MoreHorizontal, UserCog, CheckCircle, XCircle 
+  Search, MoreHorizontal, UserCog, Building2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -43,23 +43,27 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 
 type AppRole = Database['public']['Enums']['app_role'];
+
+interface Company {
+  id: string;
+  name: string;
+  code: string | null;
+}
 
 interface UserProfile {
   id: string;
   user_id: string;
   full_name: string;
   role: AppRole;
+  company_id: string | null;
   created_at: string;
   updated_at: string;
-}
-
-interface UserWithEmail extends UserProfile {
-  email?: string;
+  companies?: Company | null;
 }
 
 const ROLE_OPTIONS: { value: AppRole; label: string; description: string }[] = [
@@ -91,29 +95,46 @@ export function UserManager() {
   const [newPassword, setNewPassword] = useState('');
   const [newFullName, setNewFullName] = useState('');
   const [newRole, setNewRole] = useState<AppRole>('STAFF');
+  const [newCompanyId, setNewCompanyId] = useState<string>('');
   const [editFullName, setEditFullName] = useState('');
   const [editRole, setEditRole] = useState<AppRole>('STAFF');
+  const [editCompanyId, setEditCompanyId] = useState<string>('');
 
-  // Fetch all users
+  // Fetch companies for dropdown
+  const { data: companies } = useQuery({
+    queryKey: ['admin-companies-dropdown'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name, code')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      return data as Company[];
+    },
+  });
+
+  // Fetch all users with company info
   const { data: users, isLoading } = useQuery({
     queryKey: ['admin-all-users'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('*')
+        .select('*, companies(id, name, code)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as UserProfile[];
     },
   });
 
-  // Create user mutation (using edge function would be ideal, but for now we'll update profile)
+  // Create user mutation
   const createUserMutation = useMutation({
-    mutationFn: async ({ email, password, fullName, role }: { 
+    mutationFn: async ({ email, password, fullName, role, companyId }: { 
       email: string; 
       password: string; 
       fullName: string; 
-      role: AppRole 
+      role: AppRole;
+      companyId: string | null;
     }) => {
       // First, sign up the user via Supabase Auth
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
@@ -130,14 +151,13 @@ export function UserManager() {
       if (signUpError) throw signUpError;
       if (!authData.user) throw new Error('Failed to create user');
 
-      // The trigger should create the profile, but we need to update the role
-      // Wait a moment for the trigger to execute
+      // Wait for trigger to create profile
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Update the role
+      // Update the role and company
       const { error: updateError } = await supabase
         .from('user_profiles')
-        .update({ role, full_name: fullName })
+        .update({ role, full_name: fullName, company_id: companyId })
         .eq('user_id', authData.user.id);
 
       if (updateError) throw updateError;
@@ -160,14 +180,15 @@ export function UserManager() {
 
   // Update user mutation
   const updateUserMutation = useMutation({
-    mutationFn: async ({ userId, fullName, role }: { 
+    mutationFn: async ({ userId, fullName, role, companyId }: { 
       userId: string; 
       fullName: string; 
-      role: AppRole 
+      role: AppRole;
+      companyId: string | null;
     }) => {
       const { error } = await supabase
         .from('user_profiles')
-        .update({ full_name: fullName, role })
+        .update({ full_name: fullName, role, company_id: companyId })
         .eq('user_id', userId);
       if (error) throw error;
     },
@@ -180,15 +201,13 @@ export function UserManager() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  // Delete user mutation (deletes profile, cascade should handle permissions)
+  // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      // First delete all permissions
       await supabase.from('user_plant_permissions').delete().eq('user_id', userId);
       await supabase.from('user_line_permissions').delete().eq('user_id', userId);
       await supabase.from('user_machine_permissions').delete().eq('user_id', userId);
       
-      // Delete the profile
       const { error } = await supabase
         .from('user_profiles')
         .delete()
@@ -208,7 +227,8 @@ export function UserManager() {
   // Filter users by search
   const filteredUsers = users?.filter(user => 
     user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.role.toLowerCase().includes(searchQuery.toLowerCase())
+    user.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (user.companies?.name && user.companies.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Count by role
@@ -222,6 +242,7 @@ export function UserManager() {
     setNewPassword('');
     setNewFullName('');
     setNewRole('STAFF');
+    setNewCompanyId('');
     setIsCreateDialogOpen(true);
   };
 
@@ -231,12 +252,14 @@ export function UserManager() {
     setNewPassword('');
     setNewFullName('');
     setNewRole('STAFF');
+    setNewCompanyId('');
   };
 
   const handleOpenEditDialog = (user: UserProfile) => {
     setSelectedUser(user);
     setEditFullName(user.full_name);
     setEditRole(user.role);
+    setEditCompanyId(user.company_id || '');
     setIsEditDialogOpen(true);
   };
 
@@ -245,6 +268,7 @@ export function UserManager() {
     setSelectedUser(null);
     setEditFullName('');
     setEditRole('STAFF');
+    setEditCompanyId('');
   };
 
   const handleOpenDeleteDialog = (user: UserProfile) => {
@@ -265,7 +289,8 @@ export function UserManager() {
       email: newEmail, 
       password: newPassword, 
       fullName: newFullName, 
-      role: newRole 
+      role: newRole,
+      companyId: newCompanyId || null,
     });
   };
 
@@ -277,7 +302,8 @@ export function UserManager() {
     updateUserMutation.mutate({ 
       userId: selectedUser.user_id, 
       fullName: editFullName, 
-      role: editRole 
+      role: editRole,
+      companyId: editCompanyId || null,
     });
   };
 
@@ -344,9 +370,9 @@ export function UserManager() {
             <TableHeader>
               <TableRow>
                 <TableHead>ชื่อ-นามสกุล</TableHead>
+                <TableHead>บริษัท</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead className="hidden md:table-cell">สร้างเมื่อ</TableHead>
-                <TableHead className="hidden md:table-cell">อัปเดตล่าสุด</TableHead>
                 <TableHead className="w-[80px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -369,6 +395,16 @@ export function UserManager() {
                     </div>
                   </TableCell>
                   <TableCell>
+                    {user.companies ? (
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <span>{user.companies.name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Badge variant={getRoleBadgeVariant(user.role)}>
                       <Shield className="h-3 w-3 mr-1" />
                       {user.role}
@@ -376,9 +412,6 @@ export function UserManager() {
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
                     {new Date(user.created_at).toLocaleDateString('th-TH')}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {new Date(user.updated_at).toLocaleDateString('th-TH')}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -464,6 +497,22 @@ export function UserManager() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="company">บริษัท</Label>
+              <Select value={newCompanyId} onValueChange={setNewCompanyId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือกบริษัท" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">ไม่ระบุ</SelectItem>
+                  {companies?.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name} {company.code && `(${company.code})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
               <Select value={newRole} onValueChange={(v) => setNewRole(v as AppRole)}>
                 <SelectTrigger>
@@ -472,9 +521,7 @@ export function UserManager() {
                 <SelectContent>
                   {ROLE_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      <div className="flex flex-col">
-                        <span>{option.label}</span>
-                      </div>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -522,6 +569,22 @@ export function UserManager() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="editCompany">บริษัท</Label>
+              <Select value={editCompanyId} onValueChange={setEditCompanyId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือกบริษัท" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">ไม่ระบุ</SelectItem>
+                  {companies?.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name} {company.code && `(${company.code})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="editRole">Role</Label>
               <Select value={editRole} onValueChange={(v) => setEditRole(v as AppRole)}>
                 <SelectTrigger>
@@ -530,9 +593,7 @@ export function UserManager() {
                 <SelectContent>
                   {ROLE_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      <div className="flex flex-col">
-                        <span>{option.label}</span>
-                      </div>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

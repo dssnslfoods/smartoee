@@ -5,3 +5,4 @@ export { DowntimeReasonManager } from './DowntimeReasonManager';
 export { DefectReasonManager } from './DefectReasonManager';
 export { UserPermissionManager } from './UserPermissionManager';
 export { UserManager } from './UserManager';
+export { CompanyManager } from './CompanyManager';
