@@ -913,6 +913,7 @@ export type Database = {
     }
     Functions: {
       get_line_from_machine: { Args: { _machine_id: string }; Returns: string }
+      get_user_company: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -936,6 +937,10 @@ export type Database = {
         Returns: boolean
       }
       is_supervisor: { Args: { _user_id: string }; Returns: boolean }
+      is_supervisor_of_company: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
       rpc_add_counts: {
         Args: {
           p_defect_reason_id?: string
