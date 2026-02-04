@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          after_json: Json | null
+          before_json: Json | null
+          entity_id: string
+          entity_type: string
+          id: string
+          ts: string
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          after_json?: Json | null
+          before_json?: Json | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          ts?: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          after_json?: Json | null
+          before_json?: Json | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          ts?: string
+        }
+        Relationships: []
+      }
       defect_reasons: {
         Row: {
           code: string
@@ -749,6 +782,20 @@ export type Database = {
       }
     }
     Views: {
+      v_audit_logs_readable: {
+        Row: {
+          action: string | null
+          actor_name: string | null
+          actor_user_id: string | null
+          after_json: Json | null
+          before_json: Json | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string | null
+          ts: string | null
+        }
+        Relationships: []
+      }
       v_current_shift_by_machine: {
         Row: {
           approval_status: Database["public"]["Enums"]["approval_status"] | null
