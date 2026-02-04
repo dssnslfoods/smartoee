@@ -2,8 +2,8 @@
 // SERVICE LAYER EXPORTS
 // =============================================
 
-// Supabase Client
-export { supabase } from './supabaseClient';
+// Supabase Client - use single source from integrations
+export { supabase } from '@/integrations/supabase/client';
 
 // OEE API (default export)
 export { default as oeeApi } from './oeeApi';

@@ -1,6 +1,19 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase, AppRole, UserProfile } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+
+// Type definitions from database
+type AppRole = Database['public']['Enums']['app_role'];
+
+interface UserProfile {
+  id: string;
+  user_id: string;
+  full_name: string;
+  role: AppRole;
+  created_at: string;
+  updated_at: string;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -58,25 +71,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async (userId: string) => {
     try {
-      // Fetch profile
+      // Fetch profile - role is stored in user_profiles table
       const { data: profileData } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('user_id', userId)
         .maybeSingle();
       
       if (profileData) {
-        setProfile(profileData);
-      }
-
-      // Fetch roles
-      const { data: rolesData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId);
-      
-      if (rolesData) {
-        setRoles(rolesData.map(r => r.role as AppRole));
+        setProfile(profileData as UserProfile);
+        // Set roles from profile - role is stored directly in user_profiles
+        setRoles([profileData.role as AppRole]);
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -117,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasRole = (role: AppRole) => roles.includes(role);
   
-  const isAdmin = () => roles.includes('admin');
+  const isAdmin = () => roles.includes('ADMIN');
 
   return (
     <AuthContext.Provider

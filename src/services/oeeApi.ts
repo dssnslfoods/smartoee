@@ -1,6 +1,7 @@
-import { supabase } from './supabaseClient';
+import { supabase } from '@/integrations/supabase/client';
 import type {
   EventType,
+  DowntimeCategory,
   Plant,
   Line,
   Machine,
@@ -55,7 +56,7 @@ export async function startEvent(
   });
 
   if (error) throw error;
-  return handleRpcError(data as StartEventResponse) as StartEventResponse;
+  return handleRpcError(data as unknown as StartEventResponse) as StartEventResponse;
 }
 
 export async function stopEvent(
@@ -68,7 +69,7 @@ export async function stopEvent(
   });
 
   if (error) throw error;
-  return handleRpcError(data as StopEventResponse) as StopEventResponse;
+  return handleRpcError(data as unknown as StopEventResponse) as StopEventResponse;
 }
 
 // =============================================
@@ -91,7 +92,7 @@ export async function addCounts(
   });
 
   if (error) throw error;
-  return handleRpcError(data as AddCountsResponse) as AddCountsResponse;
+  return handleRpcError(data as unknown as AddCountsResponse) as AddCountsResponse;
 }
 
 // =============================================
@@ -106,7 +107,7 @@ export async function approveShift(
   });
 
   if (error) throw error;
-  return handleRpcError(data as ApproveShiftResponse) as ApproveShiftResponse;
+  return handleRpcError(data as unknown as ApproveShiftResponse) as ApproveShiftResponse;
 }
 
 export async function lockShift(
@@ -117,7 +118,7 @@ export async function lockShift(
   });
 
   if (error) throw error;
-  return handleRpcError(data as LockShiftResponse) as LockShiftResponse;
+  return handleRpcError(data as unknown as LockShiftResponse) as LockShiftResponse;
 }
 
 export async function recalcOeeForShift(
@@ -128,7 +129,7 @@ export async function recalcOeeForShift(
   });
 
   if (error) throw error;
-  return handleRpcError(data as RecalcOeeResponse) as RecalcOeeResponse;
+  return handleRpcError(data as unknown as RecalcOeeResponse) as RecalcOeeResponse;
 }
 
 // =============================================
@@ -273,7 +274,7 @@ export async function getTodayShiftCalendar(plantId: string): Promise<ShiftCalen
 // QUERY FUNCTIONS - Reasons
 // =============================================
 
-export async function getDowntimeReasons(category?: string): Promise<DowntimeReason[]> {
+export async function getDowntimeReasons(category?: DowntimeCategory): Promise<DowntimeReason[]> {
   let query = supabase
     .from('downtime_reasons')
     .select('*')
@@ -286,7 +287,7 @@ export async function getDowntimeReasons(category?: string): Promise<DowntimeRea
 
   const { data, error } = await query;
   if (error) throw error;
-  return data || [];
+  return (data || []) as DowntimeReason[];
 }
 
 export async function getDefectReasons(): Promise<DefectReason[]> {

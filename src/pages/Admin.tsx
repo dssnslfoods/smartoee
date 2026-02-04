@@ -29,7 +29,7 @@ export default function Admin() {
     return <Navigate to="/auth" replace />;
   }
 
-  const isAdmin = hasRole('admin');
+  const isAdmin = hasRole('ADMIN');
 
   if (!isAdmin) {
     return (
