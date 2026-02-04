@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { CheckCircle2, Lock, RefreshCw, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { CheckCircle2, Lock, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { OEEMetricsPanel } from '@/components/supervisor/OEEMetricsPanel';
 import { ApprovalControls } from '@/components/supervisor/ApprovalControls';
 import { AuditLogViewer } from '@/components/supervisor/AuditLogViewer';
@@ -94,20 +94,13 @@ export default function Supervisor() {
   const isSupervisor = hasRole('SUPERVISOR') || hasRole('ADMIN');
 
   return (
-    <div className="min-h-screen bg-background">
+    <AppLayout>
       <div className="container mx-auto p-4 space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Link to="/shopfloor">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold">Supervisor Dashboard</h1>
-              <p className="text-muted-foreground">จัดการและปิดกะ</p>
-            </div>
+          <div>
+            <h1 className="text-2xl font-bold">Supervisor Dashboard</h1>
+            <p className="text-muted-foreground">จัดการและปิดกะ</p>
           </div>
           
           <div className="flex flex-wrap gap-3">
@@ -233,7 +226,7 @@ export default function Supervisor() {
           </Tabs>
         )}
       </div>
-    </div>
+    </AppLayout>
   );
 }
 

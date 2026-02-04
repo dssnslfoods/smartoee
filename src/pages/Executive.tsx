@@ -1,15 +1,13 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
-import { th } from 'date-fns/locale';
 import { Calendar, RefreshCw } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { OEETrendChart } from '@/components/dashboard/OEETrendChart';
 import {
   SummaryCards,
@@ -26,7 +24,6 @@ interface BreadcrumbItem {
 }
 
 export default function Executive() {
-  const { toast } = useToast();
   const { hasRole } = useAuth();
   
   const [dateRange, setDateRange] = useState<'7' | '14' | '30'>('7');
@@ -288,7 +285,7 @@ export default function Executive() {
   const isExecutive = hasRole('EXECUTIVE') || hasRole('ADMIN');
 
   return (
-    <div className="min-h-screen bg-background">
+    <AppLayout>
       <div className="container mx-auto p-4 space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -314,10 +311,6 @@ export default function Executive() {
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-
-            <Link to="/supervisor">
-              <Button variant="outline">Supervisor View</Button>
-            </Link>
           </div>
         </div>
 
@@ -385,6 +378,6 @@ export default function Executive() {
           </Card>
         )}
       </div>
-    </div>
+    </AppLayout>
   );
 }
