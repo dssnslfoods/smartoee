@@ -285,6 +285,7 @@ export type Database = {
       plants: {
         Row: {
           code: string | null
+          company_id: string | null
           created_at: string
           id: string
           is_active: boolean
@@ -293,6 +294,7 @@ export type Database = {
         }
         Insert: {
           code?: string | null
+          company_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -301,13 +303,22 @@ export type Database = {
         }
         Update: {
           code?: string | null
+          company_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
           name?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "plants_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       production_counts: {
         Row: {

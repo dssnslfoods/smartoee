@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -34,11 +35,19 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
+interface Company {
+  id: string;
+  name: string;
+  code: string | null;
+}
+
 interface Plant {
   id: string;
   name: string;
   code: string | null;
   is_active: boolean;
+  company_id: string | null;
+  companies?: Company | null;
 }
 
 export function PlantManager() {
@@ -47,14 +56,28 @@ export function PlantManager() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingPlant, setEditingPlant] = useState<Plant | null>(null);
   const [deletingPlant, setDeletingPlant] = useState<Plant | null>(null);
-  const [formData, setFormData] = useState({ name: '', code: '', is_active: true });
+  const [formData, setFormData] = useState({ name: '', code: '', is_active: true, company_id: '' });
+
+  // Fetch companies for dropdown
+  const { data: companies } = useQuery({
+    queryKey: ['admin-companies-dropdown'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name, code')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      return data as Company[];
+    },
+  });
 
   const { data: plants, isLoading } = useQuery({
     queryKey: ['admin-plants'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('plants')
-        .select('*')
+        .select('*, companies(id, name, code)')
         .order('name');
       if (error) throw error;
       return data as Plant[];
@@ -62,10 +85,15 @@ export function PlantManager() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; code: string; is_active: boolean }) => {
+    mutationFn: async (data: { name: string; code: string; is_active: boolean; company_id: string }) => {
       const { error } = await supabase
         .from('plants')
-        .insert({ name: data.name, code: data.code || null, is_active: data.is_active });
+        .insert({ 
+          name: data.name, 
+          code: data.code || null, 
+          is_active: data.is_active,
+          company_id: data.company_id || null,
+        });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -77,10 +105,15 @@ export function PlantManager() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { name: string; code: string; is_active: boolean } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { name: string; code: string; is_active: boolean; company_id: string } }) => {
       const { error } = await supabase
         .from('plants')
-        .update({ name: data.name, code: data.code || null, is_active: data.is_active })
+        .update({ 
+          name: data.name, 
+          code: data.code || null, 
+          is_active: data.is_active,
+          company_id: data.company_id || null,
+        })
         .eq('id', id);
       if (error) throw error;
     },
@@ -108,20 +141,25 @@ export function PlantManager() {
 
   const handleOpenCreate = () => {
     setEditingPlant(null);
-    setFormData({ name: '', code: '', is_active: true });
+    setFormData({ name: '', code: '', is_active: true, company_id: '' });
     setIsDialogOpen(true);
   };
 
   const handleOpenEdit = (plant: Plant) => {
     setEditingPlant(plant);
-    setFormData({ name: plant.name, code: plant.code || '', is_active: plant.is_active });
+    setFormData({ 
+      name: plant.name, 
+      code: plant.code || '', 
+      is_active: plant.is_active,
+      company_id: plant.company_id || '',
+    });
     setIsDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingPlant(null);
-    setFormData({ name: '', code: '', is_active: true });
+    setFormData({ name: '', code: '', is_active: true, company_id: '' });
   };
 
   const handleSubmit = () => {
@@ -158,6 +196,7 @@ export function PlantManager() {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Code</TableHead>
+              <TableHead>Company</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
@@ -167,6 +206,16 @@ export function PlantManager() {
               <TableRow key={plant.id}>
                 <TableCell className="font-medium">{plant.name}</TableCell>
                 <TableCell>{plant.code || '-'}</TableCell>
+                <TableCell>
+                  {plant.companies ? (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      <span>{plant.companies.name}</span>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   <span className={plant.is_active ? 'text-status-running' : 'text-muted-foreground'}>
                     {plant.is_active ? 'Active' : 'Inactive'}
@@ -186,7 +235,7 @@ export function PlantManager() {
             ))}
             {plants?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                   No plants found
                 </TableCell>
               </TableRow>
@@ -222,6 +271,22 @@ export function PlantManager() {
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 placeholder="e.g., PLT-001"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="company">Company</Label>
+              <Select value={formData.company_id} onValueChange={(v) => setFormData({ ...formData, company_id: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select company" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No company</SelectItem>
+                  {companies?.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name} {company.code && `(${company.code})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-2">
               <Switch
