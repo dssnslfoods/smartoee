@@ -867,6 +867,38 @@ export type Database = {
         Returns: boolean
       }
       is_supervisor: { Args: { _user_id: string }; Returns: boolean }
+      rpc_add_counts: {
+        Args: {
+          p_defect_reason_id?: string
+          p_good_qty: number
+          p_machine_id: string
+          p_notes?: string
+          p_reject_qty?: number
+        }
+        Returns: Json
+      }
+      rpc_approve_shift: {
+        Args: { p_shift_calendar_id: string }
+        Returns: Json
+      }
+      rpc_lock_shift: { Args: { p_shift_calendar_id: string }; Returns: Json }
+      rpc_recalc_oee_for_shift: {
+        Args: { p_shift_calendar_id: string }
+        Returns: Json
+      }
+      rpc_start_event: {
+        Args: {
+          p_event_type: Database["public"]["Enums"]["event_type"]
+          p_machine_id: string
+          p_notes?: string
+          p_reason_id?: string
+        }
+        Returns: Json
+      }
+      rpc_stop_event: {
+        Args: { p_machine_id: string; p_notes?: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "STAFF" | "SUPERVISOR" | "EXECUTIVE" | "ADMIN"
