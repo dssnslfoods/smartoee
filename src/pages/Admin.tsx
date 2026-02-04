@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom';
-import { Settings, Factory, Layers, Cpu, AlertTriangle, Ban, Users } from 'lucide-react';
+import { Settings, Factory, Layers, Cpu, AlertTriangle, Ban, Users, UserCog } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import {
   DowntimeReasonManager,
   DefectReasonManager,
   UserPermissionManager,
+  UserManager,
 } from '@/components/admin';
 
 export default function Admin() {
@@ -50,8 +51,12 @@ export default function Admin() {
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="plants" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex">
+        <Tabs defaultValue="users" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-flex">
+            <TabsTrigger value="users" className="gap-2">
+              <UserCog className="h-4 w-4 hidden sm:block" />
+              Users
+            </TabsTrigger>
             <TabsTrigger value="plants" className="gap-2">
               <Factory className="h-4 w-4 hidden sm:block" />
               Plants
@@ -80,6 +85,10 @@ export default function Admin() {
 
           <Card>
             <CardContent className="p-6">
+              <TabsContent value="users" className="mt-0">
+                <UserManager />
+              </TabsContent>
+
               <TabsContent value="plants" className="mt-0">
                 <PlantManager />
               </TabsContent>
