@@ -6,11 +6,18 @@ import type { Database } from '@/integrations/supabase/types';
 // Type definitions from database
 type AppRole = Database['public']['Enums']['app_role'];
 
+interface Company {
+  id: string;
+  name: string;
+  code: string | null;
+}
+
 interface UserProfile {
   id: string;
   user_id: string;
   full_name: string;
   role: AppRole;
+  company_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +26,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: UserProfile | null;
+  company: Company | null;
   roles: AppRole[];
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -34,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [company, setCompany] = useState<Company | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -51,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }, 0);
         } else {
           setProfile(null);
+          setCompany(null);
           setRoles([]);
         }
       }
@@ -82,6 +92,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(profileData as UserProfile);
         // Set roles from profile - role is stored directly in user_profiles
         setRoles([profileData.role as AppRole]);
+
+        // Fetch company if company_id exists
+        if (profileData.company_id) {
+          const { data: companyData } = await supabase
+            .from('companies')
+            .select('id, name, code')
+            .eq('id', profileData.company_id)
+            .maybeSingle();
+          
+          if (companyData) {
+            setCompany(companyData as Company);
+          }
+        } else {
+          setCompany(null);
+        }
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -117,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setProfile(null);
+    setCompany(null);
     setRoles([]);
   };
 
@@ -130,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         session,
         profile,
+        company,
         roles,
         isLoading,
         signIn,

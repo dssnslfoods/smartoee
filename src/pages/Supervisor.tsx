@@ -14,6 +14,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { OEEMetricsPanel } from '@/components/supervisor/OEEMetricsPanel';
 import { ApprovalControls } from '@/components/supervisor/ApprovalControls';
 import { AuditLogViewer } from '@/components/supervisor/AuditLogViewer';
+import { StaffManager } from '@/components/supervisor/StaffManager';
 import oeeApi from '@/services/oeeApi';
 
 export default function Supervisor() {
@@ -148,6 +149,7 @@ export default function Supervisor() {
           <Tabs defaultValue="shifts" className="space-y-4">
             <TabsList>
               <TabsTrigger value="shifts">สรุปกะ</TabsTrigger>
+              <TabsTrigger value="staff">จัดการพนักงาน</TabsTrigger>
               <TabsTrigger value="audit">Audit Log</TabsTrigger>
             </TabsList>
 
@@ -218,6 +220,10 @@ export default function Supervisor() {
                   </Card>
                 ))
               )}
+            </TabsContent>
+
+            <TabsContent value="staff">
+              <StaffManager />
             </TabsContent>
 
             <TabsContent value="audit">
