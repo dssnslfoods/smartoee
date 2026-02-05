@@ -13,7 +13,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground dark">
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
             <div className="h-12 w-12 rounded-full border-4 border-muted" />
@@ -30,7 +30,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background text-foreground dark">
       <AppSidebar />
       <main className="flex-1 overflow-auto">
         <div className="min-h-full">
