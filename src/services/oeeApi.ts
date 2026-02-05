@@ -285,7 +285,7 @@ export async function getTodayShiftCalendar(plantId: string): Promise<ShiftCalen
 // QUERY FUNCTIONS - Reasons
 // =============================================
 
-export async function getDowntimeReasons(category?: DowntimeCategory): Promise<DowntimeReason[]> {
+export async function getDowntimeReasons(category?: DowntimeCategory, companyId?: string): Promise<DowntimeReason[]> {
   let query = supabase
     .from('downtime_reasons')
     .select('*')
@@ -295,19 +295,27 @@ export async function getDowntimeReasons(category?: DowntimeCategory): Promise<D
   if (category) {
     query = query.eq('category', category);
   }
+  if (companyId) {
+    query = query.eq('company_id', companyId);
+  }
 
   const { data, error } = await query;
   if (error) throw error;
   return (data || []) as DowntimeReason[];
 }
 
-export async function getDefectReasons(): Promise<DefectReason[]> {
-  const { data, error } = await supabase
+export async function getDefectReasons(companyId?: string): Promise<DefectReason[]> {
+  let query = supabase
     .from('defect_reasons')
     .select('*')
     .eq('is_active', true)
     .order('name');
 
+  if (companyId) {
+    query = query.eq('company_id', companyId);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return data || [];
 }

@@ -102,14 +102,14 @@ export default function Shopfloor() {
   });
 
   const { data: downtimeReasons = [] } = useQuery({
-    queryKey: ['downtimeReasons'],
-    queryFn: () => getDowntimeReasons(),
+    queryKey: ['downtimeReasons', company?.id],
+    queryFn: () => getDowntimeReasons(undefined, company?.id),
     enabled: isAuthenticated === true,
   });
 
   const { data: defectReasons = [] } = useQuery({
-    queryKey: ['defectReasons'],
-    queryFn: () => getDefectReasons(),
+    queryKey: ['defectReasons', company?.id],
+    queryFn: () => getDefectReasons(company?.id),
     enabled: isAuthenticated === true,
   });
 
