@@ -3,13 +3,16 @@
  import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
  import { Badge } from '@/components/ui/badge';
  import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
- import { OEEGauge } from './OEEGauge';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
  import { Skeleton } from '@/components/ui/skeleton';
  import { useQuery } from '@tanstack/react-query';
  import { getMachineOEEHistory, getMachineById } from '@/services/oeeApi';
+import { exportToCSV, exportToExcel, formatOEEForExport } from '@/lib/exportUtils';
  import { cn } from '@/lib/utils';
  import { format } from 'date-fns';
- import { Play, Pause, AlertTriangle, Wrench, TrendingUp, TrendingDown, Minus, Clock, Calendar } from 'lucide-react';
+import { Play, Pause, AlertTriangle, Wrench, TrendingUp, TrendingDown, Minus, Clock, Calendar, Download, FileSpreadsheet, FileText } from 'lucide-react';
+import { toast } from 'sonner';
  import {
    Area,
    AreaChart,
@@ -90,6 +93,29 @@
  
    const oeeTrend = getTrend(latestOEE?.oee, previousOEE?.oee);
  
+  // Export handlers
+  const handleExportCSV = () => {
+    if (!oeeHistory?.snapshots?.length || !machine) {
+      toast.error('No data to export');
+      return;
+    }
+    const exportData = formatOEEForExport(oeeHistory.snapshots);
+    const filename = `${machine.code}_OEE_${period}_${format(new Date(), 'yyyyMMdd')}`;
+    exportToCSV(exportData, filename);
+    toast.success('CSV file downloaded');
+  };
+
+  const handleExportExcel = () => {
+    if (!oeeHistory?.snapshots?.length || !machine) {
+      toast.error('No data to export');
+      return;
+    }
+    const exportData = formatOEEForExport(oeeHistory.snapshots);
+    const filename = `${machine.code}_OEE_${period}_${format(new Date(), 'yyyyMMdd')}`;
+    exportToExcel(exportData, filename, `${machine.name} OEE`);
+    toast.success('Excel file downloaded');
+  };
+
    // Format chart data
    const chartData = (oeeHistory?.snapshots || [])
      .slice()
@@ -120,9 +146,29 @@
                    {machine?.code}
                  </Badge>
                </SheetTitle>
-               <SheetDescription>
-                 {machine?.line?.name} • {machine?.line?.plant?.name}
-               </SheetDescription>
+              <div className="flex items-center justify-between">
+                <SheetDescription>
+                  {machine?.line?.name} • {machine?.line?.plant?.name}
+                </SheetDescription>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Download className="h-4 w-4" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleExportCSV} className="gap-2 cursor-pointer">
+                      <FileText className="h-4 w-4" />
+                      Export as CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
+                      <FileSpreadsheet className="h-4 w-4" />
+                      Export as Excel
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
              </>
            )}
          </SheetHeader>
