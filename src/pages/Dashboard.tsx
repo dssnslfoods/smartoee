@@ -124,43 +124,57 @@
            </Select>
          </PageHeader>
  
-         {/* OEE Summary Cards - Racing Speedometer Style */}
-         <div className="grid gap-4 sm:gap-5 md:gap-6 grid-cols-2 md:grid-cols-4">
+          {/* Main OEE Gauge - Hero Section */}
+          <div className="flex flex-col items-center justify-center py-4 sm:py-6">
            {isLoading ? (
-             <>
-               <OEECardSkeleton />
-               <OEECardSkeleton />
-               <OEECardSkeleton />
-               <OEECardSkeleton />
-             </>
+              <OEECardSkeleton />
            ) : (
-             <>
-               <Card className="relative overflow-hidden bg-gradient-to-br from-card via-card to-oee-availability/5 border-oee-availability/30 shadow-[0_0_20px_-5px_hsl(var(--oee-availability)/0.3)] hover:shadow-[0_0_30px_-5px_hsl(var(--oee-availability)/0.5)] transition-shadow">
-                 <CardContent className="p-4 sm:p-5 flex flex-col items-center justify-center">
-                   <OEEGauge value={oee.availability} label="Availability" color="availability" size="sm" />
-                 </CardContent>
-               </Card>
+              <div className="relative">
+                {/* Glow backdrop */}
+                <div className="absolute inset-0 blur-3xl opacity-30 bg-oee-overall rounded-full scale-75" />
+                <Card className="relative overflow-hidden bg-gradient-to-br from-card via-card to-oee-overall/10 border-oee-overall/40 shadow-[0_0_60px_-10px_hsl(var(--oee-overall)/0.5)] p-6 sm:p-8">
+                  <CardContent className="p-0 flex flex-col items-center justify-center">
+                    <p className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-[0.2em] mb-2">Overall Equipment Effectiveness</p>
+                    <OEEGauge value={oee.oee} label="" color="overall" size="lg" />
+                    <p className="text-lg sm:text-xl font-bold text-foreground mt-3">
+                      {oee.oee >= 85 ? '🏆 World Class' : oee.oee >= 60 ? '✓ Acceptable' : '⚠ Needs Improvement'}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
  
-               <Card className="relative overflow-hidden bg-gradient-to-br from-card via-card to-oee-performance/5 border-oee-performance/30 shadow-[0_0_20px_-5px_hsl(var(--oee-performance)/0.3)] hover:shadow-[0_0_30px_-5px_hsl(var(--oee-performance)/0.5)] transition-shadow">
-                 <CardContent className="p-4 sm:p-5 flex flex-col items-center justify-center">
-                   <OEEGauge value={oee.performance} label="Performance" color="performance" size="sm" />
-                 </CardContent>
-               </Card>
+          {/* OEE Component Gauges - A P Q */}
+          <div className="grid gap-4 sm:gap-5 md:gap-6 grid-cols-3">
+            {isLoading ? (
+              <>
+                <OEECardSkeleton />
+                <OEECardSkeleton />
+                <OEECardSkeleton />
+              </>
+            ) : (
+              <>
+                <Card className="relative overflow-hidden bg-gradient-to-br from-card via-card to-oee-availability/5 border-oee-availability/30 shadow-[0_0_20px_-5px_hsl(var(--oee-availability)/0.3)] hover:shadow-[0_0_30px_-5px_hsl(var(--oee-availability)/0.5)] transition-shadow">
+                  <CardContent className="p-3 sm:p-5 flex flex-col items-center justify-center">
+                    <OEEGauge value={oee.availability} label="Availability" color="availability" size="sm" />
+                  </CardContent>
+                </Card>
  
-               <Card className="relative overflow-hidden bg-gradient-to-br from-card via-card to-oee-quality/5 border-oee-quality/30 shadow-[0_0_20px_-5px_hsl(var(--oee-quality)/0.3)] hover:shadow-[0_0_30px_-5px_hsl(var(--oee-quality)/0.5)] transition-shadow">
-                 <CardContent className="p-4 sm:p-5 flex flex-col items-center justify-center">
-                   <OEEGauge value={oee.quality} label="Quality" color="quality" size="sm" />
-                 </CardContent>
-               </Card>
+                <Card className="relative overflow-hidden bg-gradient-to-br from-card via-card to-oee-performance/5 border-oee-performance/30 shadow-[0_0_20px_-5px_hsl(var(--oee-performance)/0.3)] hover:shadow-[0_0_30px_-5px_hsl(var(--oee-performance)/0.5)] transition-shadow">
+                  <CardContent className="p-3 sm:p-5 flex flex-col items-center justify-center">
+                    <OEEGauge value={oee.performance} label="Performance" color="performance" size="sm" />
+                  </CardContent>
+                </Card>
  
-               <Card className="relative overflow-hidden bg-gradient-to-br from-card via-card to-oee-overall/10 border-oee-overall/40 shadow-[0_0_25px_-5px_hsl(var(--oee-overall)/0.4)] hover:shadow-[0_0_35px_-5px_hsl(var(--oee-overall)/0.6)] transition-shadow">
-                 <CardContent className="p-4 sm:p-5 flex flex-col items-center justify-center">
-                   <OEEGauge value={oee.oee} label="Overall OEE" color="overall" size="sm" />
-                 </CardContent>
-               </Card>
-             </>
-           )}
-         </div>
+                <Card className="relative overflow-hidden bg-gradient-to-br from-card via-card to-oee-quality/5 border-oee-quality/30 shadow-[0_0_20px_-5px_hsl(var(--oee-quality)/0.3)] hover:shadow-[0_0_30px_-5px_hsl(var(--oee-quality)/0.5)] transition-shadow">
+                  <CardContent className="p-3 sm:p-5 flex flex-col items-center justify-center">
+                    <OEEGauge value={oee.quality} label="Quality" color="quality" size="sm" />
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </div>
  
          {/* Quick Stats - Racing HUD Style */}
          <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
