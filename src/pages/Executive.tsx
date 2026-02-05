@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartCardSkeleton, GridSelectorSkeleton } from '@/components/ui/skeletons';
 import { useAuth } from '@/hooks/useAuth';
+ import { useFullscreen } from '@/hooks/useFullscreen';
+ import { FullscreenToggle } from '@/components/ui/FullscreenToggle';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { OEETrendChart } from '@/components/dashboard/OEETrendChart';
@@ -31,6 +33,7 @@ export default function Executive() {
   
   const [dateRange, setDateRange] = useState<'7' | '14' | '30'>('7');
   const [drillPath, setDrillPath] = useState<BreadcrumbItem[]>([]);
+   const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   const currentLevel = drillPath.length === 0 ? 'plant' : drillPath[drillPath.length - 1].level;
   const currentId = drillPath.length === 0 ? undefined : drillPath[drillPath.length - 1].id;
@@ -266,8 +269,12 @@ export default function Executive() {
 
   const isExecutive = hasRole('EXECUTIVE') || hasRole('ADMIN');
 
+   // Fullscreen layout wrapper
+   const ContentWrapper = isFullscreen ? 'div' : AppLayout;
+   const wrapperProps = isFullscreen ? { className: 'fixed inset-0 z-50 overflow-auto bg-background dark' } : {};
+ 
   return (
-    <AppLayout>
+     <ContentWrapper {...wrapperProps}>
       <div className="page-container space-y-6">
         {/* Header */}
         <PageHeader 
@@ -275,6 +282,9 @@ export default function Executive() {
           description="OEE Overview & Analysis"
           icon={BarChart3}
         >
+           {/* Fullscreen Toggle */}
+           <FullscreenToggle isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
+ 
           <Select value={dateRange} onValueChange={(v: '7' | '14' | '30') => setDateRange(v)}>
             <SelectTrigger className="w-[140px] sm:w-[160px] bg-background">
               <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -369,6 +379,6 @@ export default function Executive() {
           </Card>
         )}
       </div>
-    </AppLayout>
+     </ContentWrapper>
   );
 }
