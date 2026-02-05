@@ -89,14 +89,33 @@ export function StaffManager() {
       if (!profile?.company_id) throw new Error('ไม่พบข้อมูลบริษัท');
 
       // Call edge function to create user without affecting current session
-      const { data, error } = await supabase.functions.invoke('create-staff-user', {
+      const response = await supabase.functions.invoke<{ success: boolean; message?: string; error?: string; user?: { id: string; email: string } }>('create-staff-user', {
         body: { email, password, fullName },
       });
       
-      if (error) throw new Error(error.message);
-      if (!data.success) throw new Error(data.message || 'ไม่สามารถสร้างผู้ใช้ได้');
+      // Handle edge function errors - check data first as it may contain error info
+      if (response.data && !response.data.success) {
+        throw new Error(response.data.message || 'ไม่สามารถสร้างผู้ใช้ได้');
+      }
+      
+      if (response.error) {
+        // FunctionsHttpError contains error response body
+        let errMessage = 'ไม่สามารถสร้างผู้ใช้ได้';
+        try {
+          // The error.context may contain the response body
+          const context = response.error as unknown as { message?: string };
+          if (context.message) {
+            errMessage = context.message;
+          }
+        } catch {
+          // Ignore parse error
+        }
+        throw new Error(errMessage);
+      }
+      
+      if (!response.data) throw new Error('ไม่ได้รับข้อมูลตอบกลับจากเซิร์ฟเวอร์');
 
-      return data.user;
+      return response.data.user;
     },
     onSuccess: () => {
       toast({ title: 'สำเร็จ', description: 'สร้างผู้ใช้ Staff เรียบร้อยแล้ว' });

@@ -1,8 +1,8 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -112,11 +112,19 @@ Deno.serve(async (req) => {
     });
 
     if (createError) {
+      console.error("Failed to create user:", createError.message);
+      // Check for duplicate email error
+      let errorMessage = createError.message;
+      if (createError.message.includes("already been registered") || createError.message.includes("duplicate")) {
+        errorMessage = "อีเมลนี้ถูกใช้งานแล้ว กรุณาใช้อีเมลอื่น";
+      }
       return new Response(
-        JSON.stringify({ success: false, error: "CREATE_ERROR", message: createError.message }),
+        JSON.stringify({ success: false, error: "CREATE_ERROR", message: errorMessage }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log("User created successfully:", { id: newUser.user.id, email: newUser.user.email, role: targetRole });
 
     return new Response(
       JSON.stringify({ 
