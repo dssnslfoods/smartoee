@@ -657,6 +657,42 @@ export async function getOEETrend(companyId?: string): Promise<{ date: string; a
 }
 
 // =============================================
+// MACHINE DETAIL FUNCTIONS
+// =============================================
+
+export interface MachineOEEHistory {
+  machine: Machine | null;
+  snapshots: OeeSnapshot[];
+}
+
+/**
+ * Get OEE history for a specific machine
+ */
+export async function getMachineOEEHistory(machineId: string, days: number = 7): Promise<MachineOEEHistory> {
+  // Get machine info
+  const machine = await getMachineById(machineId);
+
+  // Get snapshots for specified days
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  const { data: snapshots, error } = await supabase
+    .from('oee_snapshots')
+    .select('*')
+    .eq('scope', 'MACHINE')
+    .eq('scope_id', machineId)
+    .gte('period_start', startDate.toISOString())
+    .order('period_start', { ascending: false });
+
+  if (error) throw error;
+
+  return {
+    machine,
+    snapshots: snapshots || [],
+  };
+}
+
+// =============================================
 // QUERY FUNCTIONS - Views
 // =============================================
 

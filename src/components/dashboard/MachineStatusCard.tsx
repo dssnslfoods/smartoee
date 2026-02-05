@@ -1,7 +1,6 @@
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Wrench, Play, Pause, AlertTriangle } from 'lucide-react';
 
 interface MachineStatusCardProps {
@@ -11,6 +10,7 @@ interface MachineStatusCardProps {
   oee: number;
   currentProduct?: string;
   compact?: boolean;
+  onClick?: () => void;
 }
 
 const statusConfig = {
@@ -55,6 +55,7 @@ export function MachineStatusCard({
   oee, 
   currentProduct,
   compact = false,
+  onClick,
 }: MachineStatusCardProps) {
   const config = statusConfig[status];
   const StatusIcon = config.icon;
@@ -62,9 +63,12 @@ export function MachineStatusCard({
   if (compact) {
     return (
       <div className={cn(
-        'flex items-center justify-between gap-3 rounded-lg border-l-4 bg-muted/30 p-3 transition-colors hover:bg-muted/50',
-        config.borderClass
-      )}>
+        'flex items-center justify-between gap-3 rounded-lg border-l-4 bg-muted/30 p-3 transition-colors hover:bg-muted/50 cursor-pointer',
+        config.borderClass,
+        onClick && 'hover:shadow-sm active:scale-[0.99]'
+      )}
+        onClick={onClick}
+      >
         <div className="flex items-center gap-3 min-w-0">
           <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', config.bgClass)}>
             <StatusIcon className={cn('h-4 w-4', config.textClass)} />
@@ -89,9 +93,12 @@ export function MachineStatusCard({
 
   return (
     <Card className={cn(
-      'relative overflow-hidden border-l-4 transition-all hover:shadow-md',
-      config.borderClass
-    )}>
+      'relative overflow-hidden border-l-4 transition-all hover:shadow-md cursor-pointer',
+      config.borderClass,
+      onClick && 'active:scale-[0.99]'
+    )}
+    onClick={onClick}
+    >
       <CardContent className="p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="min-w-0">
