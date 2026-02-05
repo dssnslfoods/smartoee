@@ -85,7 +85,7 @@
  
    return (
      <AppLayout>
-       <div className="page-container space-y-6 dark">
+        <div className="page-container space-y-6 dark bg-background text-foreground min-h-screen">
          {/* Header */}
          <PageHeader 
            title="OEE Dashboard" 
