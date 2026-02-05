@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
  import { Skeleton } from '@/components/ui/skeleton';
  import { useQuery } from '@tanstack/react-query';
  import { getMachineOEEHistory, getMachineById } from '@/services/oeeApi';
+import { getMachineDowntimeBreakdown, type DowntimeBreakdown } from '@/services/oeeApi';
 import { exportToCSV, exportToExcel, formatOEEForExport } from '@/lib/exportUtils';
  import { cn } from '@/lib/utils';
  import { format } from 'date-fns';
@@ -22,6 +23,7 @@ import { toast } from 'sonner';
    XAxis,
    YAxis,
  } from 'recharts';
+import { Bar, BarChart, Cell } from 'recharts';
  
  interface MachineDetailSheetProps {
    machineId: string | null;
@@ -77,7 +79,14 @@ import { toast } from 'sonner';
      enabled: !!machineId && open,
    });
  
-   const isLoading = isLoadingMachine || isLoadingHistory;
+  // Fetch downtime breakdown
+  const { data: downtimeBreakdown, isLoading: isLoadingDowntime } = useQuery({
+    queryKey: ['machineDowntimeBreakdown', machineId, period],
+    queryFn: () => getMachineDowntimeBreakdown(machineId!, period === '7d' ? 7 : 30),
+    enabled: !!machineId && open,
+  });
+
+  const isLoading = isLoadingMachine || isLoadingHistory || isLoadingDowntime;
  
    // Calculate current OEE from latest snapshot
    const latestOEE = oeeHistory?.snapshots?.[0];
@@ -92,6 +101,28 @@ import { toast } from 'sonner';
    };
  
    const oeeTrend = getTrend(latestOEE?.oee, previousOEE?.oee);
+
+  // Downtime chart colors by category
+  const categoryColors: Record<string, string> = {
+    PLANNED: 'hsl(var(--status-idle))',
+    UNPLANNED: 'hsl(var(--status-stopped))',
+    BREAKDOWN: 'hsl(var(--destructive))',
+    CHANGEOVER: 'hsl(var(--status-maintenance))',
+  };
+
+  // Format downtime data for chart
+  const downtimeChartData = (downtimeBreakdown || []).slice(0, 8).map((item) => ({
+    name: item.reason_name.length > 15 ? item.reason_name.substring(0, 15) + '...' : item.reason_name,
+    fullName: item.reason_name,
+    code: item.reason_code,
+    minutes: item.total_minutes,
+    hours: Math.round(item.total_minutes / 60 * 10) / 10,
+    count: item.event_count,
+    category: item.category,
+    color: categoryColors[item.category] || 'hsl(var(--muted-foreground))',
+  }));
+
+  const totalDowntimeMinutes = (downtimeBreakdown || []).reduce((sum, d) => sum + d.total_minutes, 0);
  
   // Export handlers
   const handleExportCSV = () => {
@@ -396,6 +427,95 @@ import { toast } from 'sonner';
              </CardContent>
            </Card>
  
+          {/* Downtime Breakdown Chart */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium">Downtime Breakdown</CardTitle>
+                {totalDowntimeMinutes > 0 && (
+                  <Badge variant="outline" className="text-xs">
+                    Total: {Math.floor(totalDowntimeMinutes / 60)}h {totalDowntimeMinutes % 60}m
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <Skeleton className="h-48 w-full" />
+              ) : downtimeChartData.length === 0 ? (
+                <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
+                  No downtime data available
+                </div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={downtimeChartData} layout="vertical" margin={{ left: 0, right: 10 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
+                      <XAxis
+                        type="number"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 10 }}
+                        className="fill-muted-foreground"
+                        tickFormatter={(val) => `${val}m`}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 10 }}
+                        className="fill-muted-foreground"
+                        width={100}
+                      />
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null;
+                          const data = payload[0].payload;
+                          return (
+                            <div className="rounded-lg border bg-background p-3 shadow-lg">
+                              <p className="text-sm font-medium mb-1">{data.fullName}</p>
+                              <p className="text-xs text-muted-foreground mb-2">Code: {data.code}</p>
+                              <div className="grid gap-1 text-sm">
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-muted-foreground">Duration:</span>
+                                  <span className="font-medium">{data.minutes} min ({data.hours}h)</span>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-muted-foreground">Occurrences:</span>
+                                  <span className="font-medium">{data.count}</span>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-muted-foreground">Category:</span>
+                                  <Badge variant="outline" className="text-xs">{data.category}</Badge>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }}
+                      />
+                      <Bar dataKey="minutes" radius={[0, 4, 4, 0]}>
+                        {downtimeChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                  
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-3 mt-3 justify-center">
+                    {Object.entries(categoryColors).map(([category, color]) => (
+                      <div key={category} className="flex items-center gap-1.5 text-xs">
+                        <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
+                        <span className="text-muted-foreground capitalize">{category.toLowerCase()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
            {/* Shift History List */}
            <Card>
              <CardHeader className="pb-2">
