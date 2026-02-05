@@ -157,28 +157,19 @@ export function UserManager() {
       role: AppRole;
       companyId: string | null;
     }) => {
-      // Sign up the user with metadata including company_id and role
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            full_name: fullName,
-            role: role,
-            company_id: companyId,
-          },
-        },
+      // Use edge function to create user without affecting current session
+      const { data, error } = await supabase.functions.invoke('create-staff-user', {
+        body: { email, password, fullName, role, companyId },
       });
       
-      if (signUpError) throw signUpError;
-      if (!authData.user) throw new Error('Failed to create user');
+      if (error) throw new Error(error.message);
+      if (!data.success) throw new Error(data.message || 'ไม่สามารถสร้างผู้ใช้ได้');
 
-      return authData.user;
+      return data.user;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-all-users'] });
-      toast.success('สร้างผู้ใช้สำเร็จ - กรุณาให้ผู้ใช้ยืนยันอีเมล');
+      toast.success('สร้างผู้ใช้สำเร็จ');
       handleCloseCreateDialog();
     },
     onError: (error: Error) => {

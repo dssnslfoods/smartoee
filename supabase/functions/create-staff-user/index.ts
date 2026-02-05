@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const { email, password, fullName } = await req.json();
+    const { email, password, fullName, role, companyId } = await req.json();
 
     if (!email || !password || !fullName) {
       return new Response(
@@ -75,6 +75,20 @@ Deno.serve(async (req) => {
         JSON.stringify({ success: false, error: "VALIDATION_ERROR", message: "Password must be at least 6 characters" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Determine role and company_id based on caller
+    let targetRole = "STAFF";
+    let targetCompanyId = profile.company_id;
+
+    if (profile.role === "ADMIN") {
+      // Admin can specify any role and company
+      targetRole = role || "STAFF";
+      targetCompanyId = companyId || profile.company_id;
+    } else {
+      // Supervisor can only create STAFF in their company
+      targetRole = "STAFF";
+      targetCompanyId = profile.company_id;
     }
 
     // Create admin client with service role key
@@ -92,8 +106,8 @@ Deno.serve(async (req) => {
       email_confirm: true, // Auto-confirm email
       user_metadata: {
         full_name: fullName,
-        role: "STAFF",
-        company_id: profile.company_id,
+        role: targetRole,
+        company_id: targetCompanyId,
       },
     });
 
@@ -111,7 +125,7 @@ Deno.serve(async (req) => {
           id: newUser.user.id, 
           email: newUser.user.email 
         },
-        message: "Staff user created successfully" 
+        message: "User created successfully" 
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
