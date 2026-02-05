@@ -59,22 +59,36 @@
      console.log("Requester:", { id: requester.id, role: requesterProfile.role, company_id: requesterProfile.company_id });
  
      // Parse request body
-     const { targetUserId, newPassword } = await req.json();
+    const { targetUserId, newPassword, newEmail } = await req.json();
  
-     if (!targetUserId || !newPassword) {
+    if (!targetUserId) {
        return new Response(
-         JSON.stringify({ success: false, error: "VALIDATION_ERROR", message: "targetUserId and newPassword are required" }),
+        JSON.stringify({ success: false, error: "VALIDATION_ERROR", message: "targetUserId is required" }),
          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
        );
      }
  
-     if (newPassword.length < 6) {
+    if (!newPassword && !newEmail) {
+      return new Response(
+        JSON.stringify({ success: false, error: "VALIDATION_ERROR", message: "newPassword or newEmail is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (newPassword && newPassword.length < 6) {
        return new Response(
          JSON.stringify({ success: false, error: "VALIDATION_ERROR", message: "Password must be at least 6 characters" }),
          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
        );
      }
  
+    if (newEmail && !newEmail.includes("@")) {
+      return new Response(
+        JSON.stringify({ success: false, error: "VALIDATION_ERROR", message: "Invalid email format" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
      // Create admin client with service role key
      const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
        auth: {
@@ -107,7 +121,7 @@
      // Admin can update any user
      // Supervisor can only update STAFF in the same company
      if (isAdmin) {
-       console.log("Admin updating user password");
+      console.log("Admin updating user account");
      } else if (isSupervisor) {
        // Supervisor can only update STAFF in their company
        if (targetProfile.role !== "STAFF") {
@@ -124,35 +138,44 @@
            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
          );
        }
-       console.log("Supervisor updating staff password");
+      console.log("Supervisor updating staff account");
      } else {
        console.error("Insufficient permissions:", requesterProfile.role);
        return new Response(
-         JSON.stringify({ success: false, error: "PERMISSION_DENIED", message: "Only admins and supervisors can update passwords" }),
+        JSON.stringify({ success: false, error: "PERMISSION_DENIED", message: "Only admins and supervisors can update user accounts" }),
          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
        );
      }
  
-     // Update the user's password using admin API
-     const { data: updatedUser, error: updateError } = await adminClient.auth.admin.updateUserById(
-       targetUserId,
-       { password: newPassword }
-     );
+    // Build update payload
+    const updatePayload: { password?: string; email?: string } = {};
+    if (newPassword) {
+      updatePayload.password = newPassword;
+    }
+    if (newEmail) {
+      updatePayload.email = newEmail;
+    }
+
+    // Update the user using admin API
+    const { data: updatedUser, error: updateError } = await adminClient.auth.admin.updateUserById(
+      targetUserId,
+      updatePayload
+    );
  
      if (updateError) {
-       console.error("Failed to update password:", updateError.message);
+      console.error("Failed to update user:", updateError.message);
        return new Response(
          JSON.stringify({ success: false, error: "UPDATE_ERROR", message: updateError.message }),
          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
        );
      }
  
-     console.log("Password updated successfully for user:", targetUserId);
+    console.log("User updated successfully:", targetUserId, { emailUpdated: !!newEmail, passwordUpdated: !!newPassword });
  
      return new Response(
        JSON.stringify({ 
          success: true, 
-         message: "Password updated successfully",
+        message: "User updated successfully",
          user: {
            id: updatedUser.user.id,
            email: updatedUser.user.email
@@ -163,7 +186,7 @@
  
    } catch (error) {
      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-     console.error("Error updating user password:", errorMessage);
+    console.error("Error updating user:", errorMessage);
      return new Response(
        JSON.stringify({ success: false, error: "INTERNAL_ERROR", message: errorMessage }),
        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

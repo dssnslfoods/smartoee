@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, User, Loader2, Settings, KeyRound, Pencil } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,7 +57,7 @@ export function StaffManager() {
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [permissionUser, setPermissionUser] = useState<{ userId: string; name: string } | null>(null);
   const [editUser, setEditUser] = useState<StaffUser | null>(null);
-  const [editForm, setEditForm] = useState({ fullName: '', newPassword: '' });
+  const [editForm, setEditForm] = useState({ fullName: '', newPassword: '', newEmail: '' });
   const [newUserForm, setNewUserForm] = useState({
     email: '',
     password: '',
@@ -110,7 +111,7 @@ export function StaffManager() {
 
   // Update staff user mutation
   const updateStaffMutation = useMutation({
-    mutationFn: async ({ userId, fullName, newPassword }: { userId: string; fullName: string; newPassword?: string }) => {
+    mutationFn: async ({ userId, fullName, newPassword, newEmail }: { userId: string; fullName: string; newPassword?: string; newEmail?: string }) => {
       // Update profile name
       const { error: profileError } = await supabase
         .from('user_profiles')
@@ -119,21 +120,21 @@ export function StaffManager() {
       
       if (profileError) throw profileError;
 
-      // Update password if provided
-      if (newPassword && newPassword.length >= 6) {
+      // Update password/email if provided
+      if ((newPassword && newPassword.length >= 6) || newEmail) {
         const { data, error } = await supabase.functions.invoke('update-user-password', {
-          body: { targetUserId: userId, newPassword },
+          body: { targetUserId: userId, newPassword: newPassword || undefined, newEmail: newEmail || undefined },
         });
         
         if (error) throw new Error(error.message);
-        if (!data.success) throw new Error(data.message || 'ไม่สามารถอัปเดตรหัสผ่านได้');
+        if (!data.success) throw new Error(data.message || 'ไม่สามารถอัปเดตบัญชีได้');
       }
     },
     onSuccess: () => {
       toast({ title: 'สำเร็จ', description: 'อัปเดตข้อมูลผู้ใช้เรียบร้อยแล้ว' });
       queryClient.invalidateQueries({ queryKey: ['staff-users'] });
       setEditUser(null);
-      setEditForm({ fullName: '', newPassword: '' });
+      setEditForm({ fullName: '', newPassword: '', newEmail: '' });
     },
     onError: (error: Error) => {
       toast({ title: 'เกิดข้อผิดพลาด', description: error.message, variant: 'destructive' });
@@ -193,16 +194,22 @@ export function StaffManager() {
       return;
     }
 
+    if (editForm.newEmail && !editForm.newEmail.includes('@')) {
+      toast({ title: 'ข้อผิดพลาด', description: 'รูปแบบอีเมลไม่ถูกต้อง', variant: 'destructive' });
+      return;
+    }
+
     updateStaffMutation.mutate({
       userId: editUser.user_id,
       fullName: editForm.fullName,
       newPassword: editForm.newPassword || undefined,
+      newEmail: editForm.newEmail || undefined,
     });
   };
 
   const openEditDialog = (user: StaffUser) => {
     setEditUser(user);
-    setEditForm({ fullName: user.full_name, newPassword: '' });
+    setEditForm({ fullName: user.full_name, newPassword: '', newEmail: '' });
   };
 
   if (!company) {
@@ -400,6 +407,22 @@ export function StaffManager() {
                 />
                 <p className="text-xs text-muted-foreground">
                   หากต้องการเปลี่ยนรหัสผ่าน กรอกรหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editEmail" className="flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  อีเมลใหม่ (ไม่บังคับ)
+                </Label>
+                <Input
+                  id="editEmail"
+                  type="email"
+                  value={editForm.newEmail}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, newEmail: e.target.value }))}
+                  placeholder="เว้นว่างหากไม่ต้องการเปลี่ยน"
+                />
+                <p className="text-xs text-muted-foreground">
+                  หากต้องการเปลี่ยนอีเมล กรอกอีเมลใหม่ที่ต้องการ
                 </p>
               </div>
             </div>
