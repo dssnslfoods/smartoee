@@ -129,6 +129,7 @@ export default function Executive() {
       return { snapshots: data || [], summary };
     },
     enabled: plants !== undefined,
+    refetchInterval: isFullscreen ? 30000 : false,
   });
 
   const { data: downtimeData } = useQuery({
@@ -193,6 +194,7 @@ export default function Executive() {
         };
       });
     },
+    refetchInterval: isFullscreen ? 30000 : false,
   });
 
   const trendData = useMemo(() => {
