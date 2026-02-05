@@ -692,6 +692,76 @@ export async function getMachineOEEHistory(machineId: string, days: number = 7):
   };
 }
 
+export interface DowntimeBreakdown {
+  reason_id: string;
+  reason_name: string;
+  reason_code: string;
+  category: string;
+  total_minutes: number;
+  event_count: number;
+}
+
+/**
+ * Get downtime breakdown by reason for a machine within a time period
+ */
+export async function getMachineDowntimeBreakdown(
+  machineId: string,
+  days: number = 7
+): Promise<DowntimeBreakdown[]> {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  
+  // Get all downtime/setup events for this machine
+  const { data: events, error } = await supabase
+    .from('production_events')
+    .select(`
+      id,
+      event_type,
+      start_ts,
+      end_ts,
+      reason_id,
+      reason:downtime_reasons(id, name, code, category)
+    `)
+    .eq('machine_id', machineId)
+    .in('event_type', ['DOWNTIME', 'SETUP'])
+    .gte('start_ts', startDate.toISOString())
+    .not('reason_id', 'is', null);
+
+  if (error) throw error;
+  if (!events || events.length === 0) return [];
+
+  // Aggregate by reason
+  const breakdownMap = new Map<string, DowntimeBreakdown>();
+  
+  for (const event of events) {
+    if (!event.reason_id || !event.reason) continue;
+    
+    const endTs = event.end_ts ? new Date(event.end_ts) : new Date();
+    const startTs = new Date(event.start_ts);
+    const durationMinutes = Math.round((endTs.getTime() - startTs.getTime()) / (1000 * 60));
+    
+    const reason = event.reason as unknown as { id: string; name: string; code: string; category: string };
+    
+    if (breakdownMap.has(event.reason_id)) {
+      const existing = breakdownMap.get(event.reason_id)!;
+      existing.total_minutes += durationMinutes;
+      existing.event_count += 1;
+    } else {
+      breakdownMap.set(event.reason_id, {
+        reason_id: event.reason_id,
+        reason_name: reason.name,
+        reason_code: reason.code,
+        category: reason.category,
+        total_minutes: durationMinutes,
+        event_count: 1,
+      });
+    }
+  }
+
+  // Sort by total duration descending
+  return Array.from(breakdownMap.values()).sort((a, b) => b.total_minutes - a.total_minutes);
+}
+
 // =============================================
 // QUERY FUNCTIONS - Views
 // =============================================
