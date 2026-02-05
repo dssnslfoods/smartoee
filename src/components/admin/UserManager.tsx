@@ -105,6 +105,7 @@ export function UserManager() {
   const [editRole, setEditRole] = useState<AppRole>('STAFF');
   const [editCompanyId, setEditCompanyId] = useState<string>('');
   const [editPassword, setEditPassword] = useState('');
+  const [editEmail, setEditEmail] = useState('');
 
   // Set default company_id when company changes
   useEffect(() => {
@@ -212,18 +213,20 @@ export function UserManager() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  // Update password mutation
-  const updatePasswordMutation = useMutation({
-    mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
+  // Update account mutation (email/password)
+  const updateAccountMutation = useMutation({
+    mutationFn: async ({ userId, newPassword, newEmail }: { userId: string; newPassword?: string; newEmail?: string }) => {
+      if (!newPassword && !newEmail) return;
+      
       const { data, error } = await supabase.functions.invoke('update-user-password', {
-        body: { targetUserId: userId, newPassword },
+        body: { targetUserId: userId, newPassword: newPassword || undefined, newEmail: newEmail || undefined },
       });
       
       if (error) throw new Error(error.message);
-      if (!data.success) throw new Error(data.message || 'ไม่สามารถอัปเดตรหัสผ่านได้');
+      if (!data.success) throw new Error(data.message || 'ไม่สามารถอัปเดตบัญชีได้');
     },
     onSuccess: () => {
-      toast.success('อัปเดตรหัสผ่านสำเร็จ');
+      toast.success('อัปเดตบัญชีสำเร็จ');
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -288,6 +291,7 @@ export function UserManager() {
     setEditRole(user.role);
     setEditCompanyId(user.company_id || '');
     setEditPassword('');
+    setEditEmail('');
     setIsEditDialogOpen(true);
   };
 
@@ -298,6 +302,7 @@ export function UserManager() {
     setEditRole('STAFF');
     setEditCompanyId('');
     setEditPassword('');
+    setEditEmail('');
   };
 
   const handleOpenDeleteDialog = (user: UserProfile) => {
@@ -343,9 +348,13 @@ export function UserManager() {
       companyId: editCompanyId || null,
     }, {
       onSuccess: () => {
-        // If password was provided, update it
-        if (editPassword && editPassword.length >= 6) {
-          updatePasswordMutation.mutate({ userId: selectedUser.user_id, newPassword: editPassword });
+        // If password or email was provided, update account
+        if ((editPassword && editPassword.length >= 6) || editEmail) {
+          updateAccountMutation.mutate({ 
+            userId: selectedUser.user_id, 
+            newPassword: editPassword || undefined,
+            newEmail: editEmail || undefined,
+          });
         }
       }
     });
@@ -664,6 +673,22 @@ export function UserManager() {
                 หากต้องการเปลี่ยนรหัสผ่าน กรอกรหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร
               </p>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="editEmail" className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                อีเมลใหม่ (ไม่บังคับ)
+              </Label>
+              <Input
+                id="editEmail"
+                type="email"
+                placeholder="เว้นว่างหากไม่ต้องการเปลี่ยน"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                หากต้องการเปลี่ยนอีเมล กรอกอีเมลใหม่ที่ต้องการ
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={handleCloseEditDialog}>
@@ -671,9 +696,9 @@ export function UserManager() {
             </Button>
             <Button 
               onClick={handleUpdateUser} 
-              disabled={updateUserMutation.isPending || updatePasswordMutation.isPending}
+              disabled={updateUserMutation.isPending || updateAccountMutation.isPending}
             >
-              {(updateUserMutation.isPending || updatePasswordMutation.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {(updateUserMutation.isPending || updateAccountMutation.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               บันทึก
             </Button>
           </DialogFooter>
