@@ -79,6 +79,14 @@ export default {
           4: "hsl(var(--chart-4))",
           5: "hsl(var(--chart-5))",
         },
+        // Neon Glow Colors for Racing Theme
+        neon: {
+          cyan: "hsl(var(--neon-cyan))",
+          green: "hsl(var(--neon-green))",
+          yellow: "hsl(var(--neon-yellow))",
+          magenta: "hsl(var(--neon-magenta))",
+          red: "hsl(var(--neon-red))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -98,11 +106,27 @@ export default {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.7" },
         },
+        "neon-pulse": {
+          "0%, 100%": { 
+            filter: "drop-shadow(0 0 8px currentColor)",
+            opacity: "1"
+          },
+          "50%": { 
+            filter: "drop-shadow(0 0 20px currentColor)",
+            opacity: "0.9"
+          },
+        },
+        "gauge-fill": {
+          "0%": { strokeDashoffset: "283" },
+          "100%": { strokeDashoffset: "var(--gauge-offset)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-slow": "pulse-slow 2s ease-in-out infinite",
+        "neon-pulse": "neon-pulse 2s ease-in-out infinite",
+        "gauge-fill": "gauge-fill 1s ease-out forwards",
       },
     },
   },

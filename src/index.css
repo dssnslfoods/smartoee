@@ -89,71 +89,78 @@
   }
 
   .dark {
-    /* Industrial Dark Mode */
-    --background: 220 28% 7%;
-    --foreground: 210 18% 94%;
+    /* Racing Dashboard Dark Mode - Cockpit Style */
+    --background: 220 40% 4%;
+    --foreground: 210 20% 96%;
 
-    --card: 220 26% 11%;
-    --card-foreground: 210 18% 94%;
+    --card: 220 35% 8%;
+    --card-foreground: 210 20% 96%;
 
-    --popover: 220 26% 11%;
-    --popover-foreground: 210 18% 94%;
+    --popover: 220 35% 10%;
+    --popover-foreground: 210 20% 96%;
 
-    --primary: 213 94% 55%;
-    --primary-foreground: 220 28% 7%;
+    --primary: 190 95% 50%;
+    --primary-foreground: 220 40% 4%;
 
-    --secondary: 220 22% 16%;
-    --secondary-foreground: 210 18% 92%;
+    --secondary: 220 30% 12%;
+    --secondary-foreground: 210 20% 90%;
 
-    --muted: 220 22% 14%;
-    --muted-foreground: 210 14% 55%;
+    --muted: 220 30% 10%;
+    --muted-foreground: 210 15% 50%;
 
-    --accent: 220 26% 18%;
-    --accent-foreground: 213 94% 62%;
+    --accent: 220 35% 14%;
+    --accent-foreground: 190 95% 60%;
 
-    --destructive: 0 72% 48%;
+    --destructive: 0 85% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 22% 16%;
-    --input: 220 22% 16%;
-    --ring: 213 94% 55%;
+    --border: 220 30% 15%;
+    --input: 220 30% 12%;
+    --ring: 190 95% 50%;
 
-    /* OEE Metric Colors - Dark Mode (Brighter) */
-    --oee-availability: 152 72% 48%;
-    --oee-performance: 38 94% 52%;
-    --oee-quality: 213 94% 58%;
-    --oee-overall: 270 72% 58%;
+    /* OEE Metric Colors - Neon Racing Style */
+    --oee-availability: 160 100% 50%;
+    --oee-performance: 45 100% 55%;
+    --oee-quality: 190 100% 55%;
+    --oee-overall: 280 100% 65%;
 
-    /* Status Colors - Dark Mode */
-    --status-running: 152 72% 48%;
-    --status-idle: 38 94% 52%;
-    --status-stopped: 0 75% 52%;
-    --status-maintenance: 270 72% 58%;
+    /* Status Colors - Neon Glow */
+    --status-running: 160 100% 50%;
+    --status-idle: 45 100% 55%;
+    --status-stopped: 0 100% 60%;
+    --status-maintenance: 280 100% 65%;
 
     /* Sidebar Dark */
-    --sidebar-background: 220 32% 5%;
-    --sidebar-foreground: 210 18% 92%;
-    --sidebar-primary: 213 94% 55%;
+    --sidebar-background: 220 45% 3%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 190 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 26% 12%;
-    --sidebar-accent-foreground: 210 18% 96%;
-    --sidebar-border: 220 26% 12%;
-    --sidebar-ring: 213 94% 55%;
+    --sidebar-accent: 220 35% 10%;
+    --sidebar-accent-foreground: 210 20% 96%;
+    --sidebar-border: 220 35% 12%;
+    --sidebar-ring: 190 100% 50%;
 
-    /* Chart Colors - Dark Mode */
-    --chart-1: 213 94% 58%;
-    --chart-2: 152 72% 48%;
-    --chart-3: 38 94% 52%;
-    --chart-4: 270 72% 58%;
-    --chart-5: 0 75% 52%;
+    /* Chart Colors - Neon */
+    --chart-1: 190 100% 55%;
+    --chart-2: 160 100% 50%;
+    --chart-3: 45 100% 55%;
+    --chart-4: 280 100% 65%;
+    --chart-5: 0 100% 60%;
 
-    /* Success/Warning/Info - Dark */
-    --success: 152 72% 48%;
+    /* Success/Warning/Info - Neon */
+    --success: 160 100% 50%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 94% 52%;
-    --warning-foreground: 220 28% 7%;
-    --info: 213 94% 55%;
+    --warning: 45 100% 55%;
+    --warning-foreground: 220 40% 4%;
+    --info: 190 100% 55%;
     --info-foreground: 0 0% 100%;
+
+    /* Racing Neon Glow Variables */
+    --neon-cyan: 190 100% 55%;
+    --neon-green: 160 100% 50%;
+    --neon-yellow: 45 100% 55%;
+    --neon-magenta: 280 100% 65%;
+    --neon-red: 0 100% 60%;
   }
 }
 
