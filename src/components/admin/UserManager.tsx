@@ -586,12 +586,12 @@ export function UserManager() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="editCompany">บริษัท</Label>
-              <Select value={editCompanyId} onValueChange={setEditCompanyId}>
+              <Select value={editCompanyId || "none"} onValueChange={(v) => setEditCompanyId(v === "none" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="เลือกบริษัท" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">ไม่ระบุ</SelectItem>
+                  <SelectItem value="none">ไม่ระบุ</SelectItem>
                   {companies?.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name} {company.code && `(${company.code})`}
