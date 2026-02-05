@@ -136,13 +136,13 @@ export default function Dashboard() {
           ) : (
             <>
               <Card className="relative overflow-hidden border-l-4 border-l-oee-availability">
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex items-center gap-3 sm:gap-4">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <OEEGauge value={oee.availability} label="" color="availability" size="sm" />
-                    <div className="min-w-0">
-                      <p className="text-xs sm:text-sm text-muted-foreground">Availability</p>
-                      <p className="text-xl sm:text-2xl font-bold text-oee-availability">
-                        {oee.availability}%
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-muted-foreground truncate">Availability</p>
+                      <p className="text-lg sm:text-xl font-bold text-oee-availability truncate">
+                        {oee.availability.toFixed(1)}%
                       </p>
                     </div>
                   </div>
@@ -150,13 +150,13 @@ export default function Dashboard() {
               </Card>
 
               <Card className="relative overflow-hidden border-l-4 border-l-oee-performance">
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex items-center gap-3 sm:gap-4">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <OEEGauge value={oee.performance} label="" color="performance" size="sm" />
-                    <div className="min-w-0">
-                      <p className="text-xs sm:text-sm text-muted-foreground">Performance</p>
-                      <p className="text-xl sm:text-2xl font-bold text-oee-performance">
-                        {oee.performance}%
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-muted-foreground truncate">Performance</p>
+                      <p className="text-lg sm:text-xl font-bold text-oee-performance truncate">
+                        {oee.performance.toFixed(1)}%
                       </p>
                     </div>
                   </div>
@@ -164,13 +164,13 @@ export default function Dashboard() {
               </Card>
 
               <Card className="relative overflow-hidden border-l-4 border-l-oee-quality">
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex items-center gap-3 sm:gap-4">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <OEEGauge value={oee.quality} label="" color="quality" size="sm" />
-                    <div className="min-w-0">
-                      <p className="text-xs sm:text-sm text-muted-foreground">Quality</p>
-                      <p className="text-xl sm:text-2xl font-bold text-oee-quality">
-                        {oee.quality}%
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-muted-foreground truncate">Quality</p>
+                      <p className="text-lg sm:text-xl font-bold text-oee-quality truncate">
+                        {oee.quality.toFixed(1)}%
                       </p>
                     </div>
                   </div>
@@ -178,13 +178,13 @@ export default function Dashboard() {
               </Card>
 
               <Card className="relative overflow-hidden border-l-4 border-l-oee-overall bg-gradient-to-br from-card to-accent/30">
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex items-center gap-3 sm:gap-4">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <OEEGauge value={oee.oee} label="" color="overall" size="sm" />
-                    <div className="min-w-0">
-                      <p className="text-xs sm:text-sm text-muted-foreground">Overall OEE</p>
-                      <p className="text-xl sm:text-2xl font-bold text-oee-overall">
-                        {oee.oee}%
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-muted-foreground truncate">Overall OEE</p>
+                      <p className="text-lg sm:text-xl font-bold text-oee-overall truncate">
+                        {oee.oee.toFixed(1)}%
                       </p>
                     </div>
                   </div>

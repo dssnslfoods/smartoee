@@ -22,7 +22,7 @@ const bgColorClasses = {
 };
 
 const sizeClasses = {
-  sm: { size: 80, stroke: 6, text: 'text-sm', label: 'text-xs' },
+  sm: { size: 64, stroke: 5, text: 'text-xs', label: 'text-xs' },
   md: { size: 120, stroke: 8, text: 'text-xl', label: 'text-sm' },
   lg: { size: 160, stroke: 10, text: 'text-2xl', label: 'text-base' },
 };
