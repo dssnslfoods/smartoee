@@ -8,7 +8,10 @@ const Index = () => {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-4">
+          <img src="/favicon.png" alt="PNF OEE Logo" className="h-20 w-20 object-contain animate-pulse" />
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
       </div>
     );
   }

@@ -3,7 +3,7 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Factory, Loader2, Mail, Lock, User, Building2, ArrowLeft } from "lucide-react";
+import { Loader2, Mail, Lock, User, Building2, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,9 +64,7 @@ export default function Auth() {
         {/* Left side - Branding */}
         <div className="hidden w-1/2 flex-col justify-between bg-sidebar p-12 lg:flex">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary">
-              <Factory className="h-6 w-6 text-sidebar-primary-foreground" />
-            </div>
+          <img src="/favicon.png" alt="PNF OEE Logo" className="h-12 w-12 object-contain" />
             <div>
               <h1 className="text-xl font-bold text-sidebar-foreground">PNF OEE System</h1>
               <p className="text-xs text-sidebar-foreground/60">Manufacturing Excellence</p>
@@ -104,9 +102,7 @@ export default function Auth() {
         <div className="flex w-full items-center justify-center p-8 lg:w-1/2">
           <Card className="w-full max-w-md">
             <CardHeader className="text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                <Building2 className="h-6 w-6 text-primary" />
-              </div>
+            <img src="/favicon.png" alt="PNF OEE Logo" className="mx-auto mb-4 h-16 w-16 object-contain" />
               <CardTitle className="text-2xl">Select Company</CardTitle>
               <CardDescription>
                 Welcome, {profile?.full_name || 'Administrator'}! Choose a company to manage.
@@ -191,9 +187,7 @@ export default function Auth() {
       {/* Left side - Branding */}
       <div className="hidden w-1/2 flex-col justify-between bg-sidebar p-12 lg:flex">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary">
-            <Factory className="h-6 w-6 text-sidebar-primary-foreground" />
-          </div>
+          <img src="/favicon.png" alt="PNF OEE Logo" className="h-12 w-12 object-contain" />
           <div>
             <h1 className="text-xl font-bold text-sidebar-foreground">PNF OEE System</h1>
             <p className="text-xs text-sidebar-foreground/60">Manufacturing Excellence</p>
@@ -234,9 +228,7 @@ export default function Auth() {
       <div className="flex w-full items-center justify-center p-8 lg:w-1/2">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 lg:hidden">
-              <Factory className="h-6 w-6 text-primary" />
-            </div>
+            <img src="/favicon.png" alt="PNF OEE Logo" className="mx-auto mb-4 h-16 w-16 object-contain lg:hidden" />
             <CardTitle className="text-2xl">Welcome</CardTitle>
             <CardDescription>Sign in to access the OEE dashboard</CardDescription>
           </CardHeader>
