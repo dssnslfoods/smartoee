@@ -10,6 +10,7 @@
    DropdownMenuTrigger,
  } from '@/components/ui/dropdown-menu';
  import type { FullscreenMode } from '@/hooks/useFullscreen';
+ import { KioskClock } from './KioskClock';
  
  interface FullscreenToggleProps {
    isFullscreen: boolean;
@@ -23,6 +24,7 @@
  interface FullscreenContainerProps {
    isFullscreen: boolean;
    isKiosk?: boolean;
+   refreshInterval?: number;
    children: ReactNode;
  }
  
@@ -90,7 +92,7 @@
    );
  }
  
- export function FullscreenContainer({ isFullscreen, isKiosk, children }: FullscreenContainerProps) {
+ export function FullscreenContainer({ isFullscreen, isKiosk, refreshInterval = 30, children }: FullscreenContainerProps) {
    if (!isFullscreen) {
      return <>{children}</>;
    }
@@ -113,16 +115,27 @@
          transition={{ duration: 0.5, delay: 0.1 }}
          className="absolute inset-0 bg-primary/5 pointer-events-none"
        />
-       {/* Kiosk mode indicator - subtle, auto-hide */}
+       {/* Kiosk mode clock and refresh countdown */}
        {isKiosk && (
          <motion.div
-           initial={{ opacity: 1, y: 0 }}
-           animate={{ opacity: 0, y: -20 }}
-           transition={{ duration: 0.5, delay: 3 }}
-           className="absolute top-2 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs text-primary font-medium"
+           initial={{ opacity: 0, y: -20 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ duration: 0.3, delay: 0.2 }}
+           className="absolute top-4 right-4 z-50"
+         >
+           <KioskClock refreshInterval={refreshInterval} />
+         </motion.div>
+       )}
+       {/* Exit hint - shows briefly then fades */}
+       {isKiosk && (
+         <motion.div
+           initial={{ opacity: 1 }}
+           animate={{ opacity: 0 }}
+           transition={{ duration: 0.5, delay: 5 }}
+           className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/80 backdrop-blur-sm border border-border/50 text-xs text-muted-foreground font-medium"
          >
            <Tv className="h-3 w-3" />
-           TV Mode • Press ESC to exit
+           Press ESC to exit TV Mode
          </motion.div>
        )}
        {children}
