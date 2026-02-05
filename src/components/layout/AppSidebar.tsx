@@ -141,7 +141,9 @@ export function AppSidebar() {
           isCollapsed ? "justify-center px-3" : "gap-3 px-4",
         )}
       >
-        <img src="/favicon.png" alt="PNF OEE Logo" className="h-10 w-10 shrink-0 object-contain rounded-xl" />
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 p-1.5 shadow-sm ring-1 ring-primary/20">
+          <img src="/favicon.png" alt="PNF OEE Logo" className="h-full w-full object-contain" />
+        </div>
         {!isCollapsed && (
           <div className="overflow-hidden">
             <h1 className="text-base font-bold text-sidebar-foreground tracking-tight">PNF OEE</h1>
