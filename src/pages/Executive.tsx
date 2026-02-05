@@ -33,7 +33,7 @@ export default function Executive() {
   
   const [dateRange, setDateRange] = useState<'7' | '14' | '30'>('7');
   const [drillPath, setDrillPath] = useState<BreadcrumbItem[]>([]);
-   const { isFullscreen, toggleFullscreen } = useFullscreen();
+   const { isFullscreen, isKiosk, toggleFullscreen, enterKiosk, enterFullscreen } = useFullscreen();
 
   const currentLevel = drillPath.length === 0 ? 'plant' : drillPath[drillPath.length - 1].level;
   const currentId = drillPath.length === 0 ? undefined : drillPath[drillPath.length - 1].id;
@@ -279,33 +279,48 @@ export default function Executive() {
          description="OEE Overview & Analysis"
          icon={BarChart3}
        >
-         {/* Fullscreen Toggle */}
-         <FullscreenToggle isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
+         {/* Fullscreen Toggle - hidden in kiosk mode */}
+         {!isKiosk && (
+           <FullscreenToggle 
+             isFullscreen={isFullscreen} 
+             isKiosk={isKiosk}
+             onToggle={toggleFullscreen} 
+             onEnterKiosk={enterKiosk}
+             onEnterFullscreen={enterFullscreen}
+           />
+         )}
  
-         <Select value={dateRange} onValueChange={(v: '7' | '14' | '30') => setDateRange(v)}>
-           <SelectTrigger className="w-[140px] sm:w-[160px] bg-background">
-             <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
-             <SelectValue />
-           </SelectTrigger>
-           <SelectContent>
-             <SelectItem value="7">Last 7 Days</SelectItem>
-             <SelectItem value="14">Last 14 Days</SelectItem>
-             <SelectItem value="30">Last 30 Days</SelectItem>
-           </SelectContent>
-         </Select>
+         {/* Controls - hidden in kiosk mode */}
+         {!isKiosk && (
+           <>
+             <Select value={dateRange} onValueChange={(v: '7' | '14' | '30') => setDateRange(v)}>
+               <SelectTrigger className="w-[140px] sm:w-[160px] bg-background">
+                 <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+                 <SelectValue />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="7">Last 7 Days</SelectItem>
+                 <SelectItem value="14">Last 14 Days</SelectItem>
+                 <SelectItem value="30">Last 30 Days</SelectItem>
+               </SelectContent>
+             </Select>
  
-         <Button variant="outline" onClick={() => refetchOee()} className="bg-background">
-           <RefreshCw className="h-4 w-4 mr-2" />
-           Refresh
-         </Button>
+             <Button variant="outline" onClick={() => refetchOee()} className="bg-background">
+               <RefreshCw className="h-4 w-4 mr-2" />
+               Refresh
+             </Button>
+           </>
+         )}
        </PageHeader>
  
-       {/* Breadcrumb Navigation */}
-       <Card className="overflow-hidden">
-         <CardContent className="p-4">
-           <DrillDownBreadcrumb items={drillPath} onNavigate={handleNavigate} />
-         </CardContent>
-       </Card>
+       {/* Breadcrumb Navigation - hidden in kiosk mode */}
+       {!isKiosk && (
+         <Card className="overflow-hidden">
+           <CardContent className="p-4">
+             <DrillDownBreadcrumb items={drillPath} onNavigate={handleNavigate} />
+           </CardContent>
+         </Card>
+       )}
  
        {/* Summary Cards */}
        <SummaryCards
@@ -334,7 +349,7 @@ export default function Executive() {
        </div>
  
        {/* Drill-Down Selector */}
-       {currentLevel !== 'machine' && (
+       {!isKiosk && currentLevel !== 'machine' && (
          <Card className="overflow-hidden">
            <CardHeader className="pb-3 bg-muted/30">
              <CardTitle className="text-base sm:text-lg font-semibold">
@@ -363,7 +378,7 @@ export default function Executive() {
        )}
  
        {/* Shift Details (when at machine level) */}
-       {currentLevel === 'machine' && (
+       {!isKiosk && currentLevel === 'machine' && (
          <Card className="overflow-hidden">
            <CardHeader className="pb-3 bg-muted/30">
              <CardTitle className="text-base sm:text-lg font-semibold">Shift History</CardTitle>
@@ -380,7 +395,7 @@ export default function Executive() {
  
    if (isFullscreen) {
      return (
-       <FullscreenContainer isFullscreen={isFullscreen}>
+       <FullscreenContainer isFullscreen={isFullscreen} isKiosk={isKiosk}>
          {content}
        </FullscreenContainer>
      );

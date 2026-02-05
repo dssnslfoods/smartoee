@@ -21,7 +21,7 @@
    const [selectedLine, setSelectedLine] = useState<string>('all');
    const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
    const [detailSheetOpen, setDetailSheetOpen] = useState(false);
-   const { isFullscreen, toggleFullscreen } = useFullscreen();
+   const { isFullscreen, isKiosk, toggleFullscreen, enterKiosk, enterFullscreen } = useFullscreen();
  
    const companyId = company?.id;
    const companyName = company?.name;
@@ -94,39 +94,52 @@
          description="Real-time production performance monitoring"
          icon={LayoutDashboard}
        >
-         {/* Fullscreen Toggle */}
-         <FullscreenToggle isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
+         {/* Fullscreen Toggle - hidden in kiosk mode */}
+         {!isKiosk && (
+           <FullscreenToggle 
+             isFullscreen={isFullscreen} 
+             isKiosk={isKiosk}
+             onToggle={toggleFullscreen} 
+             onEnterKiosk={enterKiosk}
+             onEnterFullscreen={enterFullscreen}
+           />
+         )}
  
-         {/* Company indicator for admin users */}
-         {isAdmin() && company && (
+         {/* Company indicator for admin users - hidden in kiosk mode */}
+         {!isKiosk && isAdmin() && company && (
            <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary/5 border-primary/20">
              <Building2 className="h-3.5 w-3.5" />
              {companyName}
            </Badge>
          )}
-         <Select defaultValue="today">
-           <SelectTrigger className="w-[140px] sm:w-[160px] bg-background border-border/50">
-             <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
-             <SelectValue placeholder="Select period" />
-           </SelectTrigger>
-           <SelectContent>
-             <SelectItem value="today">Today</SelectItem>
-             <SelectItem value="week">This Week</SelectItem>
-             <SelectItem value="month">This Month</SelectItem>
-           </SelectContent>
-         </Select>
-         <Select value={selectedLine} onValueChange={setSelectedLine}>
-           <SelectTrigger className="w-[140px] sm:w-[160px] bg-background border-border/50">
-             <Factory className="mr-2 h-4 w-4 text-muted-foreground" />
-             <SelectValue placeholder="Select line" />
-           </SelectTrigger>
-           <SelectContent>
-             <SelectItem value="all">All Lines</SelectItem>
-             {lines?.map(line => (
-               <SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>
-             ))}
-           </SelectContent>
-         </Select>
+         {/* Filters - hidden in kiosk mode */}
+         {!isKiosk && (
+           <>
+             <Select defaultValue="today">
+               <SelectTrigger className="w-[140px] sm:w-[160px] bg-background border-border/50">
+                 <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+                 <SelectValue placeholder="Select period" />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="today">Today</SelectItem>
+                 <SelectItem value="week">This Week</SelectItem>
+                 <SelectItem value="month">This Month</SelectItem>
+               </SelectContent>
+             </Select>
+             <Select value={selectedLine} onValueChange={setSelectedLine}>
+               <SelectTrigger className="w-[140px] sm:w-[160px] bg-background border-border/50">
+                 <Factory className="mr-2 h-4 w-4 text-muted-foreground" />
+                 <SelectValue placeholder="Select line" />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="all">All Lines</SelectItem>
+                 {lines?.map(line => (
+                   <SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>
+                 ))}
+               </SelectContent>
+             </Select>
+           </>
+         )}
        </PageHeader>
  
        {/* Main OEE Gauge - Hero Section */}
@@ -327,7 +340,7 @@
  
    if (isFullscreen) {
      return (
-       <FullscreenContainer isFullscreen={isFullscreen}>
+       <FullscreenContainer isFullscreen={isFullscreen} isKiosk={isKiosk}>
          {content}
        </FullscreenContainer>
      );
