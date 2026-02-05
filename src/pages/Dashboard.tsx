@@ -2,6 +2,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { OEEGauge } from '@/components/dashboard/OEEGauge';
 import { MachineStatusCard } from '@/components/dashboard/MachineStatusCard';
+import { MachineDetailSheet } from '@/components/dashboard/MachineDetailSheet';
 import { OEETrendChart } from '@/components/dashboard/OEETrendChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,11 +13,12 @@ import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { getDashboardOEE, getMachinesWithStatus, getOEETrend, getLines } from '@/services/oeeApi';
 import { useState, useMemo } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Dashboard() {
   const { company, isAdmin } = useAuth();
   const [selectedLine, setSelectedLine] = useState<string>('all');
+  const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
 
   const companyId = company?.id;
   const companyName = company?.name;
@@ -73,6 +75,11 @@ export default function Dashboard() {
   const stats = filteredStats || { running: 0, idle: 0, stopped: 0, maintenance: 0 };
   const oee = oeeData || { availability: 0, performance: 0, quality: 0, oee: 0 };
   const trend = trendData || [];
+
+  const handleMachineClick = (machineId: string) => {
+    setSelectedMachineId(machineId);
+    setDetailSheetOpen(true);
+  };
 
   const isLoading = isLoadingOEE || isLoadingMachines;
 
@@ -279,6 +286,7 @@ export default function Dashboard() {
                     oee={machine.oee}
                     currentProduct={machine.currentProduct}
                     compact 
+                    onClick={() => handleMachineClick(machine.id)}
                   />
                 ))
               )}
@@ -314,11 +322,19 @@ export default function Dashboard() {
                   status={machine.status}
                   oee={machine.oee}
                   currentProduct={machine.currentProduct}
+                  onClick={() => handleMachineClick(machine.id)}
                 />
               ))}
             </div>
           )}
         </div>
+
+        {/* Machine Detail Sheet */}
+        <MachineDetailSheet
+          machineId={selectedMachineId}
+          open={detailSheetOpen}
+          onOpenChange={setDetailSheetOpen}
+        />
       </div>
     </AppLayout>
   );
