@@ -9,6 +9,8 @@
  import { OEECardSkeleton, StatsCardSkeleton, MachineCardSkeleton, ChartCardSkeleton } from '@/components/ui/skeletons';
  import { Calendar, Factory, AlertTriangle, LayoutDashboard, Play, Pause, Wrench, Building2 } from 'lucide-react';
  import { useAuth } from '@/hooks/useAuth';
+ import { useFullscreen } from '@/hooks/useFullscreen';
+ import { FullscreenToggle } from '@/components/ui/FullscreenToggle';
  import { Badge } from '@/components/ui/badge';
  import { useQuery } from '@tanstack/react-query';
  import { getDashboardOEE, getMachinesWithStatus, getOEETrend, getLines } from '@/services/oeeApi';
@@ -19,6 +21,7 @@
    const [selectedLine, setSelectedLine] = useState<string>('all');
    const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
    const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+   const { isFullscreen, toggleFullscreen } = useFullscreen();
  
    const companyId = company?.id;
    const companyName = company?.name;
@@ -83,8 +86,12 @@
  
    const isLoading = isLoadingOEE || isLoadingMachines;
  
+   // Fullscreen layout wrapper
+   const ContentWrapper = isFullscreen ? 'div' : AppLayout;
+   const wrapperProps = isFullscreen ? { className: 'fixed inset-0 z-50 overflow-auto bg-background dark' } : {};
+ 
    return (
-     <AppLayout>
+     <ContentWrapper {...wrapperProps}>
         <div className="page-container space-y-6">
          {/* Header */}
          <PageHeader 
@@ -92,6 +99,9 @@
            description="Real-time production performance monitoring"
            icon={LayoutDashboard}
          >
+           {/* Fullscreen Toggle */}
+           <FullscreenToggle isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
+ 
            {/* Company indicator for admin users */}
            {isAdmin() && company && (
              <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary/5 border-primary/20">
@@ -318,6 +328,6 @@
            onOpenChange={setDetailSheetOpen}
          />
        </div>
-     </AppLayout>
+     </ContentWrapper>
    );
  }
