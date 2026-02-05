@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Plus, Trash2, Loader2, Pencil, UserPlus, Shield, Mail, 
-  Search, MoreHorizontal, UserCog, Building2
+  Search, MoreHorizontal, UserCog, Building2, KeyRound
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -104,6 +104,7 @@ export function UserManager() {
   const [editFullName, setEditFullName] = useState('');
   const [editRole, setEditRole] = useState<AppRole>('STAFF');
   const [editCompanyId, setEditCompanyId] = useState<string>('');
+  const [editPassword, setEditPassword] = useState('');
 
   // Set default company_id when company changes
   useEffect(() => {
@@ -211,6 +212,22 @@ export function UserManager() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  // Update password mutation
+  const updatePasswordMutation = useMutation({
+    mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
+      const { data, error } = await supabase.functions.invoke('update-user-password', {
+        body: { targetUserId: userId, newPassword },
+      });
+      
+      if (error) throw new Error(error.message);
+      if (!data.success) throw new Error(data.message || 'ไม่สามารถอัปเดตรหัสผ่านได้');
+    },
+    onSuccess: () => {
+      toast.success('อัปเดตรหัสผ่านสำเร็จ');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -270,6 +287,7 @@ export function UserManager() {
     setEditFullName(user.full_name);
     setEditRole(user.role);
     setEditCompanyId(user.company_id || '');
+    setEditPassword('');
     setIsEditDialogOpen(true);
   };
 
@@ -279,6 +297,7 @@ export function UserManager() {
     setEditFullName('');
     setEditRole('STAFF');
     setEditCompanyId('');
+    setEditPassword('');
   };
 
   const handleOpenDeleteDialog = (user: UserProfile) => {
@@ -313,11 +332,22 @@ export function UserManager() {
       toast.error('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
+    if (editPassword && editPassword.length > 0 && editPassword.length < 6) {
+      toast.error('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+      return;
+    }
     updateUserMutation.mutate({ 
       userId: selectedUser.user_id, 
       fullName: editFullName, 
       role: editRole,
       companyId: editCompanyId || null,
+    }, {
+      onSuccess: () => {
+        // If password was provided, update it
+        if (editPassword && editPassword.length >= 6) {
+          updatePasswordMutation.mutate({ userId: selectedUser.user_id, newPassword: editPassword });
+        }
+      }
     });
   };
 
@@ -618,6 +648,22 @@ export function UserManager() {
                 {ROLE_OPTIONS.find(r => r.value === editRole)?.description}
               </p>
             </div>
+            <div className="space-y-2 border-t pt-4">
+              <Label htmlFor="editPassword" className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4" />
+                รหัสผ่านใหม่ (ไม่บังคับ)
+              </Label>
+              <Input
+                id="editPassword"
+                type="password"
+                placeholder="เว้นว่างหากไม่ต้องการเปลี่ยน"
+                value={editPassword}
+                onChange={(e) => setEditPassword(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                หากต้องการเปลี่ยนรหัสผ่าน กรอกรหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={handleCloseEditDialog}>
@@ -625,9 +671,9 @@ export function UserManager() {
             </Button>
             <Button 
               onClick={handleUpdateUser} 
-              disabled={updateUserMutation.isPending}
+              disabled={updateUserMutation.isPending || updatePasswordMutation.isPending}
             >
-              {updateUserMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {(updateUserMutation.isPending || updatePasswordMutation.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               บันทึก
             </Button>
           </DialogFooter>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, User, Loader2, Settings } from 'lucide-react';
+import { Plus, Trash2, User, Loader2, Settings, KeyRound, Pencil } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +55,8 @@ export function StaffManager() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [permissionUser, setPermissionUser] = useState<{ userId: string; name: string } | null>(null);
+  const [editUser, setEditUser] = useState<StaffUser | null>(null);
+  const [editForm, setEditForm] = useState({ fullName: '', newPassword: '' });
   const [newUserForm, setNewUserForm] = useState({
     email: '',
     password: '',
@@ -106,6 +108,38 @@ export function StaffManager() {
     },
   });
 
+  // Update staff user mutation
+  const updateStaffMutation = useMutation({
+    mutationFn: async ({ userId, fullName, newPassword }: { userId: string; fullName: string; newPassword?: string }) => {
+      // Update profile name
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .update({ full_name: fullName })
+        .eq('user_id', userId);
+      
+      if (profileError) throw profileError;
+
+      // Update password if provided
+      if (newPassword && newPassword.length >= 6) {
+        const { data, error } = await supabase.functions.invoke('update-user-password', {
+          body: { targetUserId: userId, newPassword },
+        });
+        
+        if (error) throw new Error(error.message);
+        if (!data.success) throw new Error(data.message || 'ไม่สามารถอัปเดตรหัสผ่านได้');
+      }
+    },
+    onSuccess: () => {
+      toast({ title: 'สำเร็จ', description: 'อัปเดตข้อมูลผู้ใช้เรียบร้อยแล้ว' });
+      queryClient.invalidateQueries({ queryKey: ['staff-users'] });
+      setEditUser(null);
+      setEditForm({ fullName: '', newPassword: '' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'เกิดข้อผิดพลาด', description: error.message, variant: 'destructive' });
+    },
+  });
+
   // Delete staff user mutation
   const deleteStaffMutation = useMutation({
     mutationFn: async (profileId: string) => {
@@ -144,6 +178,31 @@ export function StaffManager() {
       password: newUserForm.password,
       fullName: newUserForm.fullName,
     });
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!editUser || !editForm.fullName) {
+      toast({ title: 'ข้อผิดพลาด', description: 'กรุณากรอกชื่อ-นามสกุล', variant: 'destructive' });
+      return;
+    }
+
+    if (editForm.newPassword && editForm.newPassword.length > 0 && editForm.newPassword.length < 6) {
+      toast({ title: 'ข้อผิดพลาด', description: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', variant: 'destructive' });
+      return;
+    }
+
+    updateStaffMutation.mutate({
+      userId: editUser.user_id,
+      fullName: editForm.fullName,
+      newPassword: editForm.newPassword || undefined,
+    });
+  };
+
+  const openEditDialog = (user: StaffUser) => {
+    setEditUser(user);
+    setEditForm({ fullName: user.full_name, newPassword: '' });
   };
 
   if (!company) {
@@ -204,6 +263,18 @@ export function StaffManager() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(user)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>แก้ไขข้อมูล / รหัสผ่าน</TooltipContent>
+                      </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -285,6 +356,59 @@ export function StaffManager() {
               </Button>
               <Button type="submit" disabled={createStaffMutation.isPending}>
                 {createStaffMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                บันทึก
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editUser} onOpenChange={(open) => !open && setEditUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              แก้ไขข้อมูลพนักงาน
+            </DialogTitle>
+            <DialogDescription>
+              แก้ไขข้อมูลและรหัสผ่านของ {editUser?.full_name}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="editFullName">ชื่อ-นามสกุล</Label>
+                <Input
+                  id="editFullName"
+                  value={editForm.fullName}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, fullName: e.target.value }))}
+                  placeholder="กรอกชื่อ-นามสกุล"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editPassword" className="flex items-center gap-2">
+                  <KeyRound className="h-4 w-4" />
+                  รหัสผ่านใหม่ (ไม่บังคับ)
+                </Label>
+                <Input
+                  id="editPassword"
+                  type="password"
+                  value={editForm.newPassword}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                  placeholder="เว้นว่างหากไม่ต้องการเปลี่ยน"
+                />
+                <p className="text-xs text-muted-foreground">
+                  หากต้องการเปลี่ยนรหัสผ่าน กรอกรหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditUser(null)}>
+                ยกเลิก
+              </Button>
+              <Button type="submit" disabled={updateStaffMutation.isPending}>
+                {updateStaffMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 บันทึก
               </Button>
             </DialogFooter>
