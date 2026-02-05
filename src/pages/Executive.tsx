@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ChartCardSkeleton, GridSelectorSkeleton } from '@/components/ui/skeletons';
 import { useAuth } from '@/hooks/useAuth';
  import { useFullscreen } from '@/hooks/useFullscreen';
- import { FullscreenToggle } from '@/components/ui/FullscreenToggle';
+  import { FullscreenToggle, FullscreenContainer } from '@/components/ui/FullscreenToggle';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { OEETrendChart } from '@/components/dashboard/OEETrendChart';
@@ -269,116 +269,124 @@ export default function Executive() {
 
   const isExecutive = hasRole('EXECUTIVE') || hasRole('ADMIN');
 
-   // Fullscreen layout wrapper
-   const ContentWrapper = isFullscreen ? 'div' : AppLayout;
-   const wrapperProps = isFullscreen ? { className: 'fixed inset-0 z-50 overflow-auto bg-background dark' } : {};
+   const content = (
+     <div className="page-container space-y-6">
+       {/* Header */}
+       <PageHeader 
+         title="Executive Dashboard" 
+         description="OEE Overview & Analysis"
+         icon={BarChart3}
+       >
+         {/* Fullscreen Toggle */}
+         <FullscreenToggle isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
+ 
+         <Select value={dateRange} onValueChange={(v: '7' | '14' | '30') => setDateRange(v)}>
+           <SelectTrigger className="w-[140px] sm:w-[160px] bg-background">
+             <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+             <SelectValue />
+           </SelectTrigger>
+           <SelectContent>
+             <SelectItem value="7">Last 7 Days</SelectItem>
+             <SelectItem value="14">Last 14 Days</SelectItem>
+             <SelectItem value="30">Last 30 Days</SelectItem>
+           </SelectContent>
+         </Select>
+ 
+         <Button variant="outline" onClick={() => refetchOee()} className="bg-background">
+           <RefreshCw className="h-4 w-4 mr-2" />
+           Refresh
+         </Button>
+       </PageHeader>
+ 
+       {/* Breadcrumb Navigation */}
+       <Card className="overflow-hidden">
+         <CardContent className="p-4">
+           <DrillDownBreadcrumb items={drillPath} onNavigate={handleNavigate} />
+         </CardContent>
+       </Card>
+ 
+       {/* Summary Cards */}
+       <SummaryCards
+         current={oeeData?.summary || { availability: 0, performance: 0, quality: 0, oee: 0 }}
+         isLoading={oeeLoading}
+       />
+ 
+       {/* Charts Row */}
+       <div className="grid gap-5 lg:gap-6 lg:grid-cols-2">
+         {oeeLoading ? (
+           <ChartCardSkeleton title="OEE Trend" />
+         ) : (
+           <OEETrendChart
+             data={trendData}
+             title={`OEE Trend (${dateRange} Days)`}
+           />
+         )}
+         {oeeLoading ? (
+           <ChartCardSkeleton title="Top Downtime" />
+         ) : (
+           <ParetoChart
+             data={downtimeData || []}
+             title="Top Downtime Reasons"
+           />
+         )}
+       </div>
+ 
+       {/* Drill-Down Selector */}
+       {currentLevel !== 'machine' && (
+         <Card className="overflow-hidden">
+           <CardHeader className="pb-3 bg-muted/30">
+             <CardTitle className="text-base sm:text-lg font-semibold">
+               {drillPath.length === 0 ? 'Select Plant' :
+                currentLevel === 'plant' ? 'Select Line' :
+                currentLevel === 'line' ? 'Select Machine' : 'Shifts'}
+             </CardTitle>
+           </CardHeader>
+           <CardContent className="pt-5">
+             {drillItems.length === 0 ? (
+               <GridSelectorSkeleton items={4} />
+             ) : (
+               <DrillDownSelector
+                 level={drillPath.length === 0 ? 'plant' : 
+                        currentLevel === 'plant' ? 'line' : 
+                        currentLevel === 'line' ? 'machine' : 'shift'}
+                 items={drillItems}
+                 onSelect={(id) => {
+                   const item = drillItems.find(i => i.id === id);
+                   if (item) handleDrillDown(id, item.name);
+                 }}
+               />
+             )}
+           </CardContent>
+         </Card>
+       )}
+ 
+       {/* Shift Details (when at machine level) */}
+       {currentLevel === 'machine' && (
+         <Card className="overflow-hidden">
+           <CardHeader className="pb-3 bg-muted/30">
+             <CardTitle className="text-base sm:text-lg font-semibold">Shift History</CardTitle>
+           </CardHeader>
+           <CardContent className="pt-5">
+             <div className="text-muted-foreground text-center py-12">
+               Select a shift from the Supervisor Dashboard to view details
+             </div>
+           </CardContent>
+         </Card>
+       )}
+     </div>
+   );
+ 
+   if (isFullscreen) {
+     return (
+       <FullscreenContainer isFullscreen={isFullscreen}>
+         {content}
+       </FullscreenContainer>
+     );
+   }
  
   return (
-     <ContentWrapper {...wrapperProps}>
-      <div className="page-container space-y-6">
-        {/* Header */}
-        <PageHeader 
-          title="Executive Dashboard" 
-          description="OEE Overview & Analysis"
-          icon={BarChart3}
-        >
-           {/* Fullscreen Toggle */}
-           <FullscreenToggle isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
- 
-          <Select value={dateRange} onValueChange={(v: '7' | '14' | '30') => setDateRange(v)}>
-            <SelectTrigger className="w-[140px] sm:w-[160px] bg-background">
-              <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 Days</SelectItem>
-              <SelectItem value="14">Last 14 Days</SelectItem>
-              <SelectItem value="30">Last 30 Days</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline" onClick={() => refetchOee()} className="bg-background">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-        </PageHeader>
-
-        {/* Breadcrumb Navigation */}
-        <Card className="overflow-hidden">
-          <CardContent className="p-4">
-            <DrillDownBreadcrumb items={drillPath} onNavigate={handleNavigate} />
-          </CardContent>
-        </Card>
-
-        {/* Summary Cards */}
-        <SummaryCards
-          current={oeeData?.summary || { availability: 0, performance: 0, quality: 0, oee: 0 }}
-          isLoading={oeeLoading}
-        />
-
-        {/* Charts Row */}
-        <div className="grid gap-5 lg:gap-6 lg:grid-cols-2">
-          {oeeLoading ? (
-            <ChartCardSkeleton title="OEE Trend" />
-          ) : (
-            <OEETrendChart
-              data={trendData}
-              title={`OEE Trend (${dateRange} Days)`}
-            />
-          )}
-          {oeeLoading ? (
-            <ChartCardSkeleton title="Top Downtime" />
-          ) : (
-            <ParetoChart
-              data={downtimeData || []}
-              title="Top Downtime Reasons"
-            />
-          )}
-        </div>
-
-        {/* Drill-Down Selector */}
-        {currentLevel !== 'machine' && (
-          <Card className="overflow-hidden">
-            <CardHeader className="pb-3 bg-muted/30">
-              <CardTitle className="text-base sm:text-lg font-semibold">
-                {drillPath.length === 0 ? 'Select Plant' :
-                 currentLevel === 'plant' ? 'Select Line' :
-                 currentLevel === 'line' ? 'Select Machine' : 'Shifts'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-5">
-              {drillItems.length === 0 ? (
-                <GridSelectorSkeleton items={4} />
-              ) : (
-                <DrillDownSelector
-                  level={drillPath.length === 0 ? 'plant' : 
-                         currentLevel === 'plant' ? 'line' : 
-                         currentLevel === 'line' ? 'machine' : 'shift'}
-                  items={drillItems}
-                  onSelect={(id) => {
-                    const item = drillItems.find(i => i.id === id);
-                    if (item) handleDrillDown(id, item.name);
-                  }}
-                />
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Shift Details (when at machine level) */}
-        {currentLevel === 'machine' && (
-          <Card className="overflow-hidden">
-            <CardHeader className="pb-3 bg-muted/30">
-              <CardTitle className="text-base sm:text-lg font-semibold">Shift History</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-5">
-              <div className="text-muted-foreground text-center py-12">
-                Select a shift from the Supervisor Dashboard to view details
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-     </ContentWrapper>
+     <AppLayout>
+       {content}
+     </AppLayout>
   );
 }
