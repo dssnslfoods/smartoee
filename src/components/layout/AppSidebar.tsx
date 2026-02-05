@@ -4,7 +4,6 @@ import {
   Settings,
   BarChart3,
   ClipboardCheck,
-  Gauge,
   LogOut,
   Menu,
   X,
@@ -142,9 +141,7 @@ export function AppSidebar() {
           isCollapsed ? "justify-center px-3" : "gap-3 px-4",
         )}
       >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sidebar-primary to-sidebar-primary/80 shadow-lg">
-          <Gauge className="h-5 w-5 text-sidebar-primary-foreground" />
-        </div>
+        <img src="/favicon.png" alt="PNF OEE Logo" className="h-10 w-10 shrink-0 object-contain rounded-xl" />
         {!isCollapsed && (
           <div className="overflow-hidden">
             <h1 className="text-base font-bold text-sidebar-foreground tracking-tight">PNF OEE</h1>
