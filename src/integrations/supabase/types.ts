@@ -77,6 +77,7 @@ export type Database = {
       defect_reasons: {
         Row: {
           code: string
+          company_id: string | null
           created_at: string
           id: string
           is_active: boolean
@@ -84,6 +85,7 @@ export type Database = {
         }
         Insert: {
           code: string
+          company_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -91,17 +93,27 @@ export type Database = {
         }
         Update: {
           code?: string
+          company_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
           name?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "defect_reasons_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       downtime_reasons: {
         Row: {
           category: Database["public"]["Enums"]["downtime_category"]
           code: string
+          company_id: string | null
           created_at: string
           id: string
           is_active: boolean
@@ -110,6 +122,7 @@ export type Database = {
         Insert: {
           category: Database["public"]["Enums"]["downtime_category"]
           code: string
+          company_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -118,12 +131,21 @@ export type Database = {
         Update: {
           category?: Database["public"]["Enums"]["downtime_category"]
           code?: string
+          company_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
           name?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "downtime_reasons_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lines: {
         Row: {
