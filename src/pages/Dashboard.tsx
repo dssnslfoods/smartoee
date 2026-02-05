@@ -125,7 +125,7 @@ export default function Dashboard() {
         </PageHeader>
 
         {/* OEE Summary Cards */}
-        <div className="grid gap-4 sm:gap-5 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 md:gap-5 grid-cols-2 md:grid-cols-4">
           {isLoading ? (
             <>
               <OEECardSkeleton />
@@ -195,7 +195,7 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
           {isLoading ? (
             <>
               <StatsCardSkeleton />
@@ -254,8 +254,8 @@ export default function Dashboard() {
         </div>
 
         {/* Charts and Machine Grid */}
-        <div className="grid gap-5 lg:gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className="grid gap-4 md:gap-5 lg:gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="md:col-span-2 lg:col-span-2">
             {isLoadingTrend ? (
               <ChartCardSkeleton />
             ) : (
@@ -298,7 +298,7 @@ export default function Dashboard() {
         <div>
           <h2 className="text-lg font-semibold mb-4">All Machines</h2>
           {isLoadingMachines ? (
-            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
               <MachineCardSkeleton />
               <MachineCardSkeleton />
               <MachineCardSkeleton />
@@ -313,7 +313,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
               {filteredMachines.map((machine) => (
                 <MachineStatusCard 
                   key={machine.id}
