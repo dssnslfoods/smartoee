@@ -54,11 +54,9 @@ export function EventControls({
   isLoading = false,
   isLocked = false,
 }: EventControlsProps) {
-  // Use passed-in effective values, fallback to old logic
-  const effectiveCycleTime = propEffectiveCycleTime ?? selectedProduct?.ideal_cycle_time_seconds ?? machineCycleTime;
-  const cycleTimeSource = propCycleTimeSource ?? (selectedProduct 
-    ? `from SKU: ${selectedProduct.code}` 
-    : 'Machine Default');
+  // Use passed-in effective values, fallback to machine default only
+  const effectiveCycleTime = propEffectiveCycleTime ?? machineCycleTime;
+  const cycleTimeSource = propCycleTimeSource ?? 'Machine Default';
   const [showDowntimeDialog, setShowDowntimeDialog] = useState(false);
   const [showSetupDialog, setShowSetupDialog] = useState(false);
   const [showStopDialog, setShowStopDialog] = useState(false);

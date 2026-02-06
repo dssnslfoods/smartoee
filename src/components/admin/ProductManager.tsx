@@ -1,6 +1,6 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Loader2, Download, Upload, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Download, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -33,7 +32,6 @@ interface Product {
   code: string;
   name: string;
   description: string | null;
-  ideal_cycle_time_seconds: number;
   is_active: boolean;
   company_id: string;
 }
@@ -42,7 +40,6 @@ const PRODUCT_COLUMNS = [
   { key: 'code', header: 'Code', type: 'string' as const },
   { key: 'name', header: 'Name', type: 'string' as const },
   { key: 'description', header: 'Description', type: 'string' as const },
-  { key: 'ideal_cycle_time_seconds', header: 'Cycle Time (s)', type: 'number' as const },
   { key: 'is_active', header: 'Status', type: 'boolean' as const },
 ];
 
@@ -56,7 +53,7 @@ export function ProductManager() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
-    code: '', name: '', description: '', ideal_cycle_time_seconds: 60, is_active: true,
+    code: '', name: '', description: '', is_active: true,
   });
 
   const selectedCompanyId = company?.id;
@@ -72,43 +69,10 @@ export function ProductManager() {
     },
   });
 
-  // Fetch machines to validate SKU cycle time against machine capacity
-  const { data: machines = [] } = useQuery({
-    queryKey: ['admin-machines-ct', selectedCompanyId],
-    queryFn: async () => {
-      let query = supabase.from('machines').select('id, name, code, ideal_cycle_time_seconds').eq('is_active', true);
-      if (selectedCompanyId) query = query.eq('company_id', selectedCompanyId);
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!selectedCompanyId,
-  });
-
-  // Compute minimum machine cycle time for validation
-  const minMachineCycleTime = useMemo(() => {
-    if (machines.length === 0) return null;
-    return Math.min(...machines.map(m => Number(m.ideal_cycle_time_seconds)));
-  }, [machines]);
-
-  // Check if current SKU cycle time exceeds machine capacity
-  const cycleTimeWarning = useMemo(() => {
-    if (!formData.ideal_cycle_time_seconds || minMachineCycleTime === null) return null;
-    if (formData.ideal_cycle_time_seconds < minMachineCycleTime) {
-      const fasterMachines = machines.filter(
-        m => Number(m.ideal_cycle_time_seconds) > formData.ideal_cycle_time_seconds
-      );
-      return `Warning: SKU speed (${formData.ideal_cycle_time_seconds}s) exceeds machine capacity. ` +
-        `${fasterMachines.length} machine(s) have slower cycle times (min: ${minMachineCycleTime}s).`;
-    }
-    return null;
-  }, [formData.ideal_cycle_time_seconds, minMachineCycleTime, machines]);
-
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const { error } = await supabase.from('products').insert({
         code: data.code, name: data.name, description: data.description || null,
-        ideal_cycle_time_seconds: data.ideal_cycle_time_seconds,
         is_active: data.is_active, company_id: selectedCompanyId!,
       } as any);
       if (error) throw error;
@@ -126,7 +90,6 @@ export function ProductManager() {
     mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
       const { error } = await supabase.from('products').update({
         code: data.code, name: data.name, description: data.description || null,
-        ideal_cycle_time_seconds: data.ideal_cycle_time_seconds,
         is_active: data.is_active,
       } as any).eq('id', id);
       if (error) throw error;
@@ -170,7 +133,7 @@ export function ProductManager() {
 
   const handleOpenCreate = () => {
     setEditingProduct(null);
-    setFormData({ code: '', name: '', description: '', ideal_cycle_time_seconds: 60, is_active: true });
+    setFormData({ code: '', name: '', description: '', is_active: true });
     setIsDialogOpen(true);
   };
 
@@ -179,7 +142,6 @@ export function ProductManager() {
     setFormData({
       code: product.code, name: product.name,
       description: product.description || '',
-      ideal_cycle_time_seconds: product.ideal_cycle_time_seconds,
       is_active: product.is_active,
     });
     setIsDialogOpen(true);
@@ -188,7 +150,7 @@ export function ProductManager() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingProduct(null);
-    setFormData({ code: '', name: '', description: '', ideal_cycle_time_seconds: 60, is_active: true });
+    setFormData({ code: '', name: '', description: '', is_active: true });
   };
 
   const handleSubmit = () => {
@@ -231,7 +193,6 @@ export function ProductManager() {
         .map(row => ({
           code: row.code, name: row.name,
           description: row.description || null,
-          ideal_cycle_time_seconds: parseFloat(row.cycle_time || row.ideal_cycle_time_seconds || '60') || 60,
           is_active: row.status ? row.status.toLowerCase() === 'active' : true,
           company_id: selectedCompanyId,
         }));
@@ -252,6 +213,9 @@ export function ProductManager() {
         <div>
           <h3 className="text-lg font-semibold">Products / SKU</h3>
           {company && <p className="text-sm text-muted-foreground">บริษัท: {company.name}</p>}
+          <p className="text-xs text-muted-foreground mt-1">
+            กำหนด Cycle Time, Setup Time, Target Quality ได้ที่แท็บ "Standards" (Machine × SKU)
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <input ref={fileInputRef} type="file" accept=".csv,.txt" onChange={handleImportFile} className="hidden" />
@@ -284,7 +248,7 @@ export function ProductManager() {
             <TableRow>
               <TableHead>Code</TableHead>
               <TableHead>Name</TableHead>
-              <TableHead>Cycle Time (s)</TableHead>
+              <TableHead>Description</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
@@ -294,7 +258,7 @@ export function ProductManager() {
               <TableRow key={product.id}>
                 <TableCell className="font-mono">{product.code}</TableCell>
                 <TableCell className="font-medium">{product.name}</TableCell>
-                <TableCell>{product.ideal_cycle_time_seconds}</TableCell>
+                <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">{product.description || '—'}</TableCell>
                 <TableCell>
                   <span className={product.is_active ? 'text-status-running' : 'text-muted-foreground'}>
                     {product.is_active ? 'Active' : 'Inactive'}
@@ -346,19 +310,6 @@ export function ProductManager() {
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
               <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="รายละเอียดสินค้า (ถ้ามี)" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cycle_time">Ideal Cycle Time (seconds) *</Label>
-              <Input id="cycle_time" type="number" min="0.1" step="0.1" value={formData.ideal_cycle_time_seconds}
-                onChange={(e) => setFormData({ ...formData, ideal_cycle_time_seconds: parseFloat(e.target.value) || 60 })} />
-              {cycleTimeWarning && (
-                <Alert variant="destructive" className="py-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    {cycleTimeWarning}
-                  </AlertDescription>
-                </Alert>
-              )}
             </div>
             <div className="flex items-center gap-2">
               <Switch id="is_active" checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />

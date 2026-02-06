@@ -1,15 +1,21 @@
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TimelineSkeleton } from '@/components/ui/skeletons';
-import { Play, Pause, Wrench, Clock, Timer, Package } from 'lucide-react';
-import { format, differenceInMinutes } from 'date-fns';
+import { Play, Pause, Wrench, Clock, Timer, Package, AlertTriangle } from 'lucide-react';
+import { format, differenceInMinutes, differenceInSeconds } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import type { ProductionEvent } from '@/services/types';
+import type { ProductionEvent, ProductionStandard } from '@/services/types';
 
 interface EventTimelineProps {
   events: ProductionEvent[];
   isLoading?: boolean;
+  /** Map of product_id -> ProductionStandard for the current machine */
+  standardsMap?: Map<string, ProductionStandard>;
+  /** Current machine's default cycle time */
+  machineCycleTime?: number;
+  /** Total good + reject counts for the shift (for performance calc) */
+  totalOutput?: number;
 }
 
 const eventTypeConfig = {
@@ -36,7 +42,12 @@ const eventTypeConfig = {
   },
 };
 
-export function EventTimeline({ events, isLoading = false }: EventTimelineProps) {
+export function EventTimeline({ 
+  events, 
+  isLoading = false,
+  standardsMap,
+  machineCycleTime,
+}: EventTimelineProps) {
   if (isLoading) {
     return <TimelineSkeleton items={4} />;
   }
@@ -68,6 +79,33 @@ export function EventTimeline({ events, isLoading = false }: EventTimelineProps)
             const isOngoing = !event.end_ts;
             const hasProduct = event.event_type === 'RUN' && event.product;
 
+            // Check if performance is slow compared to benchmark
+            let isSlowPerformance = false;
+            let benchmarkCycleTime: number | undefined;
+            if (event.event_type === 'RUN' && event.product_id) {
+              const standard = standardsMap?.get(event.product_id);
+              benchmarkCycleTime = standard?.ideal_cycle_time_seconds ?? machineCycleTime;
+              
+              // Calculate actual cycle time: duration / expected output
+              if (benchmarkCycleTime && duration > 0) {
+                const durationSeconds = endTime 
+                  ? differenceInSeconds(endTime, startTime)
+                  : differenceInSeconds(new Date(), startTime);
+                // Expected output at benchmark speed
+                const expectedOutput = durationSeconds / benchmarkCycleTime;
+                // If we have less than 80% of expected output, flag as slow
+                // Simple heuristic: if the event has been running longer than the setup time without output
+                if (durationSeconds > 120 && expectedOutput > 0) {
+                  // We mark slow if duration exceeds expected significantly
+                  isSlowPerformance = durationSeconds > (benchmarkCycleTime * expectedOutput * 1.25);
+                }
+              }
+            }
+
+            // For RUN events without a benchmark standard, mark as warning
+            const noBenchmark = event.event_type === 'RUN' && event.product_id && 
+              !standardsMap?.has(event.product_id);
+
             return (
               <div key={event.id} className="relative flex gap-4">
                 {/* Timeline dot */}
@@ -83,7 +121,11 @@ export function EventTimeline({ events, isLoading = false }: EventTimelineProps)
                 <div className={cn(
                   'flex-1 rounded-lg border p-3',
                   config.bgColor,
-                  config.borderColor
+                  noBenchmark 
+                    ? 'border-yellow-500 border-2'
+                    : isSlowPerformance
+                      ? 'border-orange-500 border-2'
+                      : config.borderColor
                 )}>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -99,6 +141,18 @@ export function EventTimeline({ events, isLoading = false }: EventTimelineProps)
                       {isOngoing && (
                         <Badge variant="outline" className="animate-pulse">
                           กำลังดำเนินการ
+                        </Badge>
+                      )}
+                      {isSlowPerformance && (
+                        <Badge className="text-xs gap-1 bg-orange-500/20 text-orange-700 border-orange-500/30">
+                          <AlertTriangle className="h-3 w-3" />
+                          Slow Performance
+                        </Badge>
+                      )}
+                      {noBenchmark && (
+                        <Badge className="text-xs gap-1 bg-yellow-500/20 text-yellow-700 border-yellow-500/30">
+                          <AlertTriangle className="h-3 w-3" />
+                          No Benchmark
                         </Badge>
                       )}
                     </div>
@@ -117,9 +171,9 @@ export function EventTimeline({ events, isLoading = false }: EventTimelineProps)
                           <> - {format(endTime, 'HH:mm', { locale: th })}</>
                         )}
                       </span>
-                      {hasProduct && (
+                      {benchmarkCycleTime && (
                         <span className="text-xs">
-                          • CT: {event.product!.ideal_cycle_time_seconds}s
+                          • Benchmark: {benchmarkCycleTime}s
                         </span>
                       )}
                     </div>

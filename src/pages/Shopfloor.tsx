@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -25,6 +25,7 @@ import {
   getMachines,
   getProducts,
   getProductionStandard,
+  getProductionStandardsForMachine,
   getTodayShiftCalendar,
   getCurrentEvent,
   getProductionEvents,
@@ -130,20 +131,34 @@ export default function Shopfloor() {
     enabled: !!selectedMachineId && !!selectedProductId,
   });
 
-  // Determine effective cycle time: production_standards > product default > machine default
+  // Fetch ALL standards for the selected machine (for timeline warnings)
+  const { data: machineStandards = [] } = useQuery({
+    queryKey: ['machineStandards', selectedMachineId],
+    queryFn: () => getProductionStandardsForMachine(selectedMachineId!),
+    enabled: !!selectedMachineId,
+  });
+
+  // Build a map of product_id -> ProductionStandard for the timeline
+  const standardsMap = useMemo(() => {
+    const map = new Map<string, typeof machineStandards[0]>();
+    for (const s of machineStandards) {
+      map.set(s.product_id, s);
+    }
+    return map;
+  }, [machineStandards]);
+
+  // Determine effective cycle time: production_standards > machine default (no product-level CT)
   const effectiveCycleTime = productionStandard?.ideal_cycle_time_seconds 
-    ?? selectedProduct?.ideal_cycle_time_seconds 
     ?? selectedMachine?.ideal_cycle_time_seconds;
   
   const cycleTimeSource = productionStandard
     ? `from Standard: ${selectedProduct?.code}`
-    : selectedProduct
-      ? `from SKU: ${selectedProduct.code}`
-      : 'Machine Default';
+    : 'Machine Default';
 
   const noBenchmarkWarning = selectedProduct && selectedMachine && !productionStandard
     ? `No benchmark defined for ${selectedProduct.code} on ${selectedMachine.name}`
     : null;
+
   const handleProductChange = async (productId: string | null) => {
     if (
       currentEvent?.event_type === 'RUN' &&
@@ -449,6 +464,8 @@ export default function Shopfloor() {
                     <EventTimeline
                       events={events}
                       isLoading={eventsLoading}
+                      standardsMap={standardsMap}
+                      machineCycleTime={selectedMachine?.ideal_cycle_time_seconds}
                     />
                   </CardContent>
                 </Card>

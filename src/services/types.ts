@@ -135,7 +135,6 @@ export interface Product {
   code: string;
   name: string;
   description?: string;
-  ideal_cycle_time_seconds: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
