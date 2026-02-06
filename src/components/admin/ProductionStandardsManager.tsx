@@ -278,28 +278,40 @@ export function ProductionStandardsManager() {
             กำหนด Cycle Time, Setup Time, Target Quality สำหรับแต่ละคู่ Machine-SKU
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Select value={selectedMachineFilter} onValueChange={setSelectedMachineFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Filter by Machine" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Machines</SelectItem>
-              {machines.map(m => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.name} ({m.code})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={handleOpenCreate} size="sm" disabled={!selectedCompanyId}>
-            <Plus className="h-4 w-4 mr-2" />
-            Assign SKU
-          </Button>
-        </div>
+        {selectedCompanyId ? (
+          <div className="flex items-center gap-2">
+            <Select value={selectedMachineFilter} onValueChange={setSelectedMachineFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter by Machine" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Machines</SelectItem>
+                {machines.map(m => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name} ({m.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={handleOpenCreate} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Assign SKU
+            </Button>
+          </div>
+        ) : (
+          <Alert className="max-w-sm">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="text-xs">กรุณาเลือกบริษัทก่อนจัดการ Standards</AlertDescription>
+          </Alert>
+        )}
       </div>
 
-      {isLoading ? (
+      {!selectedCompanyId ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed rounded-lg">
+          <AlertTriangle className="h-10 w-10 text-muted-foreground mb-3" />
+          <p className="text-muted-foreground">กรุณาเลือกบริษัทจากเมนูด้านซ้ายก่อนจัดการ Standards</p>
+        </div>
+      ) : isLoading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
