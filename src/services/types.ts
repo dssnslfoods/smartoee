@@ -129,6 +129,18 @@ export interface DefectReason {
   created_at: string;
 }
 
+export interface Product {
+  id: string;
+  company_id: string;
+  code: string;
+  name: string;
+  description?: string;
+  ideal_cycle_time_seconds: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ProductionEvent {
   id: string;
   plant_id: string;
@@ -137,6 +149,7 @@ export interface ProductionEvent {
   shift_calendar_id: string;
   event_type: EventType;
   reason_id?: string;
+  product_id?: string;
   start_ts: string;
   end_ts?: string;
   notes?: string;
@@ -145,6 +158,7 @@ export interface ProductionEvent {
   updated_at: string;
   machine?: Machine;
   reason?: DowntimeReason;
+  product?: Product;
 }
 
 export interface ProductionCount {

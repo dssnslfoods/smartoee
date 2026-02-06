@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TimelineSkeleton } from '@/components/ui/skeletons';
-import { Play, Pause, Wrench, Clock, Timer } from 'lucide-react';
+import { Play, Pause, Wrench, Clock, Timer, Package } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -57,7 +57,7 @@ export function EventTimeline({ events, isLoading = false }: EventTimelineProps)
         <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-border" />
 
         <div className="space-y-4">
-          {events.map((event, index) => {
+          {events.map((event) => {
             const config = eventTypeConfig[event.event_type];
             const Icon = config.icon;
             const startTime = new Date(event.start_ts);
@@ -66,6 +66,7 @@ export function EventTimeline({ events, isLoading = false }: EventTimelineProps)
               ? differenceInMinutes(endTime, startTime)
               : differenceInMinutes(new Date(), startTime);
             const isOngoing = !event.end_ts;
+            const hasProduct = event.event_type === 'RUN' && event.product;
 
             return (
               <div key={event.id} className="relative flex gap-4">
@@ -85,17 +86,23 @@ export function EventTimeline({ events, isLoading = false }: EventTimelineProps)
                   config.borderColor
                 )}>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant={isOngoing ? 'default' : 'secondary'}>
                         {config.label}
                       </Badge>
+                      {hasProduct && (
+                        <Badge variant="outline" className="text-xs gap-1 bg-background/50">
+                          <Package className="h-3 w-3" />
+                          {event.product!.name}
+                        </Badge>
+                      )}
                       {isOngoing && (
                         <Badge variant="outline" className="animate-pulse">
                           กำลังดำเนินการ
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
                       <Timer className="h-3 w-3" />
                       <span>{duration} นาที</span>
                     </div>
@@ -110,6 +117,11 @@ export function EventTimeline({ events, isLoading = false }: EventTimelineProps)
                           <> - {format(endTime, 'HH:mm', { locale: th })}</>
                         )}
                       </span>
+                      {hasProduct && (
+                        <span className="text-xs">
+                          • CT: {event.product!.ideal_cycle_time_seconds}s
+                        </span>
+                      )}
                     </div>
                     
                     {event.reason && (

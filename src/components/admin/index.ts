@@ -1,6 +1,7 @@
 export { PlantManager } from './PlantManager';
 export { LineManager } from './LineManager';
 export { MachineManager } from './MachineManager';
+export { ProductManager } from './ProductManager';
 export { DowntimeReasonManager } from './DowntimeReasonManager';
 export { DefectReasonManager } from './DefectReasonManager';
 export { UserPermissionManager } from './UserPermissionManager';
