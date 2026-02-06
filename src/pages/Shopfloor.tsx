@@ -108,6 +108,7 @@ export default function Shopfloor() {
     queryKey: ['productionEvents', selectedMachineId, currentShift?.id],
     queryFn: () => getProductionEvents(selectedMachineId!, currentShift?.id),
     enabled: !!selectedMachineId && !!currentShift?.id,
+    refetchInterval: 10000,
   });
 
   const { data: downtimeReasons = [] } = useQuery({
@@ -172,8 +173,8 @@ export default function Shopfloor() {
         await stopEvent(selectedMachineId!);
         setSelectedProductId(productId);
         await startEvent(selectedMachineId!, 'RUN', undefined, undefined, productId);
-        queryClient.invalidateQueries({ queryKey: ['currentEvent'] });
-        queryClient.invalidateQueries({ queryKey: ['productionEvents'] });
+        queryClient.invalidateQueries({ queryKey: ['currentEvent', selectedMachineId] });
+        queryClient.invalidateQueries({ queryKey: ['productionEvents', selectedMachineId, currentShift?.id] });
         toast.success('เปลี่ยน SKU สำเร็จ - หยุด Session เดิมและเริ่ม Session ใหม่');
       } catch (error: any) {
         toast.error(error.message || 'ไม่สามารถเปลี่ยน SKU ได้');
@@ -192,8 +193,8 @@ export default function Shopfloor() {
     onSuccess: (data) => {
       if (data.success) {
         toast.success(data.message);
-        queryClient.invalidateQueries({ queryKey: ['currentEvent'] });
-        queryClient.invalidateQueries({ queryKey: ['productionEvents'] });
+        queryClient.invalidateQueries({ queryKey: ['currentEvent', selectedMachineId] });
+        queryClient.invalidateQueries({ queryKey: ['productionEvents', selectedMachineId, currentShift?.id] });
       } else {
         toast.error(data.message || 'Failed to start event');
       }
@@ -210,8 +211,8 @@ export default function Shopfloor() {
     onSuccess: (data) => {
       if (data.success) {
         toast.success(data.message);
-        queryClient.invalidateQueries({ queryKey: ['currentEvent'] });
-        queryClient.invalidateQueries({ queryKey: ['productionEvents'] });
+        queryClient.invalidateQueries({ queryKey: ['currentEvent', selectedMachineId] });
+        queryClient.invalidateQueries({ queryKey: ['productionEvents', selectedMachineId, currentShift?.id] });
       } else {
         toast.error(data.message || 'Failed to stop event');
       }
