@@ -1,83 +1,120 @@
- import { AppLayout } from '@/components/layout/AppLayout';
- import { PageHeader } from '@/components/ui/PageHeader';
- import { OEEGauge } from '@/components/dashboard/OEEGauge';
- import { MachineStatusCard } from '@/components/dashboard/MachineStatusCard';
- import { MachineDetailSheet } from '@/components/dashboard/MachineDetailSheet';
- import { OEETrendChart } from '@/components/dashboard/OEETrendChart';
- import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
- import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
- import { OEECardSkeleton, StatsCardSkeleton, MachineCardSkeleton, ChartCardSkeleton } from '@/components/ui/skeletons';
- import { Calendar, Factory, AlertTriangle, LayoutDashboard, Play, Pause, Wrench, Building2 } from 'lucide-react';
- import { useAuth } from '@/hooks/useAuth';
- import { useFullscreen } from '@/hooks/useFullscreen';
- import { FullscreenToggle, FullscreenContainer } from '@/components/ui/FullscreenToggle';
- import { Badge } from '@/components/ui/badge';
- import { useQuery } from '@tanstack/react-query';
- import { getDashboardOEE, getMachinesWithStatus, getOEETrend, getLines } from '@/services/oeeApi';
- import { useState, useMemo } from 'react';
- 
- export default function Dashboard() {
-   const { company, isAdmin } = useAuth();
-   const [selectedLine, setSelectedLine] = useState<string>('all');
-   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
-   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
-   const { isFullscreen, isKiosk, toggleFullscreen, enterKiosk, enterFullscreen } = useFullscreen();
- 
-   const companyId = company?.id;
-   const companyName = company?.name;
- 
-   // Fetch OEE summary data (auto-refresh every 30 seconds)
-   const { data: oeeData, isLoading: isLoadingOEE } = useQuery({
-     queryKey: ['dashboardOEE', companyId],
-     queryFn: () => getDashboardOEE(companyId),
-     enabled: !!companyId || !isAdmin(),
-     refetchInterval: 30000,
-   });
- 
-   // Fetch machines with status (auto-refresh every 30 seconds)
-   const { data: machineData, isLoading: isLoadingMachines } = useQuery({
-     queryKey: ['dashboardMachines', companyId],
-     queryFn: () => getMachinesWithStatus(companyId),
-     enabled: !!companyId || !isAdmin(),
-     refetchInterval: 30000,
-   });
- 
-   // Fetch OEE trend data (auto-refresh every 30 seconds)
-   const { data: trendData, isLoading: isLoadingTrend } = useQuery({
-     queryKey: ['dashboardTrend', companyId],
-     queryFn: () => getOEETrend(companyId),
-     enabled: !!companyId || !isAdmin(),
-     refetchInterval: 30000,
-   });
- 
-   // Fetch lines for filter
-   const { data: lines } = useQuery({
-     queryKey: ['lines', companyId],
-     queryFn: () => getLines(undefined, companyId),
-     enabled: !!companyId || !isAdmin(),
-   });
- 
-   // Filter machines by selected line
-   const filteredMachines = useMemo(() => {
-     if (!machineData?.machines) return [];
-     if (selectedLine === 'all') return machineData.machines;
-     return machineData.machines.filter(m => m.line_id === selectedLine);
-   }, [machineData?.machines, selectedLine]);
- 
-   // Recalculate stats based on filtered machines
-   const filteredStats = useMemo(() => {
-     if (selectedLine === 'all') return machineData?.stats;
-     
-     const stats = { running: 0, idle: 0, stopped: 0, maintenance: 0 };
-     filteredMachines.forEach(machine => {
-       stats[machine.status]++;
-     });
-     return stats;
-   }, [filteredMachines, selectedLine, machineData?.stats]);
- 
-   const stats = filteredStats || { running: 0, idle: 0, stopped: 0, maintenance: 0 };
-   const oee = oeeData || { availability: 0, performance: 0, quality: 0, oee: 0 };
-   const trend = trendData || [];
+import { AppLayout } from '@/components/layout/AppLayout';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { OEEGauge } from '@/components/dashboard/OEEGauge';
+import { MachineStatusCard } from '@/components/dashboard/MachineStatusCard';
+import { MachineDetailSheet } from '@/components/dashboard/MachineDetailSheet';
+import { OEETrendChart } from '@/components/dashboard/OEETrendChart';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { OEECardSkeleton, StatsCardSkeleton, MachineCardSkeleton, ChartCardSkeleton } from '@/components/ui/skeletons';
+import { Calendar, Factory, AlertTriangle, LayoutDashboard, Play, Pause, Wrench, Building2 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useFullscreen } from '@/hooks/useFullscreen';
+import { FullscreenToggle, FullscreenContainer } from '@/components/ui/FullscreenToggle';
+import { Badge } from '@/components/ui/badge';
+import { useQuery } from '@tanstack/react-query';
+import { getDashboardOEE, getMachinesWithStatus, getOEETrend, getLines } from '@/services/oeeApi';
+import { useState, useMemo } from 'react';
+import { subDays, startOfDay, endOfDay } from 'date-fns';
+
+type PeriodOption = 'today' | 'yesterday' | '7d' | '14d' | '30d' | '60d';
+
+const PERIOD_OPTIONS: { value: PeriodOption; label: string; trendDays: number }[] = [
+  { value: 'today', label: 'วันนี้', trendDays: 1 },
+  { value: 'yesterday', label: 'เมื่อวาน', trendDays: 1 },
+  { value: '7d', label: '7 วัน', trendDays: 7 },
+  { value: '14d', label: '14 วัน', trendDays: 14 },
+  { value: '30d', label: '30 วัน', trendDays: 30 },
+  { value: '60d', label: '60 วัน', trendDays: 60 },
+];
+
+function getDateRange(period: PeriodOption): { startDate: string; endDate: string; trendDays: number } {
+  const now = new Date();
+  const opt = PERIOD_OPTIONS.find(o => o.value === period)!;
+
+  switch (period) {
+    case 'today':
+      return { startDate: startOfDay(now).toISOString(), endDate: endOfDay(now).toISOString(), trendDays: 7 };
+    case 'yesterday': {
+      const yesterday = subDays(now, 1);
+      return { startDate: startOfDay(yesterday).toISOString(), endDate: endOfDay(yesterday).toISOString(), trendDays: 7 };
+    }
+    default: {
+      const start = subDays(now, opt.trendDays - 1);
+      return { startDate: startOfDay(start).toISOString(), endDate: endOfDay(now).toISOString(), trendDays: opt.trendDays };
+    }
+  }
+}
+
+export default function Dashboard() {
+  const { company, isAdmin, hasRole } = useAuth();
+  const [selectedLine, setSelectedLine] = useState<string>('all');
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodOption>('today');
+  const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const { isFullscreen, isKiosk, toggleFullscreen, enterKiosk, enterFullscreen } = useFullscreen();
+
+  const companyId = company?.id;
+  const companyName = company?.name;
+
+  // Check if the user can use the time filter (admin, supervisor, executive)
+  const canUseTimeFilter = isAdmin() || hasRole('SUPERVISOR') || hasRole('EXECUTIVE');
+
+  // Calculate date range from selected period
+  const { startDate, endDate, trendDays } = useMemo(() => getDateRange(selectedPeriod), [selectedPeriod]);
+
+  // Fetch OEE summary data (auto-refresh every 30 seconds)
+  const { data: oeeData, isLoading: isLoadingOEE } = useQuery({
+    queryKey: ['dashboardOEE', companyId, startDate, endDate],
+    queryFn: () => getDashboardOEE(companyId, canUseTimeFilter ? startDate : undefined, canUseTimeFilter ? endDate : undefined),
+    enabled: !!companyId || !isAdmin(),
+    refetchInterval: 30000,
+  });
+
+  // Fetch machines with status (auto-refresh every 30 seconds)
+  const { data: machineData, isLoading: isLoadingMachines } = useQuery({
+    queryKey: ['dashboardMachines', companyId],
+    queryFn: () => getMachinesWithStatus(companyId),
+    enabled: !!companyId || !isAdmin(),
+    refetchInterval: 30000,
+  });
+
+  // Fetch OEE trend data (auto-refresh every 30 seconds)
+  const { data: trendData, isLoading: isLoadingTrend } = useQuery({
+    queryKey: ['dashboardTrend', companyId, trendDays],
+    queryFn: () => getOEETrend(companyId, canUseTimeFilter ? trendDays : 7),
+    enabled: !!companyId || !isAdmin(),
+    refetchInterval: 30000,
+  });
+
+  // Fetch lines for filter
+  const { data: lines } = useQuery({
+    queryKey: ['lines', companyId],
+    queryFn: () => getLines(undefined, companyId),
+    enabled: !!companyId || !isAdmin(),
+  });
+
+  // Filter machines by selected line
+  const filteredMachines = useMemo(() => {
+    if (!machineData?.machines) return [];
+    if (selectedLine === 'all') return machineData.machines;
+    return machineData.machines.filter(m => m.line_id === selectedLine);
+  }, [machineData?.machines, selectedLine]);
+
+  // Recalculate stats based on filtered machines
+  const filteredStats = useMemo(() => {
+    if (selectedLine === 'all') return machineData?.stats;
+    
+    const stats = { running: 0, idle: 0, stopped: 0, maintenance: 0 };
+    filteredMachines.forEach(machine => {
+      stats[machine.status]++;
+    });
+    return stats;
+  }, [filteredMachines, selectedLine, machineData?.stats]);
+
+  const stats = filteredStats || { running: 0, idle: 0, stopped: 0, maintenance: 0 };
+  const oee = oeeData || { availability: 0, performance: 0, quality: 0, oee: 0 };
+  const trend = trendData || [];
  
    const handleMachineClick = (machineId: string) => {
      setSelectedMachineId(machineId);
@@ -113,19 +150,21 @@
            </Badge>
          )}
          {/* Filters - hidden in kiosk mode */}
-         {!isKiosk && (
-           <>
-             <Select defaultValue="today">
-               <SelectTrigger className="w-[140px] sm:w-[160px] bg-background border-border/50">
-                 <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
-                 <SelectValue placeholder="Select period" />
-               </SelectTrigger>
-               <SelectContent>
-                 <SelectItem value="today">Today</SelectItem>
-                 <SelectItem value="week">This Week</SelectItem>
-                 <SelectItem value="month">This Month</SelectItem>
-               </SelectContent>
-             </Select>
+          {!isKiosk && (
+            <>
+              {canUseTimeFilter && (
+                <Select value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as PeriodOption)}>
+                  <SelectTrigger className="w-[140px] sm:w-[160px] bg-background border-border/50">
+                    <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <SelectValue placeholder="เลือกช่วงเวลา" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PERIOD_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
              <Select value={selectedLine} onValueChange={setSelectedLine}>
                <SelectTrigger className="w-[140px] sm:w-[160px] bg-background border-border/50">
                  <Factory className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -259,7 +298,7 @@
            {isLoadingTrend ? (
              <ChartCardSkeleton />
            ) : (
-             <OEETrendChart data={trend} title="Weekly OEE Trend" />
+              <OEETrendChart data={trend} title={`OEE Trend (${PERIOD_OPTIONS.find(o => o.value === selectedPeriod)?.label || '7 วัน'})`} />
            )}
          </div>
          <Card className="border-border/50">

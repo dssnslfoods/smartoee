@@ -506,8 +506,11 @@ export interface DashboardStats {
 
 /**
  * Get aggregated OEE metrics for a company's machines
+ * @param companyId - Filter by company
+ * @param startDate - Optional start date (ISO string) to filter snapshots
+ * @param endDate - Optional end date (ISO string) to filter snapshots
  */
-export async function getDashboardOEE(companyId?: string): Promise<DashboardOEEData> {
+export async function getDashboardOEE(companyId?: string, startDate?: string, endDate?: string): Promise<DashboardOEEData> {
   // Get all machines for the company
   const machines = await getMachines(undefined, companyId);
   
@@ -518,34 +521,52 @@ export async function getDashboardOEE(companyId?: string): Promise<DashboardOEED
   // Get latest OEE snapshot for each machine
   const machineIds = machines.map(m => m.id);
   
-  const { data: snapshots, error } = await supabase
+  let query = supabase
     .from('oee_snapshots')
     .select('*')
     .eq('scope', 'MACHINE')
     .in('scope_id', machineIds)
     .order('period_start', { ascending: false });
 
-  if (error) throw error;
-
-  // Get latest snapshot per machine
-  const latestByMachine = new Map<string, OeeSnapshot>();
-  for (const snap of snapshots || []) {
-    if (!latestByMachine.has(snap.scope_id)) {
-      latestByMachine.set(snap.scope_id, snap);
-    }
+  // Apply date range filter if provided
+  if (startDate) {
+    query = query.gte('period_start', startDate);
+  }
+  if (endDate) {
+    query = query.lte('period_start', endDate);
   }
 
-  const latestSnapshots = Array.from(latestByMachine.values());
+  const { data: snapshots, error } = await query;
+
+  if (error) throw error;
+
+  // If date range is specified, average ALL snapshots in the range
+  // Otherwise, get latest snapshot per machine (original behavior)
+  let relevantSnapshots: OeeSnapshot[];
   
-  if (latestSnapshots.length === 0) {
+  if (startDate || endDate) {
+    // Average all snapshots within the date range
+    relevantSnapshots = snapshots || [];
+  } else {
+    // Get latest snapshot per machine
+    const latestByMachine = new Map<string, OeeSnapshot>();
+    for (const snap of snapshots || []) {
+      if (!latestByMachine.has(snap.scope_id)) {
+        latestByMachine.set(snap.scope_id, snap);
+      }
+    }
+    relevantSnapshots = Array.from(latestByMachine.values());
+  }
+  
+  if (relevantSnapshots.length === 0) {
     return { availability: 0, performance: 0, quality: 0, oee: 0 };
   }
 
   // Calculate averages
-  const avgAvailability = latestSnapshots.reduce((sum, s) => sum + (Number(s.availability) || 0), 0) / latestSnapshots.length;
-  const avgPerformance = latestSnapshots.reduce((sum, s) => sum + (Number(s.performance) || 0), 0) / latestSnapshots.length;
-  const avgQuality = latestSnapshots.reduce((sum, s) => sum + (Number(s.quality) || 0), 0) / latestSnapshots.length;
-  const avgOee = latestSnapshots.reduce((sum, s) => sum + (Number(s.oee) || 0), 0) / latestSnapshots.length;
+  const avgAvailability = relevantSnapshots.reduce((sum, s) => sum + (Number(s.availability) || 0), 0) / relevantSnapshots.length;
+  const avgPerformance = relevantSnapshots.reduce((sum, s) => sum + (Number(s.performance) || 0), 0) / relevantSnapshots.length;
+  const avgQuality = relevantSnapshots.reduce((sum, s) => sum + (Number(s.quality) || 0), 0) / relevantSnapshots.length;
+  const avgOee = relevantSnapshots.reduce((sum, s) => sum + (Number(s.oee) || 0), 0) / relevantSnapshots.length;
 
   return {
     availability: Math.round(avgAvailability * 10) / 10,
@@ -651,9 +672,11 @@ export async function getMachinesWithStatus(companyId?: string): Promise<{ machi
 }
 
 /**
- * Get OEE trend data for the last 7 days
+ * Get OEE trend data for a specified number of days
+ * @param companyId - Filter by company
+ * @param days - Number of days to look back (default 7)
  */
-export async function getOEETrend(companyId?: string): Promise<{ date: string; availability: number; performance: number; quality: number; oee: number }[]> {
+export async function getOEETrend(companyId?: string, days: number = 7): Promise<{ date: string; availability: number; performance: number; quality: number; oee: number }[]> {
   const machines = await getMachines(undefined, companyId);
   
   if (machines.length === 0) {
@@ -662,10 +685,10 @@ export async function getOEETrend(companyId?: string): Promise<{ date: string; a
 
   const machineIds = machines.map(m => m.id);
   
-  // Get snapshots for last 7 days
+  // Get snapshots for the specified number of days
   const endDate = new Date();
   const startDate = new Date();
-  startDate.setDate(startDate.getDate() - 6);
+  startDate.setDate(startDate.getDate() - (days - 1));
 
   const { data: snapshots, error } = await supabase
     .from('oee_snapshots')
@@ -679,15 +702,19 @@ export async function getOEETrend(companyId?: string): Promise<{ date: string; a
 
   if (error) throw error;
 
-  // Group by date and calculate averages
+  // Group by date (use short date format for <= 14 days, otherwise use MM/DD)
+  const useShortFormat = days <= 14;
   const byDate = new Map<string, { availability: number[]; performance: number[]; quality: number[]; oee: number[] }>();
   
   for (const snap of snapshots || []) {
-    const date = new Date(snap.period_start).toLocaleDateString('en-US', { weekday: 'short' });
-    if (!byDate.has(date)) {
-      byDate.set(date, { availability: [], performance: [], quality: [], oee: [] });
+    const d = new Date(snap.period_start);
+    const dateKey = useShortFormat
+      ? d.toLocaleDateString('en-US', { weekday: 'short' })
+      : `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}`;
+    if (!byDate.has(dateKey)) {
+      byDate.set(dateKey, { availability: [], performance: [], quality: [], oee: [] });
     }
-    const entry = byDate.get(date)!;
+    const entry = byDate.get(dateKey)!;
     entry.availability.push(Number(snap.availability) || 0);
     entry.performance.push(Number(snap.performance) || 0);
     entry.quality.push(Number(snap.quality) || 0);
@@ -696,24 +723,26 @@ export async function getOEETrend(companyId?: string): Promise<{ date: string; a
 
   // Calculate averages per day
   const result: { date: string; availability: number; performance: number; quality: number; oee: number }[] = [];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < days; i++) {
     const d = new Date(startDate);
     d.setDate(d.getDate() + i);
-    const dayName = days[d.getDay()];
+    const dateKey = useShortFormat
+      ? dayNames[d.getDay()]
+      : `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}`;
     
-    const entry = byDate.get(dayName);
+    const entry = byDate.get(dateKey);
     if (entry && entry.oee.length > 0) {
       result.push({
-        date: dayName,
+        date: dateKey,
         availability: Math.round(entry.availability.reduce((a, b) => a + b, 0) / entry.availability.length),
         performance: Math.round(entry.performance.reduce((a, b) => a + b, 0) / entry.performance.length),
         quality: Math.round(entry.quality.reduce((a, b) => a + b, 0) / entry.quality.length),
         oee: Math.round(entry.oee.reduce((a, b) => a + b, 0) / entry.oee.length),
       });
     } else {
-      result.push({ date: dayName, availability: 0, performance: 0, quality: 0, oee: 0 });
+      result.push({ date: dateKey, availability: 0, performance: 0, quality: 0, oee: 0 });
     }
   }
 
