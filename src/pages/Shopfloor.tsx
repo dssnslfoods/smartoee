@@ -12,11 +12,12 @@ import { ProductionCountHistory } from '@/components/shopfloor/ProductionCountHi
 import { EventTimeline } from '@/components/shopfloor/EventTimeline';
 import { LockedBanner } from '@/components/shopfloor/LockedBanner';
 import { MyMachinesViewer } from '@/components/shopfloor/MyMachinesViewer';
+import { ProductionBenchmarkCard } from '@/components/shopfloor/ProductionBenchmarkCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Factory, Activity, Package, Monitor, Clock, AlertTriangle } from 'lucide-react';
+import { Loader2, Factory, Activity, Package, Monitor, Clock, AlertTriangle, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -393,6 +394,31 @@ export default function Shopfloor() {
                     noBenchmarkWarning={noBenchmarkWarning}
                     isLoading={productsLoading}
                     disabled={isLocked}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Production Benchmark - shown when machine + SKU selected */}
+            {selectedMachineId && selectedProductId && (
+              <Card className="overflow-hidden">
+                <CardHeader className="pb-3 bg-muted/30">
+                  <CardTitle className="flex items-center gap-3 text-base sm:text-lg">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-oee-overall/10">
+                      <BarChart3 className="h-5 w-5 text-oee-overall" />
+                    </div>
+                    ค่ามาตรฐานการผลิต
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <ProductionBenchmarkCard
+                    productionStandard={productionStandard}
+                    machineName={selectedMachine?.name}
+                    machineCode={selectedMachine?.code}
+                    machineCycleTime={selectedMachine?.ideal_cycle_time_seconds}
+                    productName={selectedProduct?.name}
+                    productCode={selectedProduct?.code}
+                    noBenchmarkWarning={noBenchmarkWarning}
                   />
                 </CardContent>
               </Card>

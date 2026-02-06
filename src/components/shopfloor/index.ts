@@ -8,3 +8,4 @@ export { EventControls } from './EventControls';
 export { AddCountsForm } from './AddCountsForm';
 export { EventTimeline } from './EventTimeline';
 export { LockedBanner } from './LockedBanner';
+export { ProductionBenchmarkCard } from './ProductionBenchmarkCard';
