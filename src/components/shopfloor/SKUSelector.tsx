@@ -71,7 +71,7 @@ export function SKUSelector({
             </div>
             <Badge variant="outline" className="shrink-0 text-xs gap-1">
               <Timer className="h-3 w-3" />
-              Target: {effectiveCycleTime ?? selectedProduct.ideal_cycle_time_seconds}s [{cycleTimeSource ?? 'SKU'}]
+              Target: {effectiveCycleTime ?? '—'}s [{cycleTimeSource ?? 'N/A'}]
             </Badge>
           </div>
           {noBenchmarkWarning && (
@@ -150,10 +150,6 @@ export function SKUSelector({
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-muted-foreground font-mono">
                         {product.code}
-                      </span>
-                      <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                        <Timer className="h-2.5 w-2.5" />
-                        {product.ideal_cycle_time_seconds}s
                       </span>
                     </div>
                   </div>
