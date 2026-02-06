@@ -43,6 +43,10 @@ interface Machine {
   line_id: string;
   company_id: string;
   ideal_cycle_time_seconds: number;
+  target_oee: number;
+  target_availability: number;
+  target_performance: number;
+  target_quality: number;
   is_active: boolean;
 }
 
@@ -73,6 +77,10 @@ export function MachineManager() {
     line_id: '', 
     company_id: '',
     ideal_cycle_time_seconds: 60, 
+    target_oee: 85,
+    target_availability: 90,
+    target_performance: 95,
+    target_quality: 99,
     is_active: true 
   });
   const [selectedCompanyIdForForm, setSelectedCompanyIdForForm] = useState<string>('');
@@ -150,6 +158,10 @@ export function MachineManager() {
           line_id: data.line_id, 
           company_id: data.company_id,
           ideal_cycle_time_seconds: data.ideal_cycle_time_seconds,
+          target_oee: data.target_oee,
+          target_availability: data.target_availability,
+          target_performance: data.target_performance,
+          target_quality: data.target_quality,
           is_active: data.is_active 
         });
       if (error) throw error;
@@ -172,6 +184,10 @@ export function MachineManager() {
           line_id: data.line_id,
           company_id: data.company_id, 
           ideal_cycle_time_seconds: data.ideal_cycle_time_seconds,
+          target_oee: data.target_oee,
+          target_availability: data.target_availability,
+          target_performance: data.target_performance,
+          target_quality: data.target_quality,
           is_active: data.is_active 
         })
         .eq('id', id);
@@ -202,7 +218,7 @@ export function MachineManager() {
   const handleOpenCreate = () => {
     setEditingMachine(null);
     setSelectedCompanyIdForForm(selectedCompanyId || companies?.[0]?.id || '');
-    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || companies?.[0]?.id || '', ideal_cycle_time_seconds: 60, is_active: true });
+    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || companies?.[0]?.id || '', ideal_cycle_time_seconds: 60, target_oee: 85, target_availability: 90, target_performance: 95, target_quality: 99, is_active: true });
     setIsDialogOpen(true);
   };
 
@@ -215,6 +231,10 @@ export function MachineManager() {
       line_id: machine.line_id, 
       company_id: machine.company_id,
       ideal_cycle_time_seconds: machine.ideal_cycle_time_seconds,
+      target_oee: machine.target_oee ?? 85,
+      target_availability: machine.target_availability ?? 90,
+      target_performance: machine.target_performance ?? 95,
+      target_quality: machine.target_quality ?? 99,
       is_active: machine.is_active 
     });
     setIsDialogOpen(true);
@@ -224,7 +244,7 @@ export function MachineManager() {
     setIsDialogOpen(false);
     setEditingMachine(null);
     setSelectedCompanyIdForForm(selectedCompanyId || '');
-    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || '', ideal_cycle_time_seconds: 60, is_active: true });
+    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || '', ideal_cycle_time_seconds: 60, target_oee: 85, target_availability: 90, target_performance: 95, target_quality: 99, is_active: true });
   };
 
   const handleCompanyChange = (companyId: string) => {
@@ -281,6 +301,7 @@ export function MachineManager() {
               <TableHead>Company</TableHead>
               <TableHead>Line</TableHead>
               <TableHead>Cycle Time (s)</TableHead>
+              <TableHead>Target OEE</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
@@ -298,6 +319,12 @@ export function MachineManager() {
                     {line?.name} ({line?.plants?.name || '-'})
                   </TableCell>
                   <TableCell>{machine.ideal_cycle_time_seconds}</TableCell>
+                  <TableCell>
+                    <span className="text-sm font-medium">{machine.target_oee ?? 85}%</span>
+                    <span className="text-xs text-muted-foreground ml-1">
+                      (A:{machine.target_availability ?? 90} P:{machine.target_performance ?? 95} Q:{machine.target_quality ?? 99})
+                    </span>
+                  </TableCell>
                   <TableCell>
                     <span className={machine.is_active ? 'text-status-running' : 'text-muted-foreground'}>
                       {machine.is_active ? 'Active' : 'Inactive'}
@@ -318,7 +345,7 @@ export function MachineManager() {
             })}
             {machines?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   No machines found
                 </TableCell>
               </TableRow>
@@ -401,6 +428,62 @@ export function MachineManager() {
                 onChange={(e) => setFormData({ ...formData, ideal_cycle_time_seconds: parseInt(e.target.value) || 60 })}
               />
             </div>
+
+            {/* Target OEE Section */}
+            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+              <Label className="text-sm font-semibold">🎯 Target OEE (%)</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="target_oee" className="text-xs text-muted-foreground">OEE</Label>
+                  <Input
+                    id="target_oee"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={formData.target_oee}
+                    onChange={(e) => setFormData({ ...formData, target_oee: parseFloat(e.target.value) || 85 })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="target_availability" className="text-xs text-muted-foreground">Availability</Label>
+                  <Input
+                    id="target_availability"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={formData.target_availability}
+                    onChange={(e) => setFormData({ ...formData, target_availability: parseFloat(e.target.value) || 90 })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="target_performance" className="text-xs text-muted-foreground">Performance</Label>
+                  <Input
+                    id="target_performance"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={formData.target_performance}
+                    onChange={(e) => setFormData({ ...formData, target_performance: parseFloat(e.target.value) || 95 })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="target_quality" className="text-xs text-muted-foreground">Quality</Label>
+                  <Input
+                    id="target_quality"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={formData.target_quality}
+                    onChange={(e) => setFormData({ ...formData, target_quality: parseFloat(e.target.value) || 99 })}
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="flex items-center gap-2">
               <Switch
                 id="is_active"
