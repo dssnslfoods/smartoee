@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Loader2, Cpu, Package, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Cpu, Package, AlertTriangle, Factory } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -37,12 +37,19 @@ interface ProductionStandard {
   products?: { name: string; code: string } | null;
 }
 
+interface PlantOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
 interface MachineOption {
   id: string;
   name: string;
   code: string;
   ideal_cycle_time_seconds: number;
-  lines?: { name: string; plants?: { name: string } | null } | null;
+  plant_id?: string | null;
+  lines?: { name: string; plant_id?: string | null; plants?: { id: string; name: string } | null } | null;
 }
 
 interface ProductOption {
@@ -56,6 +63,7 @@ export function ProductionStandardsManager() {
   const { company } = useAuth();
   const selectedCompanyId = company?.id;
 
+  const [selectedPlantFilter, setSelectedPlantFilter] = useState<string>('all');
   const [selectedMachineFilter, setSelectedMachineFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -70,13 +78,29 @@ export function ProductionStandardsManager() {
     is_active: true,
   });
 
+  // Fetch plants
+  const { data: plants = [] } = useQuery({
+    queryKey: ['ps-plants', selectedCompanyId],
+    queryFn: async () => {
+      let query = supabase
+        .from('plants')
+        .select('id, name, code')
+        .eq('is_active', true)
+        .order('name');
+      if (selectedCompanyId) query = query.eq('company_id', selectedCompanyId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as PlantOption[];
+    },
+  });
+
   // Fetch machines
   const { data: machines = [] } = useQuery({
     queryKey: ['ps-machines', selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from('machines')
-        .select('id, name, code, ideal_cycle_time_seconds, lines(name, plants(name))')
+        .select('id, name, code, ideal_cycle_time_seconds, lines(name, plant_id, plants(id, name))')
         .eq('is_active', true)
         .order('name');
       if (selectedCompanyId) query = query.eq('company_id', selectedCompanyId);
@@ -85,6 +109,12 @@ export function ProductionStandardsManager() {
       return (data || []) as MachineOption[];
     },
   });
+
+  // Filter machines by selected plant
+  const filteredMachines = useMemo(() => {
+    if (selectedPlantFilter === 'all') return machines;
+    return machines.filter(m => m.lines?.plants?.id === selectedPlantFilter);
+  }, [machines, selectedPlantFilter]);
 
   // Fetch products
   const { data: products = [] } = useQuery({
@@ -279,14 +309,33 @@ export function ProductionStandardsManager() {
           </p>
         </div>
         {selectedCompanyId ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={selectedPlantFilter} onValueChange={(v) => { setSelectedPlantFilter(v); setSelectedMachineFilter('all'); }}>
+              <SelectTrigger className="w-[180px]">
+                <div className="flex items-center gap-2">
+                  <Factory className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <SelectValue placeholder="Filter by Plant" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Plants</SelectItem>
+                {plants.map(p => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name} ({p.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={selectedMachineFilter} onValueChange={setSelectedMachineFilter}>
               <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Filter by Machine" />
+                <div className="flex items-center gap-2">
+                  <Cpu className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <SelectValue placeholder="Filter by Machine" />
+                </div>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Machines</SelectItem>
-                {machines.map(m => (
+                {filteredMachines.map(m => (
                   <SelectItem key={m.id} value={m.id}>
                     {m.name} ({m.code})
                   </SelectItem>
@@ -417,9 +466,10 @@ export function ProductionStandardsManager() {
                   <SelectValue placeholder="เลือกเครื่องจักร" />
                 </SelectTrigger>
                 <SelectContent>
-                  {machines.map(m => (
+                  {filteredMachines.map(m => (
                     <SelectItem key={m.id} value={m.id}>
                       {m.name} ({m.code}) — CT: {m.ideal_cycle_time_seconds}s
+                      {m.lines?.plants?.name ? ` [${m.lines.plants.name}]` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
