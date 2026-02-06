@@ -300,6 +300,10 @@ export type Database = {
           is_active: boolean
           line_id: string
           name: string
+          target_availability: number | null
+          target_oee: number | null
+          target_performance: number | null
+          target_quality: number | null
           updated_at: string
         }
         Insert: {
@@ -311,6 +315,10 @@ export type Database = {
           is_active?: boolean
           line_id: string
           name: string
+          target_availability?: number | null
+          target_oee?: number | null
+          target_performance?: number | null
+          target_quality?: number | null
           updated_at?: string
         }
         Update: {
@@ -322,6 +330,10 @@ export type Database = {
           is_active?: boolean
           line_id?: string
           name?: string
+          target_availability?: number | null
+          target_oee?: number | null
+          target_performance?: number | null
+          target_quality?: number | null
           updated_at?: string
         }
         Relationships: [
