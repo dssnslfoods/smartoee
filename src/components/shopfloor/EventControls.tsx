@@ -27,6 +27,7 @@ interface EventControlsProps {
   currentEvent: ProductionEvent | null | undefined;
   downtimeReasons: DowntimeReason[];
   selectedProduct: Product | null;
+  machineCycleTime?: number;
   onStartRun: () => void;
   onStartDowntime: (reasonId: string, notes?: string) => void;
   onStartSetup: (reasonId: string, notes?: string) => void;
@@ -39,6 +40,7 @@ export function EventControls({
   currentEvent,
   downtimeReasons,
   selectedProduct,
+  machineCycleTime,
   onStartRun,
   onStartDowntime,
   onStartSetup,
@@ -46,6 +48,11 @@ export function EventControls({
   isLoading = false,
   isLocked = false,
 }: EventControlsProps) {
+  // Determine effective cycle time: SKU overrides machine, with fallback
+  const effectiveCycleTime = selectedProduct?.ideal_cycle_time_seconds ?? machineCycleTime;
+  const cycleTimeSource = selectedProduct 
+    ? `from SKU: ${selectedProduct.code}` 
+    : 'Machine Default';
   const [showDowntimeDialog, setShowDowntimeDialog] = useState(false);
   const [showSetupDialog, setShowSetupDialog] = useState(false);
   const [showStopDialog, setShowStopDialog] = useState(false);
@@ -111,11 +118,11 @@ export function EventControls({
               )}
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {/* Ideal Cycle Time badge for running status */}
-              {currentEvent.event_type === 'RUN' && selectedProduct && (
+              {/* Cycle Time badge - shows source (SKU or Machine Default) */}
+              {currentEvent.event_type === 'RUN' && effectiveCycleTime && (
                 <Badge variant="outline" className="text-xs gap-1">
                   <Timer className="h-3 w-3" />
-                  CT: {selectedProduct.ideal_cycle_time_seconds}s
+                  Target: {effectiveCycleTime}s [{cycleTimeSource}]
                 </Badge>
               )}
               <Clock className="h-4 w-4" />

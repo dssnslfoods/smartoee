@@ -326,6 +326,7 @@ export default function Shopfloor() {
                     products={products}
                     selectedProductId={selectedProductId}
                     onProductChange={handleProductChange}
+                    machineCycleTime={selectedMachine?.ideal_cycle_time_seconds}
                     isLoading={productsLoading}
                     disabled={isLocked}
                   />
@@ -365,6 +366,7 @@ export default function Shopfloor() {
                         currentEvent={currentEvent}
                         downtimeReasons={downtimeReasons}
                         selectedProduct={selectedProduct}
+                        machineCycleTime={selectedMachine?.ideal_cycle_time_seconds}
                         onStartRun={handleStartRun}
                         onStartDowntime={(reasonId, notes) => 
                           startEventMutation.mutate({ eventType: 'DOWNTIME', reasonId, notes })
