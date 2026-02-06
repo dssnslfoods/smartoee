@@ -142,8 +142,8 @@ export function ProductionStandardsManager() {
     },
   });
 
-  // Fetch production standards
-  const { data: standards = [], isLoading } = useQuery({
+  // Fetch production standards (raw)
+  const { data: rawStandards = [], isLoading } = useQuery({
     queryKey: ['production-standards', selectedCompanyId, selectedMachineFilter],
     queryFn: async () => {
       let query = supabase
@@ -156,20 +156,22 @@ export function ProductionStandardsManager() {
       }
       const { data, error } = await query;
       if (error) throw error;
-      
-      // Enrich with machine and product names from already fetched data
-      return (data || []).map(s => ({
-        ...s,
-        machines: machines.find(m => m.id === s.machine_id) 
-          ? { name: machines.find(m => m.id === s.machine_id)!.name, code: machines.find(m => m.id === s.machine_id)!.code, ideal_cycle_time_seconds: machines.find(m => m.id === s.machine_id)!.ideal_cycle_time_seconds }
-          : null,
-        products: products.find(p => p.id === s.product_id)
-          ? { name: products.find(p => p.id === s.product_id)!.name, code: products.find(p => p.id === s.product_id)!.code }
-          : null,
-      })) as ProductionStandard[];
+      return data || [];
     },
-    enabled: machines.length > 0 || products.length > 0,
   });
+
+  // Enrich standards with machine and product names reactively
+  const standards: ProductionStandard[] = useMemo(() => {
+    return rawStandards.map(s => ({
+      ...s,
+      machines: machines.find(m => m.id === s.machine_id)
+        ? { name: machines.find(m => m.id === s.machine_id)!.name, code: machines.find(m => m.id === s.machine_id)!.code, ideal_cycle_time_seconds: machines.find(m => m.id === s.machine_id)!.ideal_cycle_time_seconds }
+        : null,
+      products: products.find(p => p.id === s.product_id)
+        ? { name: products.find(p => p.id === s.product_id)!.name, code: products.find(p => p.id === s.product_id)!.code }
+        : null,
+    })) as ProductionStandard[];
+  }, [rawStandards, machines, products]);
 
   // Validation: check if SKU cycle time is faster than machine capacity
   const selectedMachine = machines.find(m => m.id === formData.machine_id);
