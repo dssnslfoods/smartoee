@@ -1,7 +1,6 @@
-import { Label } from '@/components/ui/label';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Cpu, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Machine } from '@/services/types';
@@ -16,17 +15,9 @@ interface MachineSelectorProps {
 
 function MachineSelectorSkeleton() {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 gap-2 p-1">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="p-3 border rounded-lg space-y-2">
-          <div className="flex items-start gap-2">
-            <Skeleton className="h-5 w-5 rounded shrink-0" />
-            <div className="flex-1 space-y-1.5">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-5 w-16 rounded" />
-            </div>
-          </div>
-        </div>
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Skeleton key={i} className="h-20 rounded-xl" />
       ))}
     </div>
   );
@@ -40,71 +31,83 @@ export function MachineSelector({
   disabled = false,
 }: MachineSelectorProps) {
   if (isLoading) {
-    return (
-      <div className="space-y-2 md:col-span-1">
-        <Label className="text-sm font-medium">Machine</Label>
-        <MachineSelectorSkeleton />
-      </div>
-    );
+    return <MachineSelectorSkeleton />;
   }
 
   if (disabled) {
     return (
-      <div className="space-y-2">
-        <Label className="text-sm font-medium">Machine</Label>
-        <div className="flex items-center justify-center h-12 border rounded-md bg-muted text-muted-foreground text-sm">
-          เลือก Line ก่อน
-        </div>
+      <div className="flex items-center justify-center h-20 border-2 border-dashed rounded-xl text-muted-foreground text-sm">
+        <Cpu className="h-5 w-5 mr-2 opacity-40" />
+        เลือก Plant & Line ก่อน
+      </div>
+    );
+  }
+
+  if (machines.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-20 border-2 border-dashed rounded-xl text-muted-foreground text-sm">
+        <Cpu className="h-5 w-5 mr-2 opacity-40" />
+        ไม่พบเครื่องจักรใน Line นี้
       </div>
     );
   }
 
   return (
-    <div className="space-y-2 md:col-span-1">
-      <Label className="text-sm font-medium">Machine</Label>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[200px] overflow-y-auto p-1">
+    <ScrollArea className={machines.length > 8 ? 'max-h-[220px]' : undefined}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pr-1">
         {machines.map((machine) => {
           const isSelected = machine.id === selectedMachineId;
           return (
-            <Card
+            <button
               key={machine.id}
               onClick={() => onMachineChange(isSelected ? null : machine.id)}
               className={cn(
-                'cursor-pointer p-3 transition-all hover:shadow-md relative',
-                isSelected 
-                  ? 'ring-2 ring-primary bg-primary/5 border-primary' 
-                  : 'hover:border-primary/50'
+                'group relative flex flex-col items-center justify-center gap-1.5 p-4 rounded-xl border-2 transition-all text-center min-h-[80px]',
+                'hover:shadow-md hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                isSelected
+                  ? 'border-primary bg-primary/10 shadow-md shadow-primary/10 ring-1 ring-primary/20'
+                  : 'border-border bg-card hover:bg-accent/30'
               )}
             >
+              {/* Selection indicator */}
               {isSelected && (
-                <CheckCircle2 className="absolute top-2 right-2 h-4 w-4 text-primary" />
-              )}
-              <div className="flex items-start gap-2">
-                <Cpu className={cn(
-                  'h-5 w-5 mt-0.5 shrink-0',
-                  isSelected ? 'text-primary' : 'text-muted-foreground'
-                )} />
-                <div className="min-w-0 flex-1">
-                  <p className={cn(
-                    'font-medium text-sm truncate',
-                    isSelected && 'text-primary'
-                  )}>
-                    {machine.name}
-                  </p>
-                  <Badge variant="outline" className="text-xs mt-1">
-                    {machine.code}
-                  </Badge>
+                <div className="absolute -top-1.5 -right-1.5">
+                  <CheckCircle2 className="h-5 w-5 text-primary fill-primary/20" />
                 </div>
+              )}
+
+              {/* Icon */}
+              <div className={cn(
+                'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
+                isSelected
+                  ? 'bg-primary/20 text-primary'
+                  : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary/70'
+              )}>
+                <Cpu className="h-5 w-5" />
               </div>
-            </Card>
+
+              {/* Machine info */}
+              <div className="min-w-0 w-full">
+                <p className={cn(
+                  'font-semibold text-sm leading-tight truncate',
+                  isSelected && 'text-primary'
+                )}>
+                  {machine.name}
+                </p>
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    'text-[10px] mt-1 font-mono px-1.5',
+                    isSelected && 'border-primary/30 text-primary'
+                  )}
+                >
+                  {machine.code}
+                </Badge>
+              </div>
+            </button>
           );
         })}
       </div>
-      {machines.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-4">
-          ไม่พบเครื่องจักรใน Line นี้
-        </p>
-      )}
-    </div>
+    </ScrollArea>
   );
 }

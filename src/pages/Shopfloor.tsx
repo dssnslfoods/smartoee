@@ -324,24 +324,47 @@ export default function Shopfloor() {
             {isLocked && <LockedBanner />}
 
             {/* Plant/Line/Machine Selection */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <PlantLineSelector
-                plants={plants}
-                lines={lines}
-                selectedPlantId={selectedPlantId}
-                selectedLineId={selectedLineId}
-                onPlantChange={setSelectedPlantId}
-                onLineChange={setSelectedLineId}
-                isLoading={plantsLoading || linesLoading}
-              />
-              <MachineSelector
-                machines={machines}
-                selectedMachineId={selectedMachineId}
-                onMachineChange={setSelectedMachineId}
-                isLoading={machinesLoading}
-                disabled={!selectedLineId}
-              />
-            </div>
+            <Card className="overflow-hidden">
+              <CardHeader className="pb-3 bg-muted/30">
+                <CardTitle className="flex items-center gap-3 text-base sm:text-lg">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                    <Factory className="h-5 w-5 text-primary" />
+                  </div>
+                  เลือกเครื่องจักร
+                  {selectedMachine && (
+                    <Badge variant="secondary" className="font-medium text-xs">
+                      {selectedMachine.name}
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-4">
+                {/* Plant & Line row */}
+                <PlantLineSelector
+                  plants={plants}
+                  lines={lines}
+                  selectedPlantId={selectedPlantId}
+                  selectedLineId={selectedLineId}
+                  onPlantChange={setSelectedPlantId}
+                  onLineChange={setSelectedLineId}
+                  isLoading={plantsLoading || linesLoading}
+                />
+
+                {/* Divider */}
+                {selectedLineId && (
+                  <div className="border-t border-border" />
+                )}
+
+                {/* Machine grid */}
+                <MachineSelector
+                  machines={machines}
+                  selectedMachineId={selectedMachineId}
+                  onMachineChange={setSelectedMachineId}
+                  isLoading={machinesLoading}
+                  disabled={!selectedLineId}
+                />
+              </CardContent>
+            </Card>
 
             {/* SKU Selector - shown when machine is selected */}
             {selectedMachineId && (
