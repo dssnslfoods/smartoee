@@ -10,6 +10,7 @@ interface SKUSelectorProps {
   products: Product[];
   selectedProductId: string | null;
   onProductChange: (productId: string | null) => void;
+  machineCycleTime?: number;
   isLoading?: boolean;
   disabled?: boolean;
 }
@@ -18,6 +19,7 @@ export function SKUSelector({
   products,
   selectedProductId,
   onProductChange,
+  machineCycleTime,
   isLoading = false,
   disabled = false,
 }: SKUSelectorProps) {
@@ -50,7 +52,7 @@ export function SKUSelector({
   return (
     <div className="space-y-3">
       {/* Selected product display */}
-      {selectedProduct && (
+      {selectedProduct ? (
         <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
           <Package className="h-4 w-4 text-primary shrink-0" />
           <div className="flex-1 min-w-0">
@@ -61,10 +63,21 @@ export function SKUSelector({
           </div>
           <Badge variant="outline" className="shrink-0 text-xs gap-1">
             <Timer className="h-3 w-3" />
-            {selectedProduct.ideal_cycle_time_seconds}s
+            Target: {selectedProduct.ideal_cycle_time_seconds}s [SKU]
           </Badge>
         </div>
-      )}
+      ) : machineCycleTime ? (
+        <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border">
+          <Timer className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-muted-foreground">ยังไม่ได้เลือก SKU</p>
+          </div>
+          <Badge variant="secondary" className="shrink-0 text-xs gap-1">
+            <Timer className="h-3 w-3" />
+            Target: {machineCycleTime}s [Machine Default]
+          </Badge>
+        </div>
+      ) : null}
 
       {/* Search */}
       <div className="relative">

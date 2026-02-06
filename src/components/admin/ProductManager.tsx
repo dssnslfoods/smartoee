@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Loader2, Download, Upload } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Download, Upload, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -70,6 +71,38 @@ export function ProductManager() {
       return data as Product[];
     },
   });
+
+  // Fetch machines to validate SKU cycle time against machine capacity
+  const { data: machines = [] } = useQuery({
+    queryKey: ['admin-machines-ct', selectedCompanyId],
+    queryFn: async () => {
+      let query = supabase.from('machines').select('id, name, code, ideal_cycle_time_seconds').eq('is_active', true);
+      if (selectedCompanyId) query = query.eq('company_id', selectedCompanyId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedCompanyId,
+  });
+
+  // Compute minimum machine cycle time for validation
+  const minMachineCycleTime = useMemo(() => {
+    if (machines.length === 0) return null;
+    return Math.min(...machines.map(m => Number(m.ideal_cycle_time_seconds)));
+  }, [machines]);
+
+  // Check if current SKU cycle time exceeds machine capacity
+  const cycleTimeWarning = useMemo(() => {
+    if (!formData.ideal_cycle_time_seconds || minMachineCycleTime === null) return null;
+    if (formData.ideal_cycle_time_seconds < minMachineCycleTime) {
+      const fasterMachines = machines.filter(
+        m => Number(m.ideal_cycle_time_seconds) > formData.ideal_cycle_time_seconds
+      );
+      return `Warning: SKU speed (${formData.ideal_cycle_time_seconds}s) exceeds machine capacity. ` +
+        `${fasterMachines.length} machine(s) have slower cycle times (min: ${minMachineCycleTime}s).`;
+    }
+    return null;
+  }, [formData.ideal_cycle_time_seconds, minMachineCycleTime, machines]);
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -316,8 +349,16 @@ export function ProductManager() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="cycle_time">Ideal Cycle Time (seconds) *</Label>
-              <Input id="cycle_time" type="number" min="1" value={formData.ideal_cycle_time_seconds}
+              <Input id="cycle_time" type="number" min="0.1" step="0.1" value={formData.ideal_cycle_time_seconds}
                 onChange={(e) => setFormData({ ...formData, ideal_cycle_time_seconds: parseFloat(e.target.value) || 60 })} />
+              {cycleTimeWarning && (
+                <Alert variant="destructive" className="py-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    {cycleTimeWarning}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Switch id="is_active" checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
