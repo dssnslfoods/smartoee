@@ -94,7 +94,41 @@ export default function Shopfloor() {
     refetchInterval: 60000,
   });
 
-  const currentShift = shiftCalendar[0] as ShiftCalendar | undefined;
+  // Find the shift that matches current time (same logic as rpc_start_event)
+  const currentShift = useMemo(() => {
+    if (shiftCalendar.length === 0) return undefined;
+    
+    const now = new Date();
+    const currentHours = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const currentSeconds = now.getSeconds();
+    const currentTimeInSeconds = currentHours * 3600 + currentMinutes * 60 + currentSeconds;
+    
+    const parseTime = (timeStr: string) => {
+      const parts = timeStr.split(':').map(Number);
+      return parts[0] * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+    };
+    
+    const activeShift = shiftCalendar.find(sc => {
+      const start = sc.shift?.start_time;
+      const end = sc.shift?.end_time;
+      if (!start || !end) return false;
+      
+      const startSec = parseTime(start);
+      const endSec = parseTime(end);
+      
+      if (startSec <= endSec) {
+        // Normal shift (e.g., 06:00 - 14:00)
+        return currentTimeInSeconds >= startSec && currentTimeInSeconds < endSec;
+      } else {
+        // Overnight shift (e.g., 22:00 - 06:00)
+        return currentTimeInSeconds >= startSec || currentTimeInSeconds < endSec;
+      }
+    });
+    
+    return (activeShift || shiftCalendar[0]) as ShiftCalendar | undefined;
+  }, [shiftCalendar]);
+  
   const isLocked = currentShift?.shift?.is_active === false;
 
   const { data: currentEvent } = useQuery({
