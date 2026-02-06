@@ -388,6 +388,7 @@ export default function Shopfloor() {
                     products={products}
                     selectedProductId={selectedProductId}
                     onProductChange={handleProductChange}
+                    standardsMap={standardsMap}
                     machineCycleTime={selectedMachine?.ideal_cycle_time_seconds}
                     effectiveCycleTime={effectiveCycleTime}
                     cycleTimeSource={cycleTimeSource}
