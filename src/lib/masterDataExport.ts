@@ -2,6 +2,7 @@
  * Master Data Import/Export Utilities
  * Handles Excel export and CSV/Excel import for Downtime and Defect reasons
  */
+import * as XLSX from 'xlsx';
 
 // ==================== EXPORT ====================
 
@@ -9,15 +10,6 @@ interface ExportColumn {
   header: string;
   key: string;
   type: 'string' | 'number' | 'boolean';
-}
-
-function escapeXml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -37,56 +29,30 @@ export function exportMasterDataToExcel<T extends Record<string, any>>(
   filename: string,
   sheetName: string = 'Data'
 ): void {
-  const xmlHeader = `<?xml version="1.0" encoding="UTF-8"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
-  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-  <Styles>
-    <Style ss:ID="Header">
-      <Font ss:Bold="1" ss:Size="11"/>
-      <Interior ss:Color="#1E3A5F" ss:Pattern="Solid"/>
-      <Font ss:Color="#FFFFFF" ss:Bold="1"/>
-    </Style>
-    <Style ss:ID="String">
-      <NumberFormat ss:Format="@"/>
-    </Style>
-    <Style ss:ID="Active">
-      <Font ss:Color="#16A34A"/>
-    </Style>
-    <Style ss:ID="Inactive">
-      <Font ss:Color="#DC2626"/>
-    </Style>
-  </Styles>
-  <Worksheet ss:Name="${escapeXml(sheetName)}">
-    <Table>`;
+  // Build worksheet data: header row + data rows
+  const wsData: any[][] = [columns.map(col => col.header)];
 
-  const headerRow = `
-      <Row>
-        ${columns.map(col => `<Cell ss:StyleID="Header"><Data ss:Type="String">${escapeXml(col.header)}</Data></Cell>`).join('')}
-      </Row>`;
-
-  const dataRows = data.map(row => {
-    const cells = columns.map(col => {
+  data.forEach(row => {
+    const rowData = columns.map(col => {
       const value = row[col.key];
-      if (col.type === 'boolean') {
-        const boolVal = Boolean(value);
-        const style = boolVal ? 'Active' : 'Inactive';
-        return `<Cell ss:StyleID="${style}"><Data ss:Type="String">${boolVal ? 'Active' : 'Inactive'}</Data></Cell>`;
-      }
-      const ssType = col.type === 'number' ? 'Number' : 'String';
-      return `<Cell><Data ss:Type="${ssType}">${escapeXml(String(value ?? ''))}</Data></Cell>`;
+      if (col.type === 'boolean') return Boolean(value) ? 'Active' : 'Inactive';
+      return value ?? '';
     });
-    return `\n      <Row>${cells.join('')}</Row>`;
-  }).join('');
+    wsData.push(rowData);
+  });
 
-  const xmlFooter = `
-    </Table>
-  </Worksheet>
-</Workbook>`;
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-  const xmlContent = xmlHeader + headerRow + dataRows + xmlFooter;
-  const blob = new Blob([xmlContent], { type: 'application/vnd.ms-excel' });
-  downloadBlob(blob, `${filename}.xls`);
+  // Set column widths
+  ws['!cols'] = columns.map(() => ({ wch: 20 }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  // Generate proper .xlsx binary
+  const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  downloadBlob(blob, `${filename}.xlsx`);
 }
 
 export function exportMasterDataToCSV<T extends Record<string, any>>(
