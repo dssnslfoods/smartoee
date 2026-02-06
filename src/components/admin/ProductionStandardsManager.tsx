@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Loader2, Cpu, Package, AlertTriangle, Factory } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Cpu, Package, AlertTriangle, Factory, Download, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,14 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import {
+  exportMasterDataToExcel, exportMasterDataToCSV,
+  parseCSV, readFileAsText,
+} from '@/lib/masterDataExport';
 
 interface ProductionStandard {
   id: string;
@@ -63,10 +70,12 @@ export function ProductionStandardsManager() {
   const { company } = useAuth();
   const selectedCompanyId = company?.id;
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedPlantFilter, setSelectedPlantFilter] = useState<string>('all');
   const [selectedMachineFilter, setSelectedMachineFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [editingStandard, setEditingStandard] = useState<ProductionStandard | null>(null);
   const [deletingStandard, setDeletingStandard] = useState<ProductionStandard | null>(null);
   const [formData, setFormData] = useState({
@@ -242,6 +251,113 @@ export function ProductionStandardsManager() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const bulkInsertMutation = useMutation({
+    mutationFn: async (rows: any[]) => {
+      const { error } = await supabase.from('production_standards').insert(rows as any);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['production-standards'] });
+      toast.success(`นำเข้าข้อมูลสำเร็จ ${variables.length} รายการ`);
+    },
+    onError: (error: Error) => toast.error(`นำเข้าข้อมูลล้มเหลว: ${error.message}`),
+  });
+
+  const STANDARD_EXPORT_COLUMNS = [
+    { key: 'machine_code', header: 'Machine Code', type: 'string' as const },
+    { key: 'machine_name', header: 'Machine Name', type: 'string' as const },
+    { key: 'product_code', header: 'Product Code', type: 'string' as const },
+    { key: 'product_name', header: 'Product Name', type: 'string' as const },
+    { key: 'ideal_cycle_time_seconds', header: 'Cycle Time (s)', type: 'number' as const },
+    { key: 'std_setup_time_seconds', header: 'Setup Time (s)', type: 'number' as const },
+    { key: 'target_quality', header: 'Target Quality (%)', type: 'number' as const },
+    { key: 'is_active', header: 'Status', type: 'boolean' as const },
+  ];
+
+  const exportData = useMemo(() => {
+    return standards.map(s => ({
+      machine_code: s.machines?.code ?? '',
+      machine_name: s.machines?.name ?? '',
+      product_code: s.products?.code ?? '',
+      product_name: s.products?.name ?? '',
+      ideal_cycle_time_seconds: s.ideal_cycle_time_seconds,
+      std_setup_time_seconds: s.std_setup_time_seconds,
+      target_quality: s.target_quality,
+      is_active: s.is_active,
+    }));
+  }, [standards]);
+
+  const handleExportExcel = () => {
+    if (exportData.length === 0) { toast.error('ไม่มีข้อมูลให้ export'); return; }
+    const companyName = company?.name || 'All';
+    exportMasterDataToExcel(exportData, STANDARD_EXPORT_COLUMNS, `production_standards_${companyName}`, 'Standards');
+    toast.success('Export Excel สำเร็จ');
+  };
+
+  const handleExportCSV = () => {
+    if (exportData.length === 0) { toast.error('ไม่มีข้อมูลให้ export'); return; }
+    const companyName = company?.name || 'All';
+    exportMasterDataToCSV(exportData, STANDARD_EXPORT_COLUMNS, `production_standards_${companyName}`);
+    toast.success('Export CSV สำเร็จ');
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!selectedCompanyId) { toast.error('กรุณาเลือกบริษัทก่อน import'); return; }
+    setIsImporting(true);
+    try {
+      const content = await readFileAsText(file);
+      const parsed = parseCSV(content);
+      if (parsed.length === 0) { toast.error('ไม่พบข้อมูลในไฟล์'); setIsImporting(false); return; }
+
+      // Build lookup maps by code
+      const machineByCode = new Map(machines.map(m => [m.code.toLowerCase(), m]));
+      const productByCode = new Map(products.map(p => [p.code.toLowerCase(), p]));
+
+      const rows: any[] = [];
+      const errors: string[] = [];
+
+      parsed.forEach((row, idx) => {
+        const machineCode = (row['machine code'] || row['machine_code'] || '').toLowerCase();
+        const productCode = (row['product code'] || row['product_code'] || '').toLowerCase();
+        if (!machineCode || !productCode) {
+          errors.push(`Row ${idx + 2}: Missing machine code or product code`);
+          return;
+        }
+        const machine = machineByCode.get(machineCode);
+        const product = productByCode.get(productCode);
+        if (!machine) { errors.push(`Row ${idx + 2}: Machine "${machineCode}" not found`); return; }
+        if (!product) { errors.push(`Row ${idx + 2}: Product "${productCode}" not found`); return; }
+
+        const cycleTime = parseFloat(row['cycle time (s)'] || row['cycle_time'] || row['ideal_cycle_time_seconds'] || '60');
+        const setupTime = parseFloat(row['setup time (s)'] || row['setup_time'] || row['std_setup_time_seconds'] || '0');
+        const quality = parseFloat(row['target quality (%)'] || row['target_quality'] || '99');
+        const status = row['status'] ? row['status'].toLowerCase() === 'active' : true;
+
+        rows.push({
+          machine_id: machine.id,
+          product_id: product.id,
+          company_id: selectedCompanyId,
+          ideal_cycle_time_seconds: isNaN(cycleTime) ? 60 : cycleTime,
+          std_setup_time_seconds: isNaN(setupTime) ? 0 : setupTime,
+          target_quality: isNaN(quality) ? 99 : quality,
+          is_active: status,
+        });
+      });
+
+      if (errors.length > 0) {
+        toast.error(`พบข้อผิดพลาด ${errors.length} รายการ: ${errors.slice(0, 3).join('; ')}${errors.length > 3 ? '...' : ''}`);
+      }
+      if (rows.length === 0) { toast.error('ไม่พบข้อมูลที่ถูกต้อง'); setIsImporting(false); return; }
+      await bulkInsertMutation.mutateAsync(rows);
+    } catch { toast.error('ไม่สามารถอ่านไฟล์ได้'); }
+    finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleOpenCreate = () => {
     setEditingStandard(null);
     setFormData({
@@ -342,6 +458,22 @@ export function ProductionStandardsManager() {
                 ))}
               </SelectContent>
             </Select>
+            <input ref={fileInputRef} type="file" accept=".csv,.txt" onChange={handleImportFile} className="hidden" />
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isImporting || !selectedCompanyId}>
+              {isImporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+              Import
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={standards.length === 0}>
+                  <Download className="h-4 w-4 mr-2" />Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportExcel}>Export Excel (.xlsx)</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportCSV}>Export CSV (.csv)</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button onClick={handleOpenCreate} size="sm">
               <Plus className="h-4 w-4 mr-2" />
               Assign SKU
