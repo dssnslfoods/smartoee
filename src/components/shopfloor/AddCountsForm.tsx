@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -10,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Minus, Loader2, Check, X } from 'lucide-react';
+import { Loader2, Check, X, Delete, RotateCcw, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DefectReason } from '@/services/types';
 
@@ -26,6 +25,10 @@ interface AddCountsFormProps {
   isLocked?: boolean;
 }
 
+type ActiveField = 'good' | 'reject';
+
+const QUICK_ADD_VALUES = [10, 50, 100, 500];
+
 export function AddCountsForm({
   defectReasons,
   onSubmit,
@@ -36,6 +39,51 @@ export function AddCountsForm({
   const [rejectQty, setRejectQty] = useState(0);
   const [defectReasonId, setDefectReasonId] = useState<string>('');
   const [notes, setNotes] = useState('');
+  const [activeField, setActiveField] = useState<ActiveField>('good');
+  const [inputBuffer, setInputBuffer] = useState('0');
+
+  const currentValue = activeField === 'good' ? goodQty : rejectQty;
+  const setCurrentValue = activeField === 'good' ? setGoodQty : setRejectQty;
+
+  const syncBufferToField = useCallback((buffer: string) => {
+    const num = parseInt(buffer) || 0;
+    setCurrentValue(Math.max(0, num));
+  }, [setCurrentValue]);
+
+  const handleFieldSelect = (field: ActiveField) => {
+    setActiveField(field);
+    const val = field === 'good' ? goodQty : rejectQty;
+    setInputBuffer(val.toString());
+  };
+
+  const handleNumpadPress = (digit: string) => {
+    if (isLocked) return;
+    const newBuffer = inputBuffer === '0' ? digit : inputBuffer + digit;
+    // Limit to 6 digits
+    if (newBuffer.length > 6) return;
+    setInputBuffer(newBuffer);
+    syncBufferToField(newBuffer);
+  };
+
+  const handleBackspace = () => {
+    if (isLocked) return;
+    const newBuffer = inputBuffer.length > 1 ? inputBuffer.slice(0, -1) : '0';
+    setInputBuffer(newBuffer);
+    syncBufferToField(newBuffer);
+  };
+
+  const handleClear = () => {
+    if (isLocked) return;
+    setInputBuffer('0');
+    setCurrentValue(0);
+  };
+
+  const handleQuickAdd = (amount: number) => {
+    if (isLocked) return;
+    const newVal = currentValue + amount;
+    setCurrentValue(newVal);
+    setInputBuffer(newVal.toString());
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,105 +101,156 @@ export function AddCountsForm({
     setRejectQty(0);
     setDefectReasonId('');
     setNotes('');
+    setInputBuffer('0');
+    setActiveField('good');
   };
-
-  const incrementGood = () => setGoodQty(prev => prev + 1);
-  const decrementGood = () => setGoodQty(prev => Math.max(0, prev - 1));
-  const incrementReject = () => setRejectQty(prev => prev + 1);
-  const decrementReject = () => setRejectQty(prev => Math.max(0, prev - 1));
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        {/* Good Quantity */}
-        <div className="space-y-2">
-          <Label className="flex items-center gap-2 text-sm font-medium">
-            <Check className="h-4 w-4 text-green-600" />
-            ชิ้นงานดี
-          </Label>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-12 w-12 shrink-0"
-              onClick={decrementGood}
-              disabled={isLocked || goodQty === 0}
-            >
-              <Minus className="h-5 w-5" />
-            </Button>
-            <Input
-              type="number"
-              value={goodQty}
-              onChange={(e) => setGoodQty(Math.max(0, parseInt(e.target.value) || 0))}
-              className={cn(
-                'h-12 text-center text-xl font-bold',
-                goodQty > 0 && 'text-green-600 border-green-300'
-              )}
-              min={0}
-              disabled={isLocked}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-12 w-12 shrink-0 hover:bg-green-50 hover:border-green-300"
-              onClick={incrementGood}
-              disabled={isLocked}
-            >
-              <Plus className="h-5 w-5" />
-            </Button>
+      {/* Quantity Display Cards */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Good Quantity Card */}
+        <button
+          type="button"
+          onClick={() => handleFieldSelect('good')}
+          className={cn(
+            'relative rounded-xl border-2 p-4 text-left transition-all',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            activeField === 'good'
+              ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/10'
+              : 'border-border bg-card hover:border-green-500/50'
+          )}
+          disabled={isLocked}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className={cn(
+              'flex h-7 w-7 items-center justify-center rounded-full',
+              activeField === 'good' ? 'bg-green-500 text-white' : 'bg-green-500/20 text-green-500'
+            )}>
+              <Check className="h-4 w-4" />
+            </div>
+            <Label className="text-sm font-medium text-muted-foreground">ชิ้นงานดี</Label>
           </div>
-        </div>
+          <div className={cn(
+            'text-3xl font-bold tabular-nums tracking-tight',
+            goodQty > 0 ? 'text-green-500' : 'text-muted-foreground'
+          )}>
+            {goodQty.toLocaleString()}
+          </div>
+          {activeField === 'good' && (
+            <div className="absolute top-2 right-2">
+              <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
+            </div>
+          )}
+        </button>
 
-        {/* Reject Quantity */}
-        <div className="space-y-2">
-          <Label className="flex items-center gap-2 text-sm font-medium">
-            <X className="h-4 w-4 text-red-600" />
-            ของเสีย
-          </Label>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-12 w-12 shrink-0"
-              onClick={decrementReject}
-              disabled={isLocked || rejectQty === 0}
-            >
-              <Minus className="h-5 w-5" />
-            </Button>
-            <Input
-              type="number"
-              value={rejectQty}
-              onChange={(e) => setRejectQty(Math.max(0, parseInt(e.target.value) || 0))}
-              className={cn(
-                'h-12 text-center text-xl font-bold',
-                rejectQty > 0 && 'text-red-600 border-red-300'
-              )}
-              min={0}
-              disabled={isLocked}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-12 w-12 shrink-0 hover:bg-red-50 hover:border-red-300"
-              onClick={incrementReject}
-              disabled={isLocked}
-            >
-              <Plus className="h-5 w-5" />
-            </Button>
+        {/* Reject Quantity Card */}
+        <button
+          type="button"
+          onClick={() => handleFieldSelect('reject')}
+          className={cn(
+            'relative rounded-xl border-2 p-4 text-left transition-all',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            activeField === 'reject'
+              ? 'border-red-500 bg-red-500/10 shadow-lg shadow-red-500/10'
+              : 'border-border bg-card hover:border-red-500/50'
+          )}
+          disabled={isLocked}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className={cn(
+              'flex h-7 w-7 items-center justify-center rounded-full',
+              activeField === 'reject' ? 'bg-red-500 text-white' : 'bg-red-500/20 text-red-500'
+            )}>
+              <X className="h-4 w-4" />
+            </div>
+            <Label className="text-sm font-medium text-muted-foreground">ของเสีย</Label>
           </div>
-        </div>
+          <div className={cn(
+            'text-3xl font-bold tabular-nums tracking-tight',
+            rejectQty > 0 ? 'text-red-500' : 'text-muted-foreground'
+          )}>
+            {rejectQty.toLocaleString()}
+          </div>
+          {activeField === 'reject' && (
+            <div className="absolute top-2 right-2">
+              <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
+            </div>
+          )}
+        </button>
+      </div>
+
+      {/* Quick Add Buttons */}
+      <div className="flex gap-2">
+        {QUICK_ADD_VALUES.map((val) => (
+          <Button
+            key={val}
+            type="button"
+            variant="outline"
+            size="sm"
+            className={cn(
+              'flex-1 h-10 text-sm font-semibold',
+              activeField === 'good'
+                ? 'hover:bg-green-500/10 hover:border-green-500/50 hover:text-green-500'
+                : 'hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-500'
+            )}
+            onClick={() => handleQuickAdd(val)}
+            disabled={isLocked}
+          >
+            +{val}
+          </Button>
+        ))}
+      </div>
+
+      {/* Numpad */}
+      <div className="grid grid-cols-3 gap-2">
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
+          <Button
+            key={digit}
+            type="button"
+            variant="outline"
+            className="h-14 text-xl font-bold hover:bg-accent"
+            onClick={() => handleNumpadPress(digit.toString())}
+            disabled={isLocked}
+          >
+            {digit}
+          </Button>
+        ))}
+        <Button
+          type="button"
+          variant="outline"
+          className="h-14 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50"
+          onClick={handleClear}
+          disabled={isLocked}
+        >
+          <RotateCcw className="h-5 w-5" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-14 text-xl font-bold hover:bg-accent"
+          onClick={() => handleNumpadPress('0')}
+          disabled={isLocked}
+        >
+          0
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-14 text-muted-foreground hover:bg-accent"
+          onClick={handleBackspace}
+          disabled={isLocked}
+        >
+          <Delete className="h-5 w-5" />
+        </Button>
       </div>
 
       {/* Defect Reason (required if reject > 0) */}
       {rejectQty > 0 && (
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">สาเหตุของเสีย *</Label>
+        <div className="space-y-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+          <Label className="text-sm font-medium text-red-400">สาเหตุของเสีย *</Label>
           <Select value={defectReasonId} onValueChange={setDefectReasonId}>
-            <SelectTrigger>
+            <SelectTrigger className="border-red-500/30">
               <SelectValue placeholder="เลือกสาเหตุ" />
             </SelectTrigger>
             <SelectContent>
@@ -178,24 +277,32 @@ export function AddCountsForm({
         />
       </div>
 
-      {/* Submit Button */}
-      <Button
-        type="submit"
-        className="w-full h-12 text-base font-medium"
-        disabled={
-          isLoading || 
-          isLocked || 
-          (goodQty === 0 && rejectQty === 0) ||
-          (rejectQty > 0 && !defectReasonId)
-        }
-      >
-        {isLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin mr-2" />
-        ) : (
-          <Plus className="h-5 w-5 mr-2" />
-        )}
-        บันทึกจำนวน ({goodQty + rejectQty} ชิ้น)
-      </Button>
+      {/* Total Summary + Submit */}
+      <div className="rounded-xl border bg-muted/30 p-3">
+        <div className="flex items-center justify-between text-sm mb-3">
+          <span className="text-muted-foreground">รวมจำนวนผลิต</span>
+          <span className="text-lg font-bold tabular-nums">
+            {(goodQty + rejectQty).toLocaleString()} ชิ้น
+          </span>
+        </div>
+        <Button
+          type="submit"
+          className="w-full h-12 text-base font-medium"
+          disabled={
+            isLoading || 
+            isLocked || 
+            (goodQty === 0 && rejectQty === 0) ||
+            (rejectQty > 0 && !defectReasonId)
+          }
+        >
+          {isLoading ? (
+            <Loader2 className="h-5 w-5 animate-spin mr-2" />
+          ) : (
+            <Plus className="h-5 w-5 mr-2" />
+          )}
+          บันทึกจำนวน
+        </Button>
+      </div>
     </form>
   );
 }
