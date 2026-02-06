@@ -1,4 +1,4 @@
-import { Label } from '@/components/ui/label';
+import { Factory, GitBranch, ChevronRight } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -6,7 +6,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 import type { Plant, Line } from '@/services/types';
 
 interface PlantLineSelectorProps {
@@ -28,33 +29,57 @@ export function PlantLineSelector({
   onLineChange,
   isLoading = false,
 }: PlantLineSelectorProps) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-14 flex-1 rounded-xl" />
+        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+        <Skeleton className="h-14 flex-1 rounded-xl" />
+      </div>
+    );
+  }
+
   return (
-    <>
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
       {/* Plant Selector */}
-      <div className="space-y-2">
-        <Label htmlFor="plant-select" className="text-sm font-medium">
-          Plant
-        </Label>
+      <div className="flex-1 min-w-0">
         <Select
           value={selectedPlantId || ''}
           onValueChange={(value) => onPlantChange(value || null)}
-          disabled={isLoading}
         >
-          <SelectTrigger id="plant-select" className="h-12 text-base">
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <SelectValue placeholder="เลือก Plant" />
+          <SelectTrigger
+            className={cn(
+              'h-14 px-4 rounded-xl border-2 transition-all',
+              'hover:border-primary/40',
+              selectedPlantId
+                ? 'border-primary/30 bg-primary/5'
+                : 'border-border'
             )}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-lg shrink-0',
+                selectedPlantId ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
+              )}>
+                <Factory className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 text-left">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium leading-none mb-1">Plant</p>
+                <SelectValue placeholder="เลือก Plant" />
+              </div>
+            </div>
           </SelectTrigger>
           <SelectContent>
             {plants.map((plant) => (
-              <SelectItem key={plant.id} value={plant.id} className="text-base py-3">
-                <div className="flex flex-col">
-                  <span className="font-medium">{plant.name}</span>
-                  {plant.code && (
-                    <span className="text-xs text-muted-foreground">{plant.code}</span>
-                  )}
+              <SelectItem key={plant.id} value={plant.id} className="py-3">
+                <div className="flex items-center gap-2">
+                  <Factory className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div>
+                    <span className="font-medium">{plant.name}</span>
+                    {plant.code && (
+                      <span className="ml-2 text-xs text-muted-foreground font-mono">{plant.code}</span>
+                    )}
+                  </div>
                 </div>
               </SelectItem>
             ))}
@@ -62,37 +87,56 @@ export function PlantLineSelector({
         </Select>
       </div>
 
+      {/* Arrow Connector */}
+      <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0 hidden sm:block" />
+
       {/* Line Selector */}
-      <div className="space-y-2">
-        <Label htmlFor="line-select" className="text-sm font-medium">
-          Line
-        </Label>
+      <div className="flex-1 min-w-0">
         <Select
           value={selectedLineId || ''}
           onValueChange={(value) => onLineChange(value || null)}
-          disabled={!selectedPlantId || isLoading}
+          disabled={!selectedPlantId}
         >
-          <SelectTrigger id="line-select" className="h-12 text-base">
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <SelectValue placeholder="เลือก Line" />
+          <SelectTrigger
+            className={cn(
+              'h-14 px-4 rounded-xl border-2 transition-all',
+              !selectedPlantId && 'opacity-50',
+              'hover:border-primary/40',
+              selectedLineId
+                ? 'border-primary/30 bg-primary/5'
+                : 'border-border'
             )}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-lg shrink-0',
+                selectedLineId ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
+              )}>
+                <GitBranch className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 text-left">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium leading-none mb-1">Line</p>
+                <SelectValue placeholder={selectedPlantId ? 'เลือก Line' : 'เลือก Plant ก่อน'} />
+              </div>
+            </div>
           </SelectTrigger>
           <SelectContent>
             {lines.map((line) => (
-              <SelectItem key={line.id} value={line.id} className="text-base py-3">
-                <div className="flex flex-col">
-                  <span className="font-medium">{line.name}</span>
-                  {line.code && (
-                    <span className="text-xs text-muted-foreground">{line.code}</span>
-                  )}
+              <SelectItem key={line.id} value={line.id} className="py-3">
+                <div className="flex items-center gap-2">
+                  <GitBranch className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div>
+                    <span className="font-medium">{line.name}</span>
+                    {line.code && (
+                      <span className="ml-2 text-xs text-muted-foreground font-mono">{line.code}</span>
+                    )}
+                  </div>
                 </div>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
-    </>
+    </div>
   );
 }
