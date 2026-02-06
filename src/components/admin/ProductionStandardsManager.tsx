@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Loader2, Cpu, Package, AlertTriangle, Factory, Download, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import * as XLSX from 'xlsx';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -301,50 +302,70 @@ export function ProductionStandardsManager() {
     toast.success('Export CSV สำเร็จ');
   };
 
+  const parseImportedRows = (parsed: Record<string, string>[]): { rows: any[]; errors: string[] } => {
+    const machineByCode = new Map(machines.map(m => [m.code.toLowerCase(), m]));
+    const productByCode = new Map(products.map(p => [p.code.toLowerCase(), p]));
+    const rows: any[] = [];
+    const errors: string[] = [];
+
+    parsed.forEach((row, idx) => {
+      // Normalize keys to lowercase for flexible matching
+      const normalizedRow: Record<string, string> = {};
+      Object.entries(row).forEach(([k, v]) => { normalizedRow[k.toLowerCase().trim()] = String(v ?? '').trim(); });
+
+      const machineCode = (normalizedRow['machine code'] || normalizedRow['machine_code'] || '').toLowerCase();
+      const productCode = (normalizedRow['product code'] || normalizedRow['product_code'] || '').toLowerCase();
+      if (!machineCode || !productCode) {
+        errors.push(`Row ${idx + 2}: Missing machine code or product code`);
+        return;
+      }
+      const machine = machineByCode.get(machineCode);
+      const product = productByCode.get(productCode);
+      if (!machine) { errors.push(`Row ${idx + 2}: Machine "${machineCode}" not found`); return; }
+      if (!product) { errors.push(`Row ${idx + 2}: Product "${productCode}" not found`); return; }
+
+      const cycleTime = parseFloat(normalizedRow['cycle time (s)'] || normalizedRow['cycle_time'] || normalizedRow['ideal_cycle_time_seconds'] || '60');
+      const setupTime = parseFloat(normalizedRow['setup time (s)'] || normalizedRow['setup_time'] || normalizedRow['std_setup_time_seconds'] || '0');
+      const quality = parseFloat(normalizedRow['target quality (%)'] || normalizedRow['target_quality'] || '99');
+      const statusVal = normalizedRow['status'];
+      const status = statusVal ? statusVal.toLowerCase() === 'active' : true;
+
+      rows.push({
+        machine_id: machine.id,
+        product_id: product.id,
+        company_id: selectedCompanyId,
+        ideal_cycle_time_seconds: isNaN(cycleTime) ? 60 : cycleTime,
+        std_setup_time_seconds: isNaN(setupTime) ? 0 : setupTime,
+        target_quality: isNaN(quality) ? 99 : quality,
+        is_active: status,
+      });
+    });
+
+    return { rows, errors };
+  };
+
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!selectedCompanyId) { toast.error('กรุณาเลือกบริษัทก่อน import'); return; }
     setIsImporting(true);
     try {
-      const content = await readFileAsText(file);
-      const parsed = parseCSV(content);
+      const isExcel = /\.(xlsx|xls)$/i.test(file.name);
+      let parsed: Record<string, string>[];
+
+      if (isExcel) {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        parsed = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
+      } else {
+        const content = await readFileAsText(file);
+        parsed = parseCSV(content);
+      }
+
       if (parsed.length === 0) { toast.error('ไม่พบข้อมูลในไฟล์'); setIsImporting(false); return; }
 
-      // Build lookup maps by code
-      const machineByCode = new Map(machines.map(m => [m.code.toLowerCase(), m]));
-      const productByCode = new Map(products.map(p => [p.code.toLowerCase(), p]));
-
-      const rows: any[] = [];
-      const errors: string[] = [];
-
-      parsed.forEach((row, idx) => {
-        const machineCode = (row['machine code'] || row['machine_code'] || '').toLowerCase();
-        const productCode = (row['product code'] || row['product_code'] || '').toLowerCase();
-        if (!machineCode || !productCode) {
-          errors.push(`Row ${idx + 2}: Missing machine code or product code`);
-          return;
-        }
-        const machine = machineByCode.get(machineCode);
-        const product = productByCode.get(productCode);
-        if (!machine) { errors.push(`Row ${idx + 2}: Machine "${machineCode}" not found`); return; }
-        if (!product) { errors.push(`Row ${idx + 2}: Product "${productCode}" not found`); return; }
-
-        const cycleTime = parseFloat(row['cycle time (s)'] || row['cycle_time'] || row['ideal_cycle_time_seconds'] || '60');
-        const setupTime = parseFloat(row['setup time (s)'] || row['setup_time'] || row['std_setup_time_seconds'] || '0');
-        const quality = parseFloat(row['target quality (%)'] || row['target_quality'] || '99');
-        const status = row['status'] ? row['status'].toLowerCase() === 'active' : true;
-
-        rows.push({
-          machine_id: machine.id,
-          product_id: product.id,
-          company_id: selectedCompanyId,
-          ideal_cycle_time_seconds: isNaN(cycleTime) ? 60 : cycleTime,
-          std_setup_time_seconds: isNaN(setupTime) ? 0 : setupTime,
-          target_quality: isNaN(quality) ? 99 : quality,
-          is_active: status,
-        });
-      });
+      const { rows, errors } = parseImportedRows(parsed);
 
       if (errors.length > 0) {
         toast.error(`พบข้อผิดพลาด ${errors.length} รายการ: ${errors.slice(0, 3).join('; ')}${errors.length > 3 ? '...' : ''}`);
@@ -458,7 +479,7 @@ export function ProductionStandardsManager() {
                 ))}
               </SelectContent>
             </Select>
-            <input ref={fileInputRef} type="file" accept=".csv,.txt" onChange={handleImportFile} className="hidden" />
+            <input ref={fileInputRef} type="file" accept=".csv,.txt,.xlsx,.xls" onChange={handleImportFile} className="hidden" />
             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isImporting || !selectedCompanyId}>
               {isImporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
               Import
