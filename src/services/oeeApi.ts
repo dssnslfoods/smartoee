@@ -46,17 +46,39 @@ export async function startEvent(
   machineId: string,
   eventType: EventType,
   reasonId?: string,
-  notes?: string
+  notes?: string,
+  productId?: string
 ): Promise<StartEventResponse> {
   const { data, error } = await supabase.rpc('rpc_start_event', {
     p_machine_id: machineId,
     p_event_type: eventType,
     p_reason_id: reasonId || null,
     p_notes: notes || null,
+    p_product_id: productId || null,
   });
 
   if (error) throw error;
   return handleRpcError(data as unknown as StartEventResponse) as StartEventResponse;
+}
+
+// =============================================
+// QUERY FUNCTIONS - Products (SKU)
+// =============================================
+
+export async function getProducts(companyId?: string): Promise<import('./types').Product[]> {
+  let query = supabase
+    .from('products')
+    .select('*')
+    .eq('is_active', true)
+    .order('name');
+
+  if (companyId) {
+    query = query.eq('company_id', companyId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
 }
 
 export async function stopEvent(
@@ -330,7 +352,7 @@ export async function getProductionEvents(
 ): Promise<ProductionEvent[]> {
   let query = supabase
     .from('production_events')
-    .select('*, machine:machines(*), reason:downtime_reasons(*)')
+    .select('*, machine:machines(*), reason:downtime_reasons(*), product:products(*)')
     .eq('machine_id', machineId)
     .order('start_ts', { ascending: false });
 
@@ -346,7 +368,7 @@ export async function getProductionEvents(
 export async function getCurrentEvent(machineId: string): Promise<ProductionEvent | null> {
   const { data, error } = await supabase
     .from('production_events')
-    .select('*, machine:machines(*), reason:downtime_reasons(*)')
+    .select('*, machine:machines(*), reason:downtime_reasons(*), product:products(*)')
     .eq('machine_id', machineId)
     .is('end_ts', null)
     .order('start_ts', { ascending: false })

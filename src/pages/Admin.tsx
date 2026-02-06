@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom';
-import { Settings, Factory, Layers, Cpu, AlertTriangle, Ban, Users, UserCog, Building2, Loader2 } from 'lucide-react';
+import { Settings, Factory, Layers, Cpu, AlertTriangle, Ban, Users, UserCog, Building2, Loader2, Package } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -9,6 +9,7 @@ import {
   PlantManager,
   LineManager,
   MachineManager,
+  ProductManager,
   DowntimeReasonManager,
   DefectReasonManager,
   UserPermissionManager,
@@ -93,6 +94,13 @@ export default function Admin() {
                 <span className="hidden sm:inline">Machines</span>
               </TabsTrigger>
               <TabsTrigger 
+                value="products" 
+                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Package className="h-4 w-4" />
+                <span className="hidden sm:inline">Products</span>
+              </TabsTrigger>
+              <TabsTrigger 
                 value="downtime" 
                 className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
               >
@@ -136,6 +144,10 @@ export default function Admin() {
 
               <TabsContent value="machines" className="mt-0">
                 <MachineManager />
+              </TabsContent>
+
+              <TabsContent value="products" className="mt-0">
+                <ProductManager />
               </TabsContent>
 
               <TabsContent value="downtime" className="mt-0">

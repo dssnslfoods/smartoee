@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PlantLineSelector } from '@/components/shopfloor/PlantLineSelector';
 import { MachineSelector } from '@/components/shopfloor/MachineSelector';
+import { SKUSelector } from '@/components/shopfloor/SKUSelector';
 import { CurrentShiftBanner } from '@/components/shopfloor/CurrentShiftBanner';
 import { EventControls } from '@/components/shopfloor/EventControls';
 import { AddCountsForm } from '@/components/shopfloor/AddCountsForm';
@@ -21,6 +22,7 @@ import {
   getPlants,
   getLines,
   getMachines,
+  getProducts,
   getTodayShiftCalendar,
   getCurrentEvent,
   getProductionEvents,
@@ -32,14 +34,9 @@ import {
   getSession,
 } from '@/services';
 import type { 
-  Plant, 
-  Line, 
-  Machine, 
   ShiftCalendar, 
-  ProductionEvent,
-  DowntimeReason,
-  DefectReason,
   EventType,
+  Product,
 } from '@/services/types';
 
 export default function Shopfloor() {
@@ -49,6 +46,7 @@ export default function Shopfloor() {
   const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState('capture');
 
@@ -58,7 +56,6 @@ export default function Shopfloor() {
     });
   }, []);
 
-  // Filter by company if user has a company context
   const companyId = company?.id;
 
   const { data: plants = [], isLoading: plantsLoading } = useQuery({
@@ -79,7 +76,13 @@ export default function Shopfloor() {
     enabled: !!selectedLineId,
   });
 
-  const { data: shiftCalendar = [], isLoading: shiftLoading } = useQuery({
+  const { data: products = [], isLoading: productsLoading } = useQuery({
+    queryKey: ['products', companyId],
+    queryFn: () => getProducts(companyId),
+    enabled: isAuthenticated === true,
+  });
+
+  const { data: shiftCalendar = [] } = useQuery({
     queryKey: ['shiftCalendar', selectedPlantId],
     queryFn: () => getTodayShiftCalendar(selectedPlantId!),
     enabled: !!selectedPlantId,
@@ -89,7 +92,7 @@ export default function Shopfloor() {
   const currentShift = shiftCalendar[0] as ShiftCalendar | undefined;
   const isLocked = currentShift?.shift?.is_active === false;
 
-  const { data: currentEvent, isLoading: eventLoading } = useQuery({
+  const { data: currentEvent } = useQuery({
     queryKey: ['currentEvent', selectedMachineId],
     queryFn: () => getCurrentEvent(selectedMachineId!),
     enabled: !!selectedMachineId,
@@ -114,9 +117,38 @@ export default function Shopfloor() {
     enabled: isAuthenticated === true,
   });
 
+  const selectedMachine = machines.find(m => m.id === selectedMachineId);
+  const selectedProduct = products.find(p => p.id === selectedProductId) || null;
+
+  // Handle SKU change while running - auto-stop previous, start new
+  const handleProductChange = async (productId: string | null) => {
+    if (
+      currentEvent?.event_type === 'RUN' &&
+      productId !== null &&
+      selectedProductId !== null &&
+      productId !== selectedProductId
+    ) {
+      // SKU changed while running - stop current, start new with new SKU
+      try {
+        await stopEvent(selectedMachineId!);
+        setSelectedProductId(productId);
+        await startEvent(selectedMachineId!, 'RUN', undefined, undefined, productId);
+        queryClient.invalidateQueries({ queryKey: ['currentEvent'] });
+        queryClient.invalidateQueries({ queryKey: ['productionEvents'] });
+        toast.success('เปลี่ยน SKU สำเร็จ - หยุด Session เดิมและเริ่ม Session ใหม่');
+      } catch (error: any) {
+        toast.error(error.message || 'ไม่สามารถเปลี่ยน SKU ได้');
+      }
+    } else {
+      setSelectedProductId(productId);
+    }
+  };
+
   const startEventMutation = useMutation({
     mutationFn: async ({ eventType, reasonId, notes }: { eventType: EventType; reasonId?: string; notes?: string }) => {
-      return startEvent(selectedMachineId!, eventType, reasonId, notes);
+      return startEvent(selectedMachineId!, eventType, reasonId, notes, 
+        eventType === 'RUN' ? selectedProductId || undefined : undefined
+      );
     },
     onSuccess: (data) => {
       if (data.success) {
@@ -172,6 +204,14 @@ export default function Shopfloor() {
     },
   });
 
+  const handleStartRun = () => {
+    if (!selectedProductId) {
+      toast.error('กรุณาเลือก SKU ก่อนเริ่มงาน');
+      return;
+    }
+    startEventMutation.mutate({ eventType: 'RUN' });
+  };
+
   useEffect(() => {
     setSelectedLineId(null);
     setSelectedMachineId(null);
@@ -180,10 +220,6 @@ export default function Shopfloor() {
   useEffect(() => {
     setSelectedMachineId(null);
   }, [selectedLineId]);
-
-  const selectedPlant = plants.find(p => p.id === selectedPlantId);
-  const selectedLine = lines.find(l => l.id === selectedLineId);
-  const selectedMachine = machines.find(m => m.id === selectedMachineId);
 
   if (isAuthenticated === null) {
     return (
@@ -220,14 +256,12 @@ export default function Shopfloor() {
   return (
     <AppLayout>
       <div className="page-container space-y-5">
-        {/* Header */}
         <PageHeader 
           title="Shopfloor" 
           description="บันทึกเหตุการณ์และจำนวนผลิต"
           icon={Factory}
         />
 
-        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="bg-muted/50 p-1">
             <TabsTrigger 
@@ -271,6 +305,34 @@ export default function Shopfloor() {
               />
             </div>
 
+            {/* SKU Selector - shown when machine is selected */}
+            {selectedMachineId && (
+              <Card className="overflow-hidden">
+                <CardHeader className="pb-3 bg-muted/30">
+                  <CardTitle className="flex items-center gap-3 text-base sm:text-lg">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/50">
+                      <Package className="h-5 w-5 text-accent-foreground" />
+                    </div>
+                    เลือก Product / SKU
+                    {selectedProduct && (
+                      <Badge variant="secondary" className="font-medium text-xs">
+                        {selectedProduct.code}
+                      </Badge>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <SKUSelector
+                    products={products}
+                    selectedProductId={selectedProductId}
+                    onProductChange={handleProductChange}
+                    isLoading={productsLoading}
+                    disabled={isLocked}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
             {currentShift && (
               <CurrentShiftBanner 
                 shiftCalendar={currentShift} 
@@ -302,7 +364,8 @@ export default function Shopfloor() {
                       <EventControls
                         currentEvent={currentEvent}
                         downtimeReasons={downtimeReasons}
-                        onStartRun={() => startEventMutation.mutate({ eventType: 'RUN' })}
+                        selectedProduct={selectedProduct}
+                        onStartRun={handleStartRun}
                         onStartDowntime={(reasonId, notes) => 
                           startEventMutation.mutate({ eventType: 'DOWNTIME', reasonId, notes })
                         }
@@ -333,7 +396,6 @@ export default function Shopfloor() {
                         isLocked={isLocked}
                       />
                       
-                      {/* Production Count History */}
                       <div className="border-t pt-4">
                         <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                           <Clock className="h-4 w-4" />

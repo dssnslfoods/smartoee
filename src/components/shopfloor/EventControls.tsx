@@ -17,15 +17,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Play, Pause, StopCircle, Wrench, Loader2, Clock } from 'lucide-react';
+import { Play, Pause, StopCircle, Wrench, Loader2, Clock, Timer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { th } from 'date-fns/locale';
-import type { ProductionEvent, DowntimeReason } from '@/services/types';
+import type { ProductionEvent, DowntimeReason, Product } from '@/services/types';
 
 interface EventControlsProps {
   currentEvent: ProductionEvent | null | undefined;
   downtimeReasons: DowntimeReason[];
+  selectedProduct: Product | null;
   onStartRun: () => void;
   onStartDowntime: (reasonId: string, notes?: string) => void;
   onStartSetup: (reasonId: string, notes?: string) => void;
@@ -37,6 +38,7 @@ interface EventControlsProps {
 export function EventControls({
   currentEvent,
   downtimeReasons,
+  selectedProduct,
   onStartRun,
   onStartDowntime,
   onStartSetup,
@@ -101,8 +103,21 @@ export function EventControls({
               <span className="font-medium">
                 {eventTypeConfig[currentEvent.event_type].label}
               </span>
+              {/* SKU Info Badge */}
+              {currentEvent.event_type === 'RUN' && currentEvent.product && (
+                <Badge variant="secondary" className="text-xs gap-1">
+                  {currentEvent.product.name}
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {/* Ideal Cycle Time badge for running status */}
+              {currentEvent.event_type === 'RUN' && selectedProduct && (
+                <Badge variant="outline" className="text-xs gap-1">
+                  <Timer className="h-3 w-3" />
+                  CT: {selectedProduct.ideal_cycle_time_seconds}s
+                </Badge>
+              )}
               <Clock className="h-4 w-4" />
               <span>
                 {formatDistanceToNow(new Date(currentEvent.start_ts), { 

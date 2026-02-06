@@ -573,6 +573,7 @@ export type Database = {
           machine_id: string
           notes: string | null
           plant_id: string
+          product_id: string | null
           reason_id: string | null
           shift_calendar_id: string
           start_ts: string
@@ -588,6 +589,7 @@ export type Database = {
           machine_id: string
           notes?: string | null
           plant_id: string
+          product_id?: string | null
           reason_id?: string | null
           shift_calendar_id: string
           start_ts?: string
@@ -603,6 +605,7 @@ export type Database = {
           machine_id?: string
           notes?: string | null
           plant_id?: string
+          product_id?: string | null
           reason_id?: string | null
           shift_calendar_id?: string
           start_ts?: string
@@ -659,6 +662,13 @@ export type Database = {
             referencedColumns: ["plant_id"]
           },
           {
+            foreignKeyName: "production_events_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "production_events_reason_id_fkey"
             columns: ["reason_id"]
             isOneToOne: false
@@ -687,6 +697,42 @@ export type Database = {
             referencedColumns: ["shift_calendar_id"]
           },
         ]
+      }
+      products: {
+        Row: {
+          code: string
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          ideal_cycle_time_seconds: number
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          ideal_cycle_time_seconds?: number
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          ideal_cycle_time_seconds?: number
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       shift_approvals: {
         Row: {
@@ -1129,15 +1175,26 @@ export type Database = {
         Args: { p_shift_calendar_id: string }
         Returns: Json
       }
-      rpc_start_event: {
-        Args: {
-          p_event_type: Database["public"]["Enums"]["event_type"]
-          p_machine_id: string
-          p_notes?: string
-          p_reason_id?: string
-        }
-        Returns: Json
-      }
+      rpc_start_event:
+        | {
+            Args: {
+              p_event_type: Database["public"]["Enums"]["event_type"]
+              p_machine_id: string
+              p_notes?: string
+              p_reason_id?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_event_type: Database["public"]["Enums"]["event_type"]
+              p_machine_id: string
+              p_notes?: string
+              p_product_id?: string
+              p_reason_id?: string
+            }
+            Returns: Json
+          }
       rpc_stop_event: {
         Args: { p_machine_id: string; p_notes?: string }
         Returns: Json

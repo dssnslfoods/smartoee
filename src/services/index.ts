@@ -40,6 +40,9 @@ export {
   getDowntimeReasons,
   getDefectReasons,
 
+  // Query Functions - Products
+  getProducts,
+
   // Query Functions - Production Events
   getProductionEvents,
   getCurrentEvent,
@@ -96,6 +99,7 @@ export type {
   ShiftCalendar,
   DowntimeReason,
   DefectReason,
+  Product,
   ProductionEvent,
   ProductionCount,
   ShiftApproval,
