@@ -7,13 +7,14 @@ import { MachineSelector } from '@/components/shopfloor/MachineSelector';
 import { CurrentShiftBanner } from '@/components/shopfloor/CurrentShiftBanner';
 import { EventControls } from '@/components/shopfloor/EventControls';
 import { AddCountsForm } from '@/components/shopfloor/AddCountsForm';
+import { ProductionCountHistory } from '@/components/shopfloor/ProductionCountHistory';
 import { EventTimeline } from '@/components/shopfloor/EventTimeline';
 import { LockedBanner } from '@/components/shopfloor/LockedBanner';
 import { MyMachinesViewer } from '@/components/shopfloor/MyMachinesViewer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Factory, Activity, Package, Monitor } from 'lucide-react';
+import { Loader2, Factory, Activity, Package, Monitor, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -324,13 +325,25 @@ export default function Shopfloor() {
                         บันทึกจำนวนผลิต
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="pt-5">
+                    <CardContent className="pt-5 space-y-5">
                       <AddCountsForm
                         defectReasons={defectReasons}
                         onSubmit={(data) => addCountsMutation.mutate(data)}
                         isLoading={addCountsMutation.isPending}
                         isLocked={isLocked}
                       />
+                      
+                      {/* Production Count History */}
+                      <div className="border-t pt-4">
+                        <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          ประวัติการบันทึกในกะนี้
+                        </h4>
+                        <ProductionCountHistory
+                          machineId={selectedMachineId}
+                          shiftCalendarId={currentShift?.id}
+                        />
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
