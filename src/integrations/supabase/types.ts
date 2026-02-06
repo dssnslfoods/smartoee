@@ -698,6 +698,45 @@ export type Database = {
           },
         ]
       }
+      production_standards: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          ideal_cycle_time_seconds: number
+          is_active: boolean
+          machine_id: string
+          product_id: string
+          std_setup_time_seconds: number
+          target_quality: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          ideal_cycle_time_seconds?: number
+          is_active?: boolean
+          machine_id: string
+          product_id: string
+          std_setup_time_seconds?: number
+          target_quality?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          ideal_cycle_time_seconds?: number
+          is_active?: boolean
+          machine_id?: string
+          product_id?: string
+          std_setup_time_seconds?: number
+          target_quality?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           code: string

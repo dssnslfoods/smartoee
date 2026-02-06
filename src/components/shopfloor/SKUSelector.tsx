@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Search, Package, Timer, Check } from 'lucide-react';
+import { Search, Package, Timer, Check, AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/services/types';
@@ -11,6 +12,9 @@ interface SKUSelectorProps {
   selectedProductId: string | null;
   onProductChange: (productId: string | null) => void;
   machineCycleTime?: number;
+  effectiveCycleTime?: number;
+  cycleTimeSource?: string;
+  noBenchmarkWarning?: string | null;
   isLoading?: boolean;
   disabled?: boolean;
 }
@@ -20,6 +24,9 @@ export function SKUSelector({
   selectedProductId,
   onProductChange,
   machineCycleTime,
+  effectiveCycleTime,
+  cycleTimeSource,
+  noBenchmarkWarning,
   isLoading = false,
   disabled = false,
 }: SKUSelectorProps) {
@@ -53,18 +60,28 @@ export function SKUSelector({
     <div className="space-y-3">
       {/* Selected product display */}
       {selectedProduct ? (
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
-          <Package className="h-4 w-4 text-primary shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-primary truncate">
-              {selectedProduct.name}
-            </p>
-            <p className="text-xs text-muted-foreground">{selectedProduct.code}</p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
+            <Package className="h-4 w-4 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-primary truncate">
+                {selectedProduct.name}
+              </p>
+              <p className="text-xs text-muted-foreground">{selectedProduct.code}</p>
+            </div>
+            <Badge variant="outline" className="shrink-0 text-xs gap-1">
+              <Timer className="h-3 w-3" />
+              Target: {effectiveCycleTime ?? selectedProduct.ideal_cycle_time_seconds}s [{cycleTimeSource ?? 'SKU'}]
+            </Badge>
           </div>
-          <Badge variant="outline" className="shrink-0 text-xs gap-1">
-            <Timer className="h-3 w-3" />
-            Target: {selectedProduct.ideal_cycle_time_seconds}s [SKU]
-          </Badge>
+          {noBenchmarkWarning && (
+            <Alert className="py-2 border-yellow-500/50 bg-yellow-500/10">
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-xs text-yellow-700">
+                {noBenchmarkWarning}
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
       ) : machineCycleTime ? (
         <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border">

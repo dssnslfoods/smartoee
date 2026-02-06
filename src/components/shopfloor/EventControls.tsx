@@ -28,6 +28,9 @@ interface EventControlsProps {
   downtimeReasons: DowntimeReason[];
   selectedProduct: Product | null;
   machineCycleTime?: number;
+  effectiveCycleTime?: number;
+  cycleTimeSource?: string;
+  noBenchmarkWarning?: string | null;
   onStartRun: () => void;
   onStartDowntime: (reasonId: string, notes?: string) => void;
   onStartSetup: (reasonId: string, notes?: string) => void;
@@ -41,6 +44,9 @@ export function EventControls({
   downtimeReasons,
   selectedProduct,
   machineCycleTime,
+  effectiveCycleTime: propEffectiveCycleTime,
+  cycleTimeSource: propCycleTimeSource,
+  noBenchmarkWarning,
   onStartRun,
   onStartDowntime,
   onStartSetup,
@@ -48,11 +54,11 @@ export function EventControls({
   isLoading = false,
   isLocked = false,
 }: EventControlsProps) {
-  // Determine effective cycle time: SKU overrides machine, with fallback
-  const effectiveCycleTime = selectedProduct?.ideal_cycle_time_seconds ?? machineCycleTime;
-  const cycleTimeSource = selectedProduct 
+  // Use passed-in effective values, fallback to old logic
+  const effectiveCycleTime = propEffectiveCycleTime ?? selectedProduct?.ideal_cycle_time_seconds ?? machineCycleTime;
+  const cycleTimeSource = propCycleTimeSource ?? (selectedProduct 
     ? `from SKU: ${selectedProduct.code}` 
-    : 'Machine Default';
+    : 'Machine Default');
   const [showDowntimeDialog, setShowDowntimeDialog] = useState(false);
   const [showSetupDialog, setShowSetupDialog] = useState(false);
   const [showStopDialog, setShowStopDialog] = useState(false);
