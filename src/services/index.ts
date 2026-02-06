@@ -43,6 +43,10 @@ export {
   // Query Functions - Products
   getProducts,
 
+  // Query Functions - Production Standards
+  getProductionStandard,
+  getProductionStandardsForMachine,
+
   // Query Functions - Production Events
   getProductionEvents,
   getCurrentEvent,
@@ -100,6 +104,7 @@ export type {
   DowntimeReason,
   DefectReason,
   Product,
+  ProductionStandard,
   ProductionEvent,
   ProductionCount,
   ShiftApproval,

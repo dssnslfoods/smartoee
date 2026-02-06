@@ -141,6 +141,19 @@ export interface Product {
   updated_at: string;
 }
 
+export interface ProductionStandard {
+  id: string;
+  machine_id: string;
+  product_id: string;
+  company_id: string;
+  ideal_cycle_time_seconds: number;
+  std_setup_time_seconds: number;
+  target_quality: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ProductionEvent {
   id: string;
   plant_id: string;

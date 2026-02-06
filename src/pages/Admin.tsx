@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom';
-import { Settings, Factory, Layers, Cpu, AlertTriangle, Ban, Users, UserCog, Building2, Loader2, Package } from 'lucide-react';
+import { Settings, Factory, Layers, Cpu, AlertTriangle, Ban, Users, UserCog, Building2, Loader2, Package, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -10,6 +10,7 @@ import {
   LineManager,
   MachineManager,
   ProductManager,
+  ProductionStandardsManager,
   DowntimeReasonManager,
   DefectReasonManager,
   UserPermissionManager,
@@ -101,6 +102,13 @@ export default function Admin() {
                 <span className="hidden sm:inline">Products</span>
               </TabsTrigger>
               <TabsTrigger 
+                value="standards" 
+                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Standards</span>
+              </TabsTrigger>
+              <TabsTrigger 
                 value="downtime" 
                 className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
               >
@@ -148,6 +156,10 @@ export default function Admin() {
 
               <TabsContent value="products" className="mt-0">
                 <ProductManager />
+              </TabsContent>
+
+              <TabsContent value="standards" className="mt-0">
+                <ProductionStandardsManager />
               </TabsContent>
 
               <TabsContent value="downtime" className="mt-0">

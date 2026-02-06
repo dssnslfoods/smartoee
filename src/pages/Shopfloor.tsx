@@ -15,7 +15,8 @@ import { MyMachinesViewer } from '@/components/shopfloor/MyMachinesViewer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Factory, Activity, Package, Monitor, Clock } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Factory, Activity, Package, Monitor, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -23,6 +24,7 @@ import {
   getLines,
   getMachines,
   getProducts,
+  getProductionStandard,
   getTodayShiftCalendar,
   getCurrentEvent,
   getProductionEvents,
@@ -37,6 +39,7 @@ import type {
   ShiftCalendar, 
   EventType,
   Product,
+  ProductionStandard,
 } from '@/services/types';
 
 export default function Shopfloor() {
@@ -120,7 +123,27 @@ export default function Shopfloor() {
   const selectedMachine = machines.find(m => m.id === selectedMachineId);
   const selectedProduct = products.find(p => p.id === selectedProductId) || null;
 
-  // Handle SKU change while running - auto-stop previous, start new
+  // Fetch production standard for current machine+SKU pair
+  const { data: productionStandard } = useQuery({
+    queryKey: ['productionStandard', selectedMachineId, selectedProductId],
+    queryFn: () => getProductionStandard(selectedMachineId!, selectedProductId!),
+    enabled: !!selectedMachineId && !!selectedProductId,
+  });
+
+  // Determine effective cycle time: production_standards > product default > machine default
+  const effectiveCycleTime = productionStandard?.ideal_cycle_time_seconds 
+    ?? selectedProduct?.ideal_cycle_time_seconds 
+    ?? selectedMachine?.ideal_cycle_time_seconds;
+  
+  const cycleTimeSource = productionStandard
+    ? `from Standard: ${selectedProduct?.code}`
+    : selectedProduct
+      ? `from SKU: ${selectedProduct.code}`
+      : 'Machine Default';
+
+  const noBenchmarkWarning = selectedProduct && selectedMachine && !productionStandard
+    ? `No benchmark defined for ${selectedProduct.code} on ${selectedMachine.name}`
+    : null;
   const handleProductChange = async (productId: string | null) => {
     if (
       currentEvent?.event_type === 'RUN' &&
@@ -327,6 +350,9 @@ export default function Shopfloor() {
                     selectedProductId={selectedProductId}
                     onProductChange={handleProductChange}
                     machineCycleTime={selectedMachine?.ideal_cycle_time_seconds}
+                    effectiveCycleTime={effectiveCycleTime}
+                    cycleTimeSource={cycleTimeSource}
+                    noBenchmarkWarning={noBenchmarkWarning}
                     isLoading={productsLoading}
                     disabled={isLocked}
                   />
@@ -367,6 +393,9 @@ export default function Shopfloor() {
                         downtimeReasons={downtimeReasons}
                         selectedProduct={selectedProduct}
                         machineCycleTime={selectedMachine?.ideal_cycle_time_seconds}
+                        effectiveCycleTime={effectiveCycleTime}
+                        cycleTimeSource={cycleTimeSource}
+                        noBenchmarkWarning={noBenchmarkWarning}
                         onStartRun={handleStartRun}
                         onStartDowntime={(reasonId, notes) => 
                           startEventMutation.mutate({ eventType: 'DOWNTIME', reasonId, notes })

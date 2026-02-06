@@ -81,6 +81,40 @@ export async function getProducts(companyId?: string): Promise<import('./types')
   return data || [];
 }
 
+// =============================================
+// QUERY FUNCTIONS - Production Standards
+// =============================================
+
+export async function getProductionStandard(
+  machineId: string,
+  productId: string
+): Promise<import('./types').ProductionStandard | null> {
+  const { data, error } = await supabase
+    .from('production_standards')
+    .select('*')
+    .eq('machine_id', machineId)
+    .eq('product_id', productId)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getProductionStandardsForMachine(
+  machineId: string
+): Promise<import('./types').ProductionStandard[]> {
+  const { data, error } = await supabase
+    .from('production_standards')
+    .select('*')
+    .eq('machine_id', machineId)
+    .eq('is_active', true)
+    .order('created_at');
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function stopEvent(
   machineId: string,
   notes?: string
@@ -955,6 +989,11 @@ const oeeApi = {
   // Reasons
   getDowntimeReasons,
   getDefectReasons,
+
+  // Products & Standards
+  getProducts: getProducts,
+  getProductionStandard,
+  getProductionStandardsForMachine,
 
   // Production Events
   getProductionEvents,
