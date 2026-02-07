@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ScrollText,
   Monitor,
+  HelpCircle,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -71,6 +72,11 @@ const navItems: NavItem[] = [
     href: "/admin",
     icon: Settings,
     roles: ["ADMIN"],
+  },
+  {
+    title: "Help Center",
+    href: "/help",
+    icon: HelpCircle,
   },
 ];
 
