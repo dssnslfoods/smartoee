@@ -50,9 +50,15 @@ const navItems: NavItem[] = [
     roles: ["EXECUTIVE", "ADMIN"],
   },
   {
+    title: "Recent Activity",
+    href: "/recent-activity",
+    icon: ScrollText,
+  },
+  {
     title: "Activity Log",
     href: "/activity-log",
     icon: ScrollText,
+    roles: ["ADMIN"],
   },
   {
     title: "Admin Setup",
