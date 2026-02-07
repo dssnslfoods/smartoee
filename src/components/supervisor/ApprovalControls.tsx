@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { CheckCircle2, Lock, Calculator, AlertTriangle, Loader2 } from 'lucide-react';
+import { CheckCircle2, Lock, AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { RecalcPreviewDialog } from './RecalcPreviewDialog';
 
 interface ApprovalControlsProps {
   shiftCalendarId: string;
@@ -69,39 +70,13 @@ export function ApprovalControls({
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-3">
-        {/* Recalculate OEE Button */}
+        {/* Recalculate OEE Button - with preview dialog */}
         {!isLocked && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button 
-                variant="outline" 
-                disabled={isRecalculating}
-                className="min-w-[140px]"
-              >
-                {isRecalculating ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Calculator className="h-4 w-4 mr-2" />
-                )}
-                {isRecalculating ? 'กำลังคำนวณ...' : 'คำนวณ OEE'}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="max-w-md">
-              <AlertDialogHeader>
-                <AlertDialogTitle>คำนวณ OEE ใหม่?</AlertDialogTitle>
-                <AlertDialogDescription className="text-sm">
-                  ระบบจะคำนวณ OEE ใหม่สำหรับเครื่องจักรทั้งหมดในกะนี้ 
-                  ข้อมูล OEE เดิมจะถูกแทนที่ด้วยค่าใหม่
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                <AlertDialogAction onClick={onRecalc}>
-                  คำนวณใหม่
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <RecalcPreviewDialog
+            shiftCalendarId={shiftCalendarId}
+            onRecalc={onRecalc}
+            isRecalculating={isRecalculating}
+          />
         )}
 
         {/* Approve Button */}

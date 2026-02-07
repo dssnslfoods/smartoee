@@ -399,6 +399,32 @@ export async function getProductionEvents(
   return data || [];
 }
 
+export async function getProductionEventsByShift(
+  shiftCalendarId: string
+): Promise<ProductionEvent[]> {
+  const { data, error } = await supabase
+    .from('production_events')
+    .select('*, machine:machines(*), reason:downtime_reasons(*), product:products(*)')
+    .eq('shift_calendar_id', shiftCalendarId)
+    .order('start_ts', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getProductionCountsByShift(
+  shiftCalendarId: string
+): Promise<ProductionCount[]> {
+  const { data, error } = await supabase
+    .from('production_counts')
+    .select('*, machine:machines(*), defect_reason:defect_reasons(*)')
+    .eq('shift_calendar_id', shiftCalendarId)
+    .order('ts', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function getCurrentEvent(machineId: string): Promise<ProductionEvent | null> {
   const { data, error } = await supabase
     .from('production_events')
@@ -1026,10 +1052,12 @@ const oeeApi = {
 
   // Production Events
   getProductionEvents,
+  getProductionEventsByShift,
   getCurrentEvent,
 
   // Production Counts
   getProductionCounts,
+  getProductionCountsByShift,
 
   // OEE Snapshots
   getOeeSnapshots,
