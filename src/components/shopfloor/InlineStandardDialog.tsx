@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { resolveTimeUnit, fromSeconds, toSeconds, TIME_UNIT_SHORT, getInputStep, getInputMin } from '@/lib/timeUnitUtils';
 import type { Product, Machine } from '@/services/types';
 
 interface InlineStandardDialogProps {
@@ -30,14 +31,17 @@ export function InlineStandardDialog({
   onCreated,
 }: InlineStandardDialogProps) {
   const queryClient = useQueryClient();
+  const unit = resolveTimeUnit(machine.time_unit);
+  const unitLabel = TIME_UNIT_SHORT[unit];
 
-  const [cycleTime, setCycleTime] = useState<number>(machine.ideal_cycle_time_seconds);
-  const [setupTime, setSetupTime] = useState<number>(0);
+  const [cycleTimeDisplay, setCycleTimeDisplay] = useState<number>(fromSeconds(machine.ideal_cycle_time_seconds, unit));
+  const [setupTimeDisplay, setSetupTimeDisplay] = useState<number>(0);
   const [targetQuality, setTargetQuality] = useState<number>(99);
 
   // Warn if SKU cycle time is faster than machine capacity
-  const cycleTimeWarning = cycleTime < machine.ideal_cycle_time_seconds
-    ? `SKU speed (${cycleTime}s) เร็วกว่า Machine capacity (${machine.ideal_cycle_time_seconds}s)`
+  const cycleTimeInSeconds = toSeconds(cycleTimeDisplay, unit);
+  const cycleTimeWarning = cycleTimeInSeconds < machine.ideal_cycle_time_seconds
+    ? `SKU speed (${cycleTimeDisplay}${unitLabel}) เร็วกว่า Machine capacity (${fromSeconds(machine.ideal_cycle_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)}${unitLabel})`
     : null;
 
   const createMutation = useMutation({
@@ -46,8 +50,8 @@ export function InlineStandardDialog({
         machine_id: machine.id,
         product_id: product.id,
         company_id: companyId,
-        ideal_cycle_time_seconds: cycleTime,
-        std_setup_time_seconds: setupTime,
+        ideal_cycle_time_seconds: toSeconds(cycleTimeDisplay, unit),
+        std_setup_time_seconds: toSeconds(setupTimeDisplay, unit),
         target_quality: targetQuality,
         is_active: true,
       } as any);
@@ -71,7 +75,7 @@ export function InlineStandardDialog({
   });
 
   const handleSubmit = () => {
-    if (cycleTime <= 0) {
+    if (cycleTimeDisplay <= 0) {
       toast.error('Cycle Time ต้องมากกว่า 0');
       return;
     }
@@ -95,27 +99,27 @@ export function InlineStandardDialog({
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground flex items-center gap-1">
                   <Timer className="h-3 w-3" />
-                  Cycle Time (s)
+                  Cycle Time ({unitLabel})
                 </Label>
                 <Input
                   type="number"
-                  min="0.1"
-                  step="0.1"
-                  value={cycleTime}
-                  onChange={(e) => setCycleTime(parseFloat(e.target.value) || 0)}
+                  min={getInputMin(unit)}
+                  step={getInputStep(unit)}
+                  value={cycleTimeDisplay}
+                  onChange={(e) => setCycleTimeDisplay(parseFloat(e.target.value) || 0)}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground flex items-center gap-1">
                   <Wrench className="h-3 w-3" />
-                  Setup Time (s)
+                  Setup Time ({unitLabel})
                 </Label>
                 <Input
                   type="number"
                   min="0"
-                  step="1"
-                  value={setupTime}
-                  onChange={(e) => setSetupTime(parseFloat(e.target.value) || 0)}
+                  step={getInputStep(unit)}
+                  value={setupTimeDisplay}
+                  onChange={(e) => setSetupTimeDisplay(parseFloat(e.target.value) || 0)}
                 />
               </div>
               <div className="space-y-1.5">
@@ -142,7 +146,7 @@ export function InlineStandardDialog({
             )}
 
             <p className="text-xs text-muted-foreground">
-              Machine Default CT: {machine.ideal_cycle_time_seconds}s
+              Machine Default CT: {fromSeconds(machine.ideal_cycle_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)}{unitLabel}
             </p>
           </div>
         </div>

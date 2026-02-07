@@ -2,6 +2,7 @@ import { Timer, Wrench, ShieldCheck, Gauge, AlertTriangle, Cpu, Package } from '
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { resolveTimeUnit, fromSeconds, TIME_UNIT_SHORT } from '@/lib/timeUnitUtils';
 import type { ProductionStandard } from '@/services/types';
 
 interface ProductionBenchmarkCardProps {
@@ -9,6 +10,7 @@ interface ProductionBenchmarkCardProps {
   machineName?: string;
   machineCode?: string;
   machineCycleTime?: number;
+  machineTimeUnit?: string;
   productName?: string;
   productCode?: string;
   noBenchmarkWarning?: string | null;
@@ -49,11 +51,14 @@ export function ProductionBenchmarkCard({
   machineName,
   machineCode,
   machineCycleTime,
+  machineTimeUnit,
   productName,
   productCode,
   noBenchmarkWarning,
 }: ProductionBenchmarkCardProps) {
   const hasBenchmark = !!productionStandard;
+  const unit = resolveTimeUnit(machineTimeUnit);
+  const unitLabel = TIME_UNIT_SHORT[unit];
 
   const cycleTime = productionStandard?.ideal_cycle_time_seconds ?? machineCycleTime;
   const setupTime = productionStandard?.std_setup_time_seconds ?? 0;
@@ -90,16 +95,16 @@ export function ProductionBenchmarkCard({
         <MetricItem
           icon={<Timer className="h-5 w-5 text-primary" />}
           label="Cycle Time"
-          value={cycleTime?.toFixed(1) ?? '—'}
-          unit="sec"
+          value={cycleTime != null ? fromSeconds(cycleTime, unit).toFixed(unit === 'minutes' ? 2 : 1) : '—'}
+          unit={unitLabel}
           colorClass="bg-primary/10"
           bgClass="border-primary/20 bg-primary/5"
         />
         <MetricItem
           icon={<Wrench className="h-5 w-5 text-oee-performance" />}
           label="Setup Time"
-          value={setupTime?.toFixed(0) ?? '—'}
-          unit="sec"
+          value={setupTime != null ? fromSeconds(setupTime, unit).toFixed(unit === 'minutes' ? 2 : 1) : '—'}
+          unit={unitLabel}
           colorClass="bg-oee-performance/10"
           bgClass="border-oee-performance/20 bg-oee-performance/5"
         />

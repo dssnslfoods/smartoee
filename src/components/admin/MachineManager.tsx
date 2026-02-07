@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Clock } from 'lucide-react';
+import { type TimeUnit, TIME_UNIT_LABELS, TIME_UNIT_SHORT, fromSeconds, toSeconds, getInputStep, getInputMin, resolveTimeUnit } from '@/lib/timeUnitUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,7 @@ interface Machine {
   line_id: string;
   company_id: string;
   ideal_cycle_time_seconds: number;
+  time_unit: string;
   target_oee: number;
   target_availability: number;
   target_performance: number;
@@ -76,13 +78,16 @@ export function MachineManager() {
     code: '', 
     line_id: '', 
     company_id: '',
-    ideal_cycle_time_seconds: 60, 
+    ideal_cycle_time_seconds: 60,
+    time_unit: 'seconds' as string,
     target_oee: 85,
     target_availability: 90,
     target_performance: 95,
     target_quality: 99,
     is_active: true 
   });
+  // Display value for cycle time (converted from seconds to chosen unit)
+  const [cycleTimeDisplay, setCycleTimeDisplay] = useState<number>(60);
   const [selectedCompanyIdForForm, setSelectedCompanyIdForForm] = useState<string>('');
 
   // Use the admin's selected company context
@@ -158,6 +163,7 @@ export function MachineManager() {
           line_id: data.line_id, 
           company_id: data.company_id,
           ideal_cycle_time_seconds: data.ideal_cycle_time_seconds,
+          time_unit: data.time_unit,
           target_oee: data.target_oee,
           target_availability: data.target_availability,
           target_performance: data.target_performance,
@@ -184,6 +190,7 @@ export function MachineManager() {
           line_id: data.line_id,
           company_id: data.company_id, 
           ideal_cycle_time_seconds: data.ideal_cycle_time_seconds,
+          time_unit: data.time_unit,
           target_oee: data.target_oee,
           target_availability: data.target_availability,
           target_performance: data.target_performance,
@@ -218,25 +225,29 @@ export function MachineManager() {
   const handleOpenCreate = () => {
     setEditingMachine(null);
     setSelectedCompanyIdForForm(selectedCompanyId || companies?.[0]?.id || '');
-    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || companies?.[0]?.id || '', ideal_cycle_time_seconds: 60, target_oee: 85, target_availability: 90, target_performance: 95, target_quality: 99, is_active: true });
+    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || companies?.[0]?.id || '', ideal_cycle_time_seconds: 60, time_unit: 'seconds', target_oee: 85, target_availability: 90, target_performance: 95, target_quality: 99, is_active: true });
+    setCycleTimeDisplay(60);
     setIsDialogOpen(true);
   };
 
   const handleOpenEdit = (machine: Machine) => {
     setEditingMachine(machine);
     setSelectedCompanyIdForForm(machine.company_id);
+    const unit = resolveTimeUnit(machine.time_unit);
     setFormData({ 
       name: machine.name, 
       code: machine.code, 
       line_id: machine.line_id, 
       company_id: machine.company_id,
       ideal_cycle_time_seconds: machine.ideal_cycle_time_seconds,
+      time_unit: unit,
       target_oee: machine.target_oee ?? 85,
       target_availability: machine.target_availability ?? 90,
       target_performance: machine.target_performance ?? 95,
       target_quality: machine.target_quality ?? 99,
       is_active: machine.is_active 
     });
+    setCycleTimeDisplay(fromSeconds(machine.ideal_cycle_time_seconds, unit));
     setIsDialogOpen(true);
   };
 
@@ -244,7 +255,8 @@ export function MachineManager() {
     setIsDialogOpen(false);
     setEditingMachine(null);
     setSelectedCompanyIdForForm(selectedCompanyId || '');
-    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || '', ideal_cycle_time_seconds: 60, target_oee: 85, target_availability: 90, target_performance: 95, target_quality: 99, is_active: true });
+    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || '', ideal_cycle_time_seconds: 60, time_unit: 'seconds', target_oee: 85, target_availability: 90, target_performance: 95, target_quality: 99, is_active: true });
+    setCycleTimeDisplay(60);
   };
 
   const handleCompanyChange = (companyId: string) => {
@@ -300,7 +312,7 @@ export function MachineManager() {
               <TableHead>Code</TableHead>
               <TableHead>Company</TableHead>
               <TableHead>Line</TableHead>
-              <TableHead>Cycle Time (s)</TableHead>
+              <TableHead>Cycle Time</TableHead>
               <TableHead>Target OEE</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
@@ -318,7 +330,12 @@ export function MachineManager() {
                   <TableCell>
                     {line?.name} ({line?.plants?.name || '-'})
                   </TableCell>
-                  <TableCell>{machine.ideal_cycle_time_seconds}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const unit = resolveTimeUnit(machine.time_unit);
+                      return `${fromSeconds(machine.ideal_cycle_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)} ${TIME_UNIT_SHORT[unit]}`;
+                    })()}
+                  </TableCell>
                   <TableCell>
                     <span className="text-sm font-medium">{machine.target_oee ?? 85}%</span>
                     <span className="text-xs text-muted-foreground ml-1">
@@ -419,13 +436,43 @@ export function MachineManager() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cycle_time">Ideal Cycle Time (seconds)</Label>
+              <Label>หน่วยเวลา (Time Unit)</Label>
+              <Select
+                value={formData.time_unit}
+                onValueChange={(v) => {
+                  const newUnit = v as TimeUnit;
+                  const oldUnit = resolveTimeUnit(formData.time_unit);
+                  // Convert display value to new unit
+                  const currentSeconds = toSeconds(cycleTimeDisplay, oldUnit);
+                  setCycleTimeDisplay(fromSeconds(currentSeconds, newUnit));
+                  setFormData({ ...formData, time_unit: newUnit, ideal_cycle_time_seconds: currentSeconds });
+                }}
+              >
+                <SelectTrigger>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <SelectValue />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="seconds">{TIME_UNIT_LABELS.seconds}</SelectItem>
+                  <SelectItem value="minutes">{TIME_UNIT_LABELS.minutes}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cycle_time">Ideal Cycle Time ({TIME_UNIT_SHORT[resolveTimeUnit(formData.time_unit)]})</Label>
               <Input
                 id="cycle_time"
                 type="number"
-                min="1"
-                value={formData.ideal_cycle_time_seconds}
-                onChange={(e) => setFormData({ ...formData, ideal_cycle_time_seconds: parseInt(e.target.value) || 60 })}
+                min={getInputMin(resolveTimeUnit(formData.time_unit))}
+                step={getInputStep(resolveTimeUnit(formData.time_unit))}
+                value={cycleTimeDisplay}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 0;
+                  setCycleTimeDisplay(val);
+                  setFormData({ ...formData, ideal_cycle_time_seconds: toSeconds(val, resolveTimeUnit(formData.time_unit)) });
+                }}
               />
             </div>
 

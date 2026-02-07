@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { resolveTimeUnit, fromSeconds, TIME_UNIT_SHORT } from '@/lib/timeUnitUtils';
 import type { Product, ProductionStandard } from '@/services/types';
 
 interface SKUSelectorProps {
@@ -14,6 +15,7 @@ interface SKUSelectorProps {
   /** Map of product_id -> ProductionStandard for the current machine */
   standardsMap?: Map<string, ProductionStandard>;
   machineCycleTime?: number;
+  machineTimeUnit?: string;
   effectiveCycleTime?: number;
   cycleTimeSource?: string;
   noBenchmarkWarning?: string | null;
@@ -31,6 +33,7 @@ export function SKUSelector({
   onProductChange,
   standardsMap,
   machineCycleTime,
+  machineTimeUnit,
   effectiveCycleTime,
   cycleTimeSource,
   noBenchmarkWarning,
@@ -40,6 +43,8 @@ export function SKUSelector({
   onCreateStandard,
 }: SKUSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const unit = resolveTimeUnit(machineTimeUnit);
+  const unitLabel = TIME_UNIT_SHORT[unit];
 
   const filteredProducts = useMemo(() => {
     if (!searchQuery.trim()) return products;
@@ -80,7 +85,7 @@ export function SKUSelector({
             </div>
             <Badge variant="outline" className="shrink-0 text-xs gap-1">
               <Timer className="h-3 w-3" />
-              Target: {effectiveCycleTime ?? '—'}s [{cycleTimeSource ?? 'N/A'}]
+              Target: {effectiveCycleTime != null ? fromSeconds(effectiveCycleTime, unit).toFixed(unit === 'minutes' ? 2 : 1) : '—'}{unitLabel} [{cycleTimeSource ?? 'N/A'}]
             </Badge>
           </div>
           {noBenchmarkWarning && (
@@ -100,7 +105,7 @@ export function SKUSelector({
           </div>
           <Badge variant="secondary" className="shrink-0 text-xs gap-1">
             <Timer className="h-3 w-3" />
-            Target: {machineCycleTime}s [Machine Default]
+            Target: {fromSeconds(machineCycleTime, unit).toFixed(unit === 'minutes' ? 2 : 1)}{unitLabel} [Machine Default]
           </Badge>
         </div>
       ) : null}
@@ -210,7 +215,7 @@ export function SKUSelector({
                             className="text-[10px] px-1.5 py-0 h-4 gap-0.5 border-status-running/30 text-status-running bg-status-running/10"
                           >
                             <ShieldCheck className="h-2.5 w-2.5" />
-                            {standard?.ideal_cycle_time_seconds}s
+                            {standard ? `${fromSeconds(standard.ideal_cycle_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)}${unitLabel}` : ''}
                           </Badge>
                         ) : canCreateStandard ? (
                           <Badge

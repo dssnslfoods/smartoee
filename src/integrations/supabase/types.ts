@@ -304,6 +304,7 @@ export type Database = {
           target_oee: number | null
           target_performance: number | null
           target_quality: number | null
+          time_unit: string
           updated_at: string
         }
         Insert: {
@@ -319,6 +320,7 @@ export type Database = {
           target_oee?: number | null
           target_performance?: number | null
           target_quality?: number | null
+          time_unit?: string
           updated_at?: string
         }
         Update: {
@@ -334,6 +336,7 @@ export type Database = {
           target_oee?: number | null
           target_performance?: number | null
           target_quality?: number | null
+          time_unit?: string
           updated_at?: string
         }
         Relationships: [

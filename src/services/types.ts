@@ -86,6 +86,7 @@ export interface Machine {
   name: string;
   code: string;
   ideal_cycle_time_seconds: number;
+  time_unit: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;

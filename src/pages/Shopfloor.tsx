@@ -430,6 +430,7 @@ export default function Shopfloor() {
                     onProductChange={handleProductChange}
                     standardsMap={standardsMap}
                     machineCycleTime={selectedMachine?.ideal_cycle_time_seconds}
+                    machineTimeUnit={selectedMachine?.time_unit}
                     effectiveCycleTime={effectiveCycleTime}
                     cycleTimeSource={cycleTimeSource}
                     noBenchmarkWarning={noBenchmarkWarning}
@@ -459,6 +460,7 @@ export default function Shopfloor() {
                     machineName={selectedMachine?.name}
                     machineCode={selectedMachine?.code}
                     machineCycleTime={selectedMachine?.ideal_cycle_time_seconds}
+                    machineTimeUnit={selectedMachine?.time_unit}
                     productName={selectedProduct?.name}
                     productCode={selectedProduct?.code}
                     noBenchmarkWarning={noBenchmarkWarning}
