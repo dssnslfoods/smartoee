@@ -52,6 +52,19 @@ function avgField(items: any[], field: string): number {
   return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
 }
 
+interface MachineInfo {
+  id: string;
+  name: string;
+  line_id: string;
+  line_name: string;
+  plant_id: string;
+  plant_name: string;
+  target_oee: number | null;
+  target_availability: number | null;
+  target_performance: number | null;
+  target_quality: number | null;
+}
+
 export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: boolean) {
   const days = parseInt(dateRange);
   const now = new Date();
@@ -59,66 +72,51 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
   const previousPeriodStart = subDays(periodStart, days);
   const todayStart = startOfDay(now);
 
-  const { data: plants } = useQuery({
-    queryKey: ['exec-plants'],
+  // Machines with line/plant hierarchy
+  const { data: machines } = useQuery({
+    queryKey: ['exec-machines'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('plants')
-        .select('id, name')
+        .from('machines')
+        .select('id, name, line_id, target_oee, target_availability, target_performance, target_quality, line:lines!inner(id, name, plant_id, plant:plants!inner(id, name))')
         .eq('is_active', true);
       if (error) throw error;
-      return data;
+      return (data || []).map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        line_id: m.line_id,
+        line_name: m.line?.name || '',
+        plant_id: m.line?.plant_id || '',
+        plant_name: m.line?.plant?.name || '',
+        target_oee: m.target_oee,
+        target_availability: m.target_availability,
+        target_performance: m.target_performance,
+        target_quality: m.target_quality,
+      })) as MachineInfo[];
     },
   });
 
-  const { data: lines } = useQuery({
-    queryKey: ['exec-lines'],
+  // MACHINE-scope snapshots (current + previous period)
+  const { data: machineSnapshots, isLoading: snapshotsLoading, refetch } = useQuery({
+    queryKey: ['exec-machine-snapshots', dateRange, machines?.map(m => m.id)],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('lines')
-        .select('id, name, plant_id')
-        .eq('is_active', true);
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: plantSnapshots, isLoading: snapshotsLoading, refetch } = useQuery({
-    queryKey: ['exec-plant-snapshots', dateRange, plants?.map(p => p.id)],
-    queryFn: async () => {
-      if (!plants?.length) return [];
+      if (!machines?.length) return [];
+      const machineIds = machines.map(m => m.id);
       const { data, error } = await supabase
         .from('oee_snapshots')
         .select('*')
-        .eq('scope', 'PLANT')
-        .in('scope_id', plants.map(p => p.id))
+        .eq('scope', 'MACHINE')
+        .in('scope_id', machineIds)
         .gte('period_start', previousPeriodStart.toISOString())
         .order('period_start');
       if (error) throw error;
       return data || [];
     },
-    enabled: !!plants?.length,
+    enabled: !!machines?.length,
     refetchInterval: isAutoRefresh ? 30000 : false,
   });
 
-  const { data: lineSnapshots } = useQuery({
-    queryKey: ['exec-line-snapshots', dateRange, lines?.map(l => l.id)],
-    queryFn: async () => {
-      if (!lines?.length) return [];
-      const { data, error } = await supabase
-        .from('oee_snapshots')
-        .select('*')
-        .eq('scope', 'LINE')
-        .in('scope_id', lines.map(l => l.id))
-        .gte('period_start', periodStart.toISOString())
-        .order('period_start');
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!lines?.length,
-    refetchInterval: isAutoRefresh ? 30000 : false,
-  });
-
+  // Downtime events with reasons
   const { data: downtimeEvents } = useQuery({
     queryKey: ['exec-downtime', dateRange],
     queryFn: async () => {
@@ -134,22 +132,18 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
     refetchInterval: isAutoRefresh ? 30000 : false,
   });
 
-  const { data: machineTargets } = useQuery({
-    queryKey: ['exec-targets'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('machines')
-        .select('target_oee, target_availability, target_performance, target_quality')
-        .eq('is_active', true);
-      if (error) throw error;
-      return data || [];
-    },
-  });
+  // Build machine → line/plant lookup
+  const machineToLine = useMemo(() => {
+    if (!machines) return new Map<string, MachineInfo>();
+    const map = new Map<string, MachineInfo>();
+    machines.forEach(m => map.set(m.id, m));
+    return map;
+  }, [machines]);
 
-  // Current period summary
+  // Current period summary (aggregate all machines → plant level)
   const summary = useMemo<ExecMetrics | null>(() => {
-    if (!plantSnapshots) return null;
-    const current = plantSnapshots.filter(s => new Date(s.period_start) >= periodStart);
+    if (!machineSnapshots?.length) return null;
+    const current = machineSnapshots.filter(s => new Date(s.period_start) >= periodStart);
     if (current.length === 0) return null;
     return {
       oee: avgField(current, 'oee'),
@@ -157,12 +151,12 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
       performance: avgField(current, 'performance'),
       quality: avgField(current, 'quality'),
     };
-  }, [plantSnapshots, periodStart]);
+  }, [machineSnapshots, periodStart]);
 
   // Previous period summary (for delta)
   const previousSummary = useMemo<ExecMetrics | null>(() => {
-    if (!plantSnapshots) return null;
-    const previous = plantSnapshots.filter(s => {
+    if (!machineSnapshots?.length) return null;
+    const previous = machineSnapshots.filter(s => {
       const d = new Date(s.period_start);
       return d >= previousPeriodStart && d < periodStart;
     });
@@ -173,12 +167,12 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
       performance: avgField(previous, 'performance'),
       quality: avgField(previous, 'quality'),
     };
-  }, [plantSnapshots, previousPeriodStart, periodStart]);
+  }, [machineSnapshots, previousPeriodStart, periodStart]);
 
   // Today summary
   const todaySummary = useMemo<ExecMetrics | null>(() => {
-    if (!plantSnapshots) return null;
-    const today = plantSnapshots.filter(s => new Date(s.period_start) >= todayStart);
+    if (!machineSnapshots?.length) return null;
+    const today = machineSnapshots.filter(s => new Date(s.period_start) >= todayStart);
     if (today.length === 0) return null;
     return {
       oee: avgField(today, 'oee'),
@@ -186,12 +180,12 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
       performance: avgField(today, 'performance'),
       quality: avgField(today, 'quality'),
     };
-  }, [plantSnapshots, todayStart]);
+  }, [machineSnapshots, todayStart]);
 
-  // Targets (average across machines)
+  // Targets (average machine targets)
   const targets = useMemo<ExecMetrics | null>(() => {
-    if (!machineTargets?.length) return null;
-    const withTargets = machineTargets.filter(m => m.target_oee != null);
+    if (!machines?.length) return null;
+    const withTargets = machines.filter(m => m.target_oee != null);
     if (withTargets.length === 0) return null;
     return {
       oee: withTargets.reduce((s, m) => s + (m.target_oee || 0), 0) / withTargets.length,
@@ -199,12 +193,12 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
       performance: withTargets.reduce((s, m) => s + (m.target_performance || 0), 0) / withTargets.length,
       quality: withTargets.reduce((s, m) => s + (m.target_quality || 0), 0) / withTargets.length,
     };
-  }, [machineTargets]);
+  }, [machines]);
 
-  // Trend data (daily averages)
+  // Trend data (daily averages across all machines)
   const trendData = useMemo<ExecTrendPoint[]>(() => {
-    if (!plantSnapshots) return [];
-    const current = plantSnapshots.filter(s => new Date(s.period_start) >= periodStart);
+    if (!machineSnapshots?.length) return [];
+    const current = machineSnapshots.filter(s => new Date(s.period_start) >= periodStart);
     const dateMap = new Map<string, { a: number[]; p: number[]; q: number[]; o: number[] }>();
     current.forEach(snap => {
       const date = format(new Date(snap.period_start), 'MM/dd');
@@ -222,7 +216,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
       quality: v.q.length ? v.q.reduce((a, b) => a + b, 0) / v.q.length : 0,
       oee: v.o.length ? v.o.reduce((a, b) => a + b, 0) / v.o.length : 0,
     }));
-  }, [plantSnapshots, periodStart]);
+  }, [machineSnapshots, periodStart]);
 
   // Pareto data (top 5)
   const paretoData = useMemo<ExecParetoItem[]>(() => {
@@ -249,25 +243,30 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
     });
   }, [downtimeEvents]);
 
-  // Line ranking
+  // Line ranking (aggregate machine snapshots by line)
   const lineRanking = useMemo<ExecLineRankItem[]>(() => {
-    if (!lineSnapshots?.length || !lines?.length) return [];
-    const lineMap = new Map<string, { a: number[]; p: number[]; q: number[]; o: number[] }>();
-    lineSnapshots.forEach(snap => {
-      if (!lineMap.has(snap.scope_id)) lineMap.set(snap.scope_id, { a: [], p: [], q: [], o: [] });
-      const e = lineMap.get(snap.scope_id)!;
+    if (!machineSnapshots?.length || !machines?.length) return [];
+    const current = machineSnapshots.filter(s => new Date(s.period_start) >= periodStart);
+
+    const lineMap = new Map<string, { name: string; a: number[]; p: number[]; q: number[]; o: number[] }>();
+    current.forEach(snap => {
+      const machine = machineToLine.get(snap.scope_id);
+      if (!machine) return;
+      const lineId = machine.line_id;
+      if (!lineMap.has(lineId)) lineMap.set(lineId, { name: machine.line_name, a: [], p: [], q: [], o: [] });
+      const e = lineMap.get(lineId)!;
       if (snap.availability) e.a.push(snap.availability);
       if (snap.performance) e.p.push(snap.performance);
       if (snap.quality) e.q.push(snap.quality);
       if (snap.oee) e.o.push(snap.oee);
     });
+
     const ranking: ExecLineRankItem[] = [];
     lineMap.forEach((v, lineId) => {
-      const line = lines.find(l => l.id === lineId);
-      if (!line || v.o.length === 0) return;
+      if (v.o.length === 0) return;
       ranking.push({
         id: lineId,
-        name: line.name,
+        name: v.name,
         oee: v.o.reduce((a, b) => a + b, 0) / v.o.length,
         availability: v.a.length ? v.a.reduce((a, b) => a + b, 0) / v.a.length : 0,
         performance: v.p.length ? v.p.reduce((a, b) => a + b, 0) / v.p.length : 0,
@@ -275,7 +274,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
       });
     });
     return ranking.sort((a, b) => b.oee - a.oee);
-  }, [lineSnapshots, lines]);
+  }, [machineSnapshots, machines, machineToLine, periodStart]);
 
   // Loss by category
   const lossByCategory = useMemo<ExecLossCategoryItem[]>(() => {
@@ -298,19 +297,24 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
       }));
   }, [downtimeEvents]);
 
-  // Attention items
+  // Attention items (declining OEE, low availability, repeating losses)
   const attentionItems = useMemo<ExecAttentionItem[]>(() => {
     const items: ExecAttentionItem[] = [];
-    if (!lineSnapshots?.length || !lines?.length) return items;
+    if (!machineSnapshots?.length || !machines?.length) return items;
 
     const recentCutoff = subDays(now, 3);
     const olderCutoff = subDays(now, Math.min(days, 7));
+    const current = machineSnapshots.filter(s => new Date(s.period_start) >= periodStart);
 
-    const lineMap = new Map<string, { recent: number[]; older: number[]; recentAvail: number[] }>();
-    lineSnapshots.forEach(snap => {
+    // Group by line
+    const lineMap = new Map<string, { name: string; recent: number[]; older: number[]; recentAvail: number[] }>();
+    current.forEach(snap => {
+      const machine = machineToLine.get(snap.scope_id);
+      if (!machine) return;
+      const lineId = machine.line_id;
       const d = new Date(snap.period_start);
-      if (!lineMap.has(snap.scope_id)) lineMap.set(snap.scope_id, { recent: [], older: [], recentAvail: [] });
-      const e = lineMap.get(snap.scope_id)!;
+      if (!lineMap.has(lineId)) lineMap.set(lineId, { name: machine.line_name, recent: [], older: [], recentAvail: [] });
+      const e = lineMap.get(lineId)!;
       if (d >= recentCutoff) {
         if (snap.oee) e.recent.push(snap.oee);
         if (snap.availability) e.recentAvail.push(snap.availability);
@@ -320,9 +324,6 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
     });
 
     lineMap.forEach((v, lineId) => {
-      const line = lines.find(l => l.id === lineId);
-      if (!line) return;
-
       // Declining OEE
       if (v.recent.length > 0 && v.older.length > 0) {
         const recentAvg = v.recent.reduce((a, b) => a + b, 0) / v.recent.length;
@@ -332,7 +333,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
           items.push({
             type: 'declining',
             severity: delta < -10 ? 'critical' : 'warning',
-            title: `${line.name}: OEE Declining`,
+            title: `${v.name}: OEE Declining`,
             detail: `${delta.toFixed(1)}% vs previous period`,
           });
         }
@@ -345,7 +346,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
           items.push({
             type: 'low_availability',
             severity: avgAvail < 50 ? 'critical' : 'warning',
-            title: `${line.name}: Low Availability`,
+            title: `${v.name}: Low Availability`,
             detail: `${avgAvail.toFixed(1)}% average (last 3 days)`,
           });
         }
@@ -363,7 +364,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
     }
 
     return items.sort((a, b) => (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1));
-  }, [lineSnapshots, lines, paretoData, now, days]);
+  }, [machineSnapshots, machines, machineToLine, paretoData, now, days, periodStart]);
 
   return {
     summary,
