@@ -9,6 +9,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ScrollText,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -47,6 +48,11 @@ const navItems: NavItem[] = [
     href: "/executive",
     icon: BarChart3,
     roles: ["EXECUTIVE", "ADMIN"],
+  },
+  {
+    title: "Activity Log",
+    href: "/activity-log",
+    icon: ScrollText,
   },
   {
     title: "Admin Setup",
