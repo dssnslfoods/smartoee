@@ -162,14 +162,27 @@
       updatePayload
     );
  
-     if (updateError) {
-      console.error("Failed to update user:", updateError.message);
-       return new Response(
-         JSON.stringify({ success: false, error: "UPDATE_ERROR", message: updateError.message }),
-         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-       );
-     }
- 
+      if (updateError) {
+       console.error("Failed to update user:", updateError.message);
+        return new Response(
+          JSON.stringify({ success: false, error: "UPDATE_ERROR", message: updateError.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+    // Sync email to user_profiles if email was updated
+    if (newEmail) {
+      const { error: profileUpdateError } = await adminClient
+        .from("user_profiles")
+        .update({ email: newEmail })
+        .eq("user_id", targetUserId);
+
+      if (profileUpdateError) {
+        console.error("Failed to sync email to profile:", profileUpdateError.message);
+        // Don't fail the request - auth email was already updated
+      }
+    }
+
     console.log("User updated successfully:", targetUserId, { emailUpdated: !!newEmail, passwordUpdated: !!newPassword });
  
      return new Response(

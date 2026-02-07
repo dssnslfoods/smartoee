@@ -60,6 +60,7 @@ interface UserProfile {
   id: string;
   user_id: string;
   full_name: string;
+  email: string | null;
   role: AppRole;
   company_id: string | null;
   created_at: string;
@@ -249,6 +250,7 @@ export function UserManager() {
   const filteredUsers = users?.filter(user => 
     user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (user.companies?.name && user.companies.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
@@ -414,6 +416,7 @@ export function UserManager() {
             <TableHeader>
               <TableRow>
                 <TableHead>ชื่อ-นามสกุล</TableHead>
+                <TableHead>อีเมล</TableHead>
                 <TableHead>บริษัท</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead className="hidden md:table-cell">สร้างเมื่อ</TableHead>
@@ -432,10 +435,13 @@ export function UserManager() {
                       </div>
                       <div>
                         <div className="font-medium">{user.full_name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          ID: {user.user_id.slice(0, 8)}...
-                        </div>
                       </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Mail className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate max-w-[200px]">{user.email || '-'}</span>
                     </div>
                   </TableCell>
                   <TableCell>

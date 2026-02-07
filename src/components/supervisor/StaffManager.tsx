@@ -43,6 +43,7 @@ interface StaffUser {
   id: string;
   user_id: string;
   full_name: string;
+  email: string | null;
   role: string;
   company_id: string;
   created_at: string;
@@ -272,6 +273,7 @@ export function StaffManager() {
             <TableHeader>
               <TableRow>
                 <TableHead>ชื่อ</TableHead>
+                <TableHead>อีเมล</TableHead>
                 <TableHead>ตำแหน่ง</TableHead>
                 <TableHead>วันที่สร้าง</TableHead>
                 <TableHead className="text-right">จัดการ</TableHead>
@@ -281,6 +283,12 @@ export function StaffManager() {
               {staffUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.full_name}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Mail className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate max-w-[200px]">{user.email || '-'}</span>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge variant="secondary">STAFF</Badge>
                   </TableCell>
