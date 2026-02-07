@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Package, Timer, Check, AlertTriangle, ShieldCheck, Ban } from 'lucide-react';
+import { Search, Package, Timer, Check, AlertTriangle, ShieldCheck, Ban, Settings2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -19,6 +19,10 @@ interface SKUSelectorProps {
   noBenchmarkWarning?: string | null;
   isLoading?: boolean;
   disabled?: boolean;
+  /** Allow admin/supervisor to create standard for unfilled SKUs */
+  canCreateStandard?: boolean;
+  /** Callback when user wants to create a standard for a product */
+  onCreateStandard?: (product: Product) => void;
 }
 
 export function SKUSelector({
@@ -32,6 +36,8 @@ export function SKUSelector({
   noBenchmarkWarning,
   isLoading = false,
   disabled = false,
+  canCreateStandard = false,
+  onCreateStandard,
 }: SKUSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -118,10 +124,17 @@ export function SKUSelector({
             <ShieldCheck className="h-3 w-3 text-status-running" />
             มีค่ามาตรฐาน
           </span>
-          <span className="flex items-center gap-1">
-            <Ban className="h-3 w-3 text-muted-foreground/50" />
-            ยังไม่ set ค่ามาตรฐาน (เลือกไม่ได้)
-          </span>
+          {canCreateStandard ? (
+            <span className="flex items-center gap-1">
+              <Settings2 className="h-3 w-3 text-primary" />
+              กดเพื่อตั้งค่ามาตรฐาน
+            </span>
+          ) : (
+            <span className="flex items-center gap-1">
+              <Ban className="h-3 w-3 text-muted-foreground/50" />
+              ยังไม่ set ค่ามาตรฐาน (เลือกไม่ได้)
+            </span>
+          )}
         </div>
       )}
 
@@ -140,13 +153,20 @@ export function SKUSelector({
               const isSelected = product.id === selectedProductId;
               const hasBenchmark = standardsMap ? standardsMap.has(product.id) : true;
               const standard = standardsMap?.get(product.id);
-              const isDisabledItem = !hasBenchmark || disabled;
+              // Admin/Supervisor can click unfilled SKUs to create standard
+              const canClickToCreate = !hasBenchmark && canCreateStandard && !disabled;
+              const isDisabledItem = !hasBenchmark && !canCreateStandard || disabled;
 
               return (
                 <button
                   key={product.id}
                   onClick={() => {
                     if (isDisabledItem) return;
+                    if (canClickToCreate) {
+                      // Trigger inline standard creation dialog
+                      onCreateStandard?.(product);
+                      return;
+                    }
                     onProductChange(isSelected ? null : product.id);
                   }}
                   disabled={isDisabledItem}
@@ -154,7 +174,9 @@ export function SKUSelector({
                     'relative flex items-start gap-2 p-2.5 rounded-lg border text-left transition-all',
                     isDisabledItem
                       ? 'opacity-45 cursor-not-allowed bg-muted/30 border-border'
-                      : 'hover:bg-accent/50 hover:border-accent-foreground/20',
+                      : canClickToCreate
+                        ? 'hover:bg-primary/5 hover:border-primary/30 border-dashed border-primary/20 bg-primary/[0.02] cursor-pointer'
+                        : 'hover:bg-accent/50 hover:border-accent-foreground/20',
                     isSelected
                       ? 'bg-primary/10 border-primary/30 ring-1 ring-primary/20'
                       : hasBenchmark
@@ -189,6 +211,14 @@ export function SKUSelector({
                           >
                             <ShieldCheck className="h-2.5 w-2.5" />
                             {standard?.ideal_cycle_time_seconds}s
+                          </Badge>
+                        ) : canCreateStandard ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 h-4 gap-0.5 border-primary/30 text-primary bg-primary/10"
+                          >
+                            <Settings2 className="h-2.5 w-2.5" />
+                            ตั้งค่ามาตรฐาน
                           </Badge>
                         ) : (
                           <Badge
