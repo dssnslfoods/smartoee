@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2, Loader2, Cpu, Package, AlertTriangle, Factory, Do
 import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/hooks/useAuth';
+import { resolveTimeUnit, fromSeconds, toSeconds, TIME_UNIT_SHORT, getInputStep, getInputMin } from '@/lib/timeUnitUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -56,6 +57,7 @@ interface MachineOption {
   name: string;
   code: string;
   ideal_cycle_time_seconds: number;
+  time_unit?: string;
   plant_id?: string | null;
   lines?: { name: string; plant_id?: string | null; plants?: { id: string; name: string } | null } | null;
 }
@@ -110,7 +112,7 @@ export function ProductionStandardsManager() {
     queryFn: async () => {
       let query = supabase
         .from('machines')
-        .select('id, name, code, ideal_cycle_time_seconds, lines(name, plant_id, plants(id, name))')
+        .select('id, name, code, ideal_cycle_time_seconds, time_unit, lines(name, plant_id, plants(id, name))')
         .eq('is_active', true)
         .order('name');
       if (selectedCompanyId) query = query.eq('company_id', selectedCompanyId);
@@ -178,7 +180,9 @@ export function ProductionStandardsManager() {
   const cycleTimeWarning = useMemo(() => {
     if (!selectedMachine || !formData.ideal_cycle_time_seconds) return null;
     if (formData.ideal_cycle_time_seconds < selectedMachine.ideal_cycle_time_seconds) {
-      return `Warning: SKU speed (${formData.ideal_cycle_time_seconds}s) exceeds machine capacity (${selectedMachine.ideal_cycle_time_seconds}s)`;
+      const unit = resolveTimeUnit(selectedMachine.time_unit);
+      const unitLabel = TIME_UNIT_SHORT[unit];
+      return `Warning: SKU speed (${fromSeconds(formData.ideal_cycle_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)}${unitLabel}) exceeds machine capacity (${fromSeconds(selectedMachine.ideal_cycle_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)}${unitLabel})`;
     }
     return null;
   }, [formData.ideal_cycle_time_seconds, selectedMachine]);
@@ -534,8 +538,8 @@ export function ProductionStandardsManager() {
             <TableRow>
               <TableHead>Machine</TableHead>
               <TableHead>SKU</TableHead>
-              <TableHead>Cycle Time (s)</TableHead>
-              <TableHead>Setup Time (s)</TableHead>
+              <TableHead>Cycle Time</TableHead>
+              <TableHead>Setup Time</TableHead>
               <TableHead>Target Quality</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
@@ -563,12 +567,28 @@ export function ProductionStandardsManager() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <span className="font-mono text-sm">{standard.ideal_cycle_time_seconds}s</span>
-                  {standard.machines && standard.ideal_cycle_time_seconds < standard.machines.ideal_cycle_time_seconds && (
-                    <AlertTriangle className="inline h-3.5 w-3.5 ml-1 text-destructive" />
-                  )}
+                  {(() => {
+                    const machine = machines.find(m => m.id === standard.machine_id);
+                    const unit = resolveTimeUnit(machine?.time_unit);
+                    const unitLabel = TIME_UNIT_SHORT[unit];
+                    return (
+                      <>
+                        <span className="font-mono text-sm">{fromSeconds(standard.ideal_cycle_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)}{unitLabel}</span>
+                        {standard.machines && standard.ideal_cycle_time_seconds < standard.machines.ideal_cycle_time_seconds && (
+                          <AlertTriangle className="inline h-3.5 w-3.5 ml-1 text-destructive" />
+                        )}
+                      </>
+                    );
+                  })()}
                 </TableCell>
-                <TableCell className="font-mono text-sm">{standard.std_setup_time_seconds}s</TableCell>
+                <TableCell>
+                  {(() => {
+                    const machine = machines.find(m => m.id === standard.machine_id);
+                    const unit = resolveTimeUnit(machine?.time_unit);
+                    const unitLabel = TIME_UNIT_SHORT[unit];
+                    return <span className="font-mono text-sm">{fromSeconds(standard.std_setup_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)}{unitLabel}</span>;
+                  })()}
+                </TableCell>
                 <TableCell>
                   <Badge variant="outline" className="font-mono text-xs">
                     {standard.target_quality}%
@@ -623,7 +643,7 @@ export function ProductionStandardsManager() {
                 <SelectContent>
                   {filteredMachines.map(m => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.name} ({m.code}) — CT: {m.ideal_cycle_time_seconds}s
+                      {m.name} ({m.code}) — CT: {fromSeconds(m.ideal_cycle_time_seconds, resolveTimeUnit(m.time_unit)).toFixed(resolveTimeUnit(m.time_unit) === 'minutes' ? 2 : 1)}{TIME_UNIT_SHORT[resolveTimeUnit(m.time_unit)]}
                       {m.lines?.plants?.name ? ` [${m.lines.plants.name}]` : ''}
                     </SelectItem>
                   ))}
@@ -654,40 +674,48 @@ export function ProductionStandardsManager() {
 
             {/* Benchmarks */}
             <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-              <Label className="text-sm font-semibold">📊 Performance Benchmarks</Label>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Ideal Cycle Time (s)</Label>
-                  <Input
-                    type="number"
-                    min="0.1"
-                    step="0.1"
-                    value={formData.ideal_cycle_time_seconds}
-                    onChange={(e) => setFormData({ ...formData, ideal_cycle_time_seconds: parseFloat(e.target.value) || 60 })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Std. Setup Time (s)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formData.std_setup_time_seconds}
-                    onChange={(e) => setFormData({ ...formData, std_setup_time_seconds: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Target Quality (%)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={formData.target_quality}
-                    onChange={(e) => setFormData({ ...formData, target_quality: parseFloat(e.target.value) || 99 })}
-                  />
-                </div>
-              </div>
+              {(() => {
+                const unit = resolveTimeUnit(selectedMachine?.time_unit);
+                const unitLabel = TIME_UNIT_SHORT[unit];
+                return (
+                  <>
+                    <Label className="text-sm font-semibold">📊 Performance Benchmarks ({unitLabel})</Label>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Ideal Cycle Time ({unitLabel})</Label>
+                        <Input
+                          type="number"
+                          min={getInputMin(unit)}
+                          step={getInputStep(unit)}
+                          value={fromSeconds(formData.ideal_cycle_time_seconds, unit)}
+                          onChange={(e) => setFormData({ ...formData, ideal_cycle_time_seconds: toSeconds(parseFloat(e.target.value) || 0, unit) })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Std. Setup Time ({unitLabel})</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step={getInputStep(unit)}
+                          value={fromSeconds(formData.std_setup_time_seconds, unit)}
+                          onChange={(e) => setFormData({ ...formData, std_setup_time_seconds: toSeconds(parseFloat(e.target.value) || 0, unit) })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Target Quality (%)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={formData.target_quality}
+                          onChange={(e) => setFormData({ ...formData, target_quality: parseFloat(e.target.value) || 99 })}
+                        />
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
 
               {cycleTimeWarning && (
                 <Alert variant="destructive" className="py-2">
