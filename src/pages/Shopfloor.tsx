@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -13,6 +13,7 @@ import { EventTimeline } from '@/components/shopfloor/EventTimeline';
 import { LockedBanner } from '@/components/shopfloor/LockedBanner';
 import { MyMachinesViewer } from '@/components/shopfloor/MyMachinesViewer';
 import { ProductionBenchmarkCard } from '@/components/shopfloor/ProductionBenchmarkCard';
+import { InlineStandardDialog } from '@/components/shopfloor/InlineStandardDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -46,7 +47,7 @@ import type {
 
 export default function Shopfloor() {
   const queryClient = useQueryClient();
-  const { company } = useAuth();
+  const { company, isAdmin, hasRole } = useAuth();
   
   const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
@@ -54,6 +55,10 @@ export default function Shopfloor() {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState('capture');
+  const [standardDialogProduct, setStandardDialogProduct] = useState<Product | null>(null);
+
+  // Admin or Supervisor can create production standards inline
+  const canCreateStandard = isAdmin() || hasRole('SUPERVISOR');
 
   useEffect(() => {
     getSession().then(session => {
@@ -430,6 +435,8 @@ export default function Shopfloor() {
                     noBenchmarkWarning={noBenchmarkWarning}
                     isLoading={productsLoading}
                     disabled={isLocked}
+                    canCreateStandard={canCreateStandard}
+                    onCreateStandard={(product) => setStandardDialogProduct(product)}
                   />
                 </CardContent>
               </Card>
@@ -576,6 +583,18 @@ export default function Shopfloor() {
             <MyMachinesViewer />
           </TabsContent>
         </Tabs>
+
+        {/* Inline Standard Dialog for Admin/Supervisor */}
+        {selectedMachine && standardDialogProduct && companyId && (
+          <InlineStandardDialog
+            open={!!standardDialogProduct}
+            onOpenChange={(open) => { if (!open) setStandardDialogProduct(null); }}
+            machine={selectedMachine}
+            product={standardDialogProduct}
+            companyId={companyId}
+            onCreated={() => setStandardDialogProduct(null)}
+          />
+        )}
       </div>
     </AppLayout>
   );
