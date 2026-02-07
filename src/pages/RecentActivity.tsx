@@ -1,11 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format, differenceInSeconds } from 'date-fns';
+import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
-import {
-  ScrollText, RefreshCw, ChevronDown, ChevronRight, Search, Clock, User,
-  Play, Pause, Wrench, Package, Cpu, Hash, Pencil, Trash2,
-} from 'lucide-react';
+import { ScrollText, RefreshCw, Search, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -16,13 +13,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Navigate } from 'react-router-dom';
-import { cn } from '@/lib/utils';
 import { EntityTypeChips, matchesChipFilter } from '@/components/recent-activity/EntityTypeChips';
 import { EditEventDialog } from '@/components/recent-activity/EditEventDialog';
 import { EditCountDialog } from '@/components/recent-activity/EditCountDialog';
 import { DeleteActivityDialog } from '@/components/recent-activity/DeleteActivityDialog';
+import { ActivitySessionCard } from '@/components/recent-activity/ActivitySessionCard';
+import { groupActivitiesIntoSessions } from '@/components/recent-activity/groupActivities';
 
 interface AuditLog {
   id: string;
@@ -57,295 +54,14 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   defect_reasons: 'สาเหตุของเสีย',
 };
 
-const ACTION_LABELS: Record<string, string> = {
-  INSERT: 'สร้าง',
-  UPDATE: 'แก้ไข',
-  DELETE: 'ลบ',
-};
-
-const EVENT_TYPE_CONFIG: Record<string, { label: string; icon: typeof Play; colorClass: string; bgClass: string }> = {
-  RUN: { label: 'Running', icon: Play, colorClass: 'text-status-running', bgClass: 'bg-status-running/10 border-status-running/20' },
-  DOWNTIME: { label: 'Downtime', icon: Pause, colorClass: 'text-destructive', bgClass: 'bg-destructive/10 border-destructive/20' },
-  SETUP: { label: 'Setup', icon: Wrench, colorClass: 'text-warning', bgClass: 'bg-warning/10 border-warning/20' },
-};
-
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.round(seconds % 60);
-  if (mins < 60) return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  const remMins = mins % 60;
-  return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
-}
-
-function getActionBadge(action: string) {
-  switch (action) {
-    case 'INSERT':
-      return <Badge className="bg-status-running/10 text-status-running border-status-running/20 text-xs">{ACTION_LABELS[action]}</Badge>;
-    case 'UPDATE':
-      return <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">{ACTION_LABELS[action]}</Badge>;
-    case 'DELETE':
-      return <Badge className="bg-destructive/10 text-destructive border-destructive/20 text-xs">{ACTION_LABELS[action]}</Badge>;
-    default:
-      return <Badge variant="secondary" className="text-xs">{action}</Badge>;
-  }
-}
-
-// --- Editable check ---
 const EDITABLE_TYPES = new Set(['production_events', 'production_counts']);
 
 function canEditLog(log: AuditLog, userId: string | undefined, role: string | undefined): boolean {
   if (!EDITABLE_TYPES.has(log.entity_type)) return false;
-  if (log.action === 'DELETE') return false; // already deleted
+  if (log.action === 'DELETE') return false;
   if (role === 'ADMIN' || role === 'SUPERVISOR') return true;
   return log.actor_user_id === userId;
 }
-
-// --- Production Event Detail Card ---
-function ProductionEventDetail({ log, lookup }: { log: AuditLog; lookup: LookupData }) {
-  const data = (log.action === 'DELETE' ? log.before_json : log.after_json) as Record<string, unknown> | null;
-  if (!data) return null;
-
-  const eventType = data.event_type as string;
-  const config = EVENT_TYPE_CONFIG[eventType];
-  const Icon = config?.icon || Play;
-  const machineId = data.machine_id as string;
-  const productId = data.product_id as string | null;
-  const reasonId = data.reason_id as string | null;
-  const startTs = data.start_ts as string | null;
-  const endTs = data.end_ts as string | null;
-  const notes = data.notes as string | null;
-
-  const machine = lookup.machines.get(machineId);
-  const product = productId ? lookup.products.get(productId) : null;
-  const reason = reasonId ? lookup.reasons.get(reasonId) : null;
-
-  const duration = startTs && endTs ? differenceInSeconds(new Date(endTs), new Date(startTs)) : null;
-  const isOngoing = startTs && !endTs && log.action !== 'DELETE';
-
-  return (
-    <div className={cn('rounded-lg border p-3 space-y-2', config?.bgClass || 'bg-muted/30')}>
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className={cn('flex items-center gap-1.5', config?.colorClass)}>
-          <Icon className="h-4 w-4" />
-          <span className="font-semibold text-sm">{config?.label || eventType}</span>
-        </div>
-        {isOngoing && (
-          <Badge variant="outline" className="text-[10px] animate-pulse border-status-running/40 text-status-running">
-            กำลังดำเนินการ
-          </Badge>
-        )}
-        {duration != null && (
-          <Badge variant="secondary" className="text-xs gap-1">
-            <Clock className="h-3 w-3" />
-            {formatDuration(duration)}
-          </Badge>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        {machine && (
-          <span className="flex items-center gap-1">
-            <Cpu className="h-3 w-3" />
-            {machine.name} <span className="font-mono text-[10px]">({machine.code})</span>
-          </span>
-        )}
-        {product && (
-          <span className="flex items-center gap-1">
-            <Package className="h-3 w-3" />
-            {product.name} <span className="font-mono text-[10px]">({product.code})</span>
-          </span>
-        )}
-        {reason && (
-          <span className="flex items-center gap-1">
-            📋 {reason.name} <span className="text-[10px]">({reason.category})</span>
-          </span>
-        )}
-      </div>
-      {startTs && (
-        <div className="text-xs text-muted-foreground">
-          {format(new Date(startTs), 'HH:mm:ss')}
-          {endTs && ` → ${format(new Date(endTs), 'HH:mm:ss')}`}
-        </div>
-      )}
-      {notes && <p className="text-xs text-muted-foreground italic">📝 {notes}</p>}
-    </div>
-  );
-}
-
-// --- Production Count Detail Card ---
-function ProductionCountDetail({ log, lookup }: { log: AuditLog; lookup: LookupData }) {
-  const data = (log.action === 'DELETE' ? log.before_json : log.after_json) as Record<string, unknown> | null;
-  if (!data) return null;
-
-  const machineId = data.machine_id as string;
-  const goodQty = data.good_qty as number;
-  const rejectQty = data.reject_qty as number;
-  const notes = data.notes as string | null;
-  const machine = lookup.machines.get(machineId);
-
-  return (
-    <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-      <div className="flex items-center gap-2 flex-wrap">
-        <Hash className="h-4 w-4 text-primary" />
-        <span className="font-semibold text-sm">บันทึกจำนวน</span>
-        <Badge className="bg-status-running/10 text-status-running border-status-running/20 text-xs">
-          ✓ {goodQty ?? 0}
-        </Badge>
-        {(rejectQty ?? 0) > 0 && (
-          <Badge className="bg-destructive/10 text-destructive border-destructive/20 text-xs">
-            ✗ {rejectQty}
-          </Badge>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        {machine && (
-          <span className="flex items-center gap-1">
-            <Cpu className="h-3 w-3" />
-            {machine.name} <span className="font-mono text-[10px]">({machine.code})</span>
-          </span>
-        )}
-      </div>
-      {notes && <p className="text-xs text-muted-foreground italic">📝 {notes}</p>}
-    </div>
-  );
-}
-
-// --- Generic Detail (fallback) ---
-function GenericDetail({ log }: { log: AuditLog }) {
-  const hasDetails = log.before_json || log.after_json;
-  if (!hasDetails) return null;
-  return (
-    <div className="space-y-3">
-      {log.before_json && (
-        <div>
-          <div className="text-xs font-medium text-muted-foreground mb-1">ก่อนแก้ไข:</div>
-          <pre className="text-xs bg-muted p-2 rounded overflow-x-auto max-h-40">
-            {JSON.stringify(log.before_json, null, 2)}
-          </pre>
-        </div>
-      )}
-      {log.after_json && (
-        <div>
-          <div className="text-xs font-medium text-muted-foreground mb-1">หลังแก้ไข:</div>
-          <pre className="text-xs bg-muted p-2 rounded overflow-x-auto max-h-40">
-            {JSON.stringify(log.after_json, null, 2)}
-          </pre>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// --- Main Activity Item ---
-interface ActivityItemProps {
-  log: AuditLog;
-  showActor: boolean;
-  lookup: LookupData;
-  editable: boolean;
-  onEdit: (log: AuditLog) => void;
-  onDelete: (log: AuditLog) => void;
-}
-
-function RecentActivityItem({ log, showActor, lookup, editable, onEdit, onDelete }: ActivityItemProps) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const isProductionEvent = log.entity_type === 'production_events';
-  const isProductionCount = log.entity_type === 'production_counts';
-  const hasRichDetail = isProductionEvent || isProductionCount;
-  const hasGenericDetail = !hasRichDetail && (log.before_json || log.after_json);
-
-  const summary = useMemo(() => {
-    const entityLabel = ENTITY_TYPE_LABELS[log.entity_type] || log.entity_type;
-    const actionLabel = ACTION_LABELS[log.action] || log.action;
-
-    if (isProductionEvent) {
-      const data = (log.action === 'DELETE' ? log.before_json : log.after_json) as Record<string, unknown> | null;
-      const eventType = data?.event_type as string;
-      const config = EVENT_TYPE_CONFIG[eventType];
-      const machineId = data?.machine_id as string;
-      const machine = lookup.machines.get(machineId);
-      return `${actionLabel} ${config?.label || eventType || 'Event'}${machine ? ` — ${machine.name}` : ''}`;
-    }
-
-    if (isProductionCount) {
-      const data = (log.action === 'DELETE' ? log.before_json : log.after_json) as Record<string, unknown> | null;
-      const machineId = data?.machine_id as string;
-      const machine = lookup.machines.get(machineId);
-      const good = (data?.good_qty as number) ?? 0;
-      const reject = (data?.reject_qty as number) ?? 0;
-      return `${actionLabel} จำนวนผลิต (✓${good} ✗${reject})${machine ? ` — ${machine.name}` : ''}`;
-    }
-
-    return `${actionLabel} ${entityLabel}`;
-  }, [log, lookup, isProductionEvent, isProductionCount]);
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="border rounded-lg p-3 hover:bg-muted/50 transition-colors">
-        <CollapsibleTrigger asChild>
-          <div className="flex items-start justify-between cursor-pointer gap-2">
-            <div className="flex items-start gap-2.5 min-w-0">
-              {(hasRichDetail || hasGenericDetail) ? (
-                isOpen ? <ChevronDown className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" /> : <ChevronRight className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-              ) : (
-                <div className="w-4 shrink-0" />
-              )}
-              <div className="space-y-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {getActionBadge(log.action)}
-                  {isProductionEvent && (() => {
-                    const data = (log.action === 'DELETE' ? log.before_json : log.after_json) as Record<string, unknown> | null;
-                    const et = data?.event_type as string;
-                    const cfg = EVENT_TYPE_CONFIG[et];
-                    if (!cfg) return null;
-                    const EtIcon = cfg.icon;
-                    return <EtIcon className={cn('h-3.5 w-3.5', cfg.colorClass)} />;
-                  })()}
-                  <span className="font-medium text-sm">{summary}</span>
-                </div>
-                {showActor && (
-                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                    <User className="h-3 w-3" />
-                    {log.actor_name || 'ระบบ'}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex items-start gap-2 shrink-0">
-              {editable && (
-                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(log)}>
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(log)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              )}
-              <div className="text-xs text-muted-foreground text-right whitespace-nowrap flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                <div>
-                  <div>{format(new Date(log.ts), 'dd MMM yy', { locale: th })}</div>
-                  <div>{format(new Date(log.ts), 'HH:mm:ss')}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="mt-3">
-            {isProductionEvent && <ProductionEventDetail log={log} lookup={lookup} />}
-            {isProductionCount && <ProductionCountDetail log={log} lookup={lookup} />}
-            {!hasRichDetail && <GenericDetail log={log} />}
-          </div>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
-  );
-}
-
-// ===================== MAIN PAGE =====================
 
 export default function RecentActivity() {
   const { user, profile, company, isLoading: authLoading } = useAuth();
@@ -353,7 +69,6 @@ export default function RecentActivity() {
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Edit/Delete state
   const [editingEvent, setEditingEvent] = useState<AuditLog | null>(null);
   const [editingCount, setEditingCount] = useState<AuditLog | null>(null);
   const [deletingLog, setDeletingLog] = useState<AuditLog | null>(null);
@@ -451,16 +166,19 @@ export default function RecentActivity() {
     return result;
   }, [logs, chipFilter, searchQuery, lookup]);
 
-  // Group by date
+  // Group into sessions
+  const sessions = useMemo(() => groupActivitiesIntoSessions(filteredLogs), [filteredLogs]);
+
+  // Group sessions by date
   const groupedByDate = useMemo(() => {
-    const groups = new Map<string, AuditLog[]>();
-    for (const log of filteredLogs) {
-      const dateKey = format(new Date(log.ts), 'yyyy-MM-dd');
+    const groups = new Map<string, typeof sessions>();
+    for (const session of sessions) {
+      const dateKey = format(new Date(session.endTs), 'yyyy-MM-dd');
       if (!groups.has(dateKey)) groups.set(dateKey, []);
-      groups.get(dateKey)!.push(log);
+      groups.get(dateKey)!.push(session);
     }
     return groups;
-  }, [filteredLogs]);
+  }, [sessions]);
 
   // Handlers
   const handleEdit = (log: AuditLog) => {
@@ -568,7 +286,16 @@ export default function RecentActivity() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center justify-between">
-                <span>กิจกรรมล่าสุด ({filteredLogs.length})</span>
+                <span className="flex items-center gap-2">
+                  กิจกรรมล่าสุด
+                  <Badge variant="secondary" className="text-xs">{filteredLogs.length} รายการ</Badge>
+                  {sessions.length !== filteredLogs.length && (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <Clock className="h-3 w-3" />
+                      {sessions.length} เซสชัน
+                    </Badge>
+                  )}
+                </span>
                 {isStaff && (
                   <Badge variant="secondary" className="text-xs">
                     แสดงเฉพาะของคุณ
@@ -588,23 +315,25 @@ export default function RecentActivity() {
                     <p>ไม่พบกิจกรรมล่าสุด</p>
                   </div>
                 ) : (
-                  <div className="space-y-4 pr-3">
-                    {[...groupedByDate.entries()].map(([dateKey, dateLogs]) => (
+                  <div className="space-y-5 pr-3">
+                    {[...groupedByDate.entries()].map(([dateKey, dateSessions]) => (
                       <div key={dateKey}>
                         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-1.5 mb-2">
                           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                             {format(new Date(dateKey), 'EEEE dd MMMM yyyy', { locale: th })}
                           </span>
-                          <span className="text-xs text-muted-foreground ml-2">({dateLogs.length})</span>
+                          <span className="text-xs text-muted-foreground ml-2">
+                            ({dateSessions.reduce((sum, s) => sum + s.logs.length, 0)})
+                          </span>
                         </div>
                         <div className="space-y-2">
-                          {dateLogs.map((log) => (
-                            <RecentActivityItem
-                              key={log.id}
-                              log={log}
+                          {dateSessions.map((session) => (
+                            <ActivitySessionCard
+                              key={session.key}
+                              session={session}
                               showActor={showActor}
                               lookup={lookup}
-                              editable={canEditLog(log, profile?.user_id, profile?.role)}
+                              canEditFn={(log) => canEditLog(log, profile?.user_id, profile?.role)}
                               onEdit={handleEdit}
                               onDelete={handleDelete}
                             />
