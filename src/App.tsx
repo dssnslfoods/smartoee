@@ -12,6 +12,7 @@ import Supervisor from "./pages/Supervisor";
 import Executive from "./pages/Executive";
 import Admin from "./pages/Admin";
 import ActivityLog from "./pages/ActivityLog";
+import RecentActivity from "./pages/RecentActivity";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/executive" element={<Executive />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/activity-log" element={<ActivityLog />} />
+            <Route path="/recent-activity" element={<RecentActivity />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
