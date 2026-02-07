@@ -11,6 +11,7 @@ import Shopfloor from "./pages/Shopfloor";
 import Supervisor from "./pages/Supervisor";
 import Executive from "./pages/Executive";
 import Admin from "./pages/Admin";
+import ActivityLog from "./pages/ActivityLog";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/supervisor" element={<Supervisor />} />
             <Route path="/executive" element={<Executive />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/activity-log" element={<ActivityLog />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
