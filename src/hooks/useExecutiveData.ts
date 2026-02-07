@@ -67,10 +67,23 @@ interface MachineInfo {
 
 export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: boolean) {
   const days = parseInt(dateRange);
-  const now = new Date();
-  const periodStart = subDays(now, days);
-  const previousPeriodStart = subDays(periodStart, days);
-  const todayStart = startOfDay(now);
+
+  // Stabilize date calculations - only recompute when dateRange changes
+  const dates = useMemo(() => {
+    const now = new Date();
+    const periodStart = subDays(now, days);
+    const previousPeriodStart = subDays(periodStart, days);
+    const todayStart = startOfDay(now);
+    return {
+      periodStartISO: periodStart.toISOString(),
+      previousPeriodStartISO: previousPeriodStart.toISOString(),
+      todayStartISO: todayStart.toISOString(),
+      periodStartMs: periodStart.getTime(),
+      previousPeriodStartMs: previousPeriodStart.getTime(),
+      todayStartMs: todayStart.getTime(),
+      nowMs: now.getTime(),
+    };
+  }, [days]);
 
   // Machines with line/plant hierarchy
   const { data: machines } = useQuery({
@@ -107,7 +120,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
         .select('*')
         .eq('scope', 'MACHINE')
         .in('scope_id', machineIds)
-        .gte('period_start', previousPeriodStart.toISOString())
+        .gte('period_start', dates.previousPeriodStartISO)
         .order('period_start');
       if (error) throw error;
       return data || [];
@@ -124,7 +137,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
         .from('production_events')
         .select('id, event_type, start_ts, end_ts, reason_id, line_id, downtime_reasons(name, category)')
         .in('event_type', ['DOWNTIME', 'SETUP'])
-        .gte('start_ts', periodStart.toISOString())
+        .gte('start_ts', dates.periodStartISO)
         .not('end_ts', 'is', null);
       if (error) throw error;
       return data || [];
@@ -143,7 +156,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
   // Current period summary (aggregate all machines → plant level)
   const summary = useMemo<ExecMetrics | null>(() => {
     if (!machineSnapshots?.length) return null;
-    const current = machineSnapshots.filter(s => new Date(s.period_start) >= periodStart);
+    const current = machineSnapshots.filter(s => new Date(s.period_start).getTime() >= dates.periodStartMs);
     if (current.length === 0) return null;
     return {
       oee: avgField(current, 'oee'),
@@ -151,14 +164,14 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
       performance: avgField(current, 'performance'),
       quality: avgField(current, 'quality'),
     };
-  }, [machineSnapshots, periodStart]);
+  }, [machineSnapshots, dates.periodStartMs]);
 
   // Previous period summary (for delta)
   const previousSummary = useMemo<ExecMetrics | null>(() => {
     if (!machineSnapshots?.length) return null;
     const previous = machineSnapshots.filter(s => {
-      const d = new Date(s.period_start);
-      return d >= previousPeriodStart && d < periodStart;
+      const d = new Date(s.period_start).getTime();
+      return d >= dates.previousPeriodStartMs && d < dates.periodStartMs;
     });
     if (previous.length === 0) return null;
     return {
@@ -167,12 +180,12 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
       performance: avgField(previous, 'performance'),
       quality: avgField(previous, 'quality'),
     };
-  }, [machineSnapshots, previousPeriodStart, periodStart]);
+  }, [machineSnapshots, dates.previousPeriodStartMs, dates.periodStartMs]);
 
   // Today summary
   const todaySummary = useMemo<ExecMetrics | null>(() => {
     if (!machineSnapshots?.length) return null;
-    const today = machineSnapshots.filter(s => new Date(s.period_start) >= todayStart);
+    const today = machineSnapshots.filter(s => new Date(s.period_start).getTime() >= dates.todayStartMs);
     if (today.length === 0) return null;
     return {
       oee: avgField(today, 'oee'),
@@ -180,7 +193,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
       performance: avgField(today, 'performance'),
       quality: avgField(today, 'quality'),
     };
-  }, [machineSnapshots, todayStart]);
+  }, [machineSnapshots, dates.todayStartMs]);
 
   // Targets (average machine targets)
   const targets = useMemo<ExecMetrics | null>(() => {
@@ -198,7 +211,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
   // Trend data (daily averages across all machines)
   const trendData = useMemo<ExecTrendPoint[]>(() => {
     if (!machineSnapshots?.length) return [];
-    const current = machineSnapshots.filter(s => new Date(s.period_start) >= periodStart);
+    const current = machineSnapshots.filter(s => new Date(s.period_start).getTime() >= dates.periodStartMs);
     const dateMap = new Map<string, { a: number[]; p: number[]; q: number[]; o: number[] }>();
     current.forEach(snap => {
       const date = format(new Date(snap.period_start), 'MM/dd');
@@ -216,7 +229,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
       quality: v.q.length ? v.q.reduce((a, b) => a + b, 0) / v.q.length : 0,
       oee: v.o.length ? v.o.reduce((a, b) => a + b, 0) / v.o.length : 0,
     }));
-  }, [machineSnapshots, periodStart]);
+  }, [machineSnapshots, dates.periodStartMs]);
 
   // Pareto data (top 5)
   const paretoData = useMemo<ExecParetoItem[]>(() => {
@@ -246,7 +259,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
   // Line ranking (aggregate machine snapshots by line)
   const lineRanking = useMemo<ExecLineRankItem[]>(() => {
     if (!machineSnapshots?.length || !machines?.length) return [];
-    const current = machineSnapshots.filter(s => new Date(s.period_start) >= periodStart);
+    const current = machineSnapshots.filter(s => new Date(s.period_start).getTime() >= dates.periodStartMs);
 
     const lineMap = new Map<string, { name: string; a: number[]; p: number[]; q: number[]; o: number[] }>();
     current.forEach(snap => {
@@ -274,7 +287,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
       });
     });
     return ranking.sort((a, b) => b.oee - a.oee);
-  }, [machineSnapshots, machines, machineToLine, periodStart]);
+  }, [machineSnapshots, machines, machineToLine, dates.periodStartMs]);
 
   // Loss by category
   const lossByCategory = useMemo<ExecLossCategoryItem[]>(() => {
@@ -302,9 +315,10 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
     const items: ExecAttentionItem[] = [];
     if (!machineSnapshots?.length || !machines?.length) return items;
 
-    const recentCutoff = subDays(now, 3);
-    const olderCutoff = subDays(now, Math.min(days, 7));
-    const current = machineSnapshots.filter(s => new Date(s.period_start) >= periodStart);
+    const recentCutoffMs = subDays(new Date(dates.nowMs), 3).getTime();
+    const olderCutoffMs = subDays(new Date(dates.nowMs), Math.min(days, 7)).getTime();
+
+    const current = machineSnapshots.filter(s => new Date(s.period_start).getTime() >= dates.periodStartMs);
 
     // Group by line
     const lineMap = new Map<string, { name: string; recent: number[]; older: number[]; recentAvail: number[] }>();
@@ -312,18 +326,18 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
       const machine = machineToLine.get(snap.scope_id);
       if (!machine) return;
       const lineId = machine.line_id;
-      const d = new Date(snap.period_start);
+      const d = new Date(snap.period_start).getTime();
       if (!lineMap.has(lineId)) lineMap.set(lineId, { name: machine.line_name, recent: [], older: [], recentAvail: [] });
       const e = lineMap.get(lineId)!;
-      if (d >= recentCutoff) {
+      if (d >= recentCutoffMs) {
         if (snap.oee) e.recent.push(snap.oee);
         if (snap.availability) e.recentAvail.push(snap.availability);
-      } else if (d >= olderCutoff && d < recentCutoff) {
+      } else if (d >= olderCutoffMs && d < recentCutoffMs) {
         if (snap.oee) e.older.push(snap.oee);
       }
     });
 
-    lineMap.forEach((v, lineId) => {
+    lineMap.forEach((v) => {
       // Declining OEE
       if (v.recent.length > 0 && v.older.length > 0) {
         const recentAvg = v.recent.reduce((a, b) => a + b, 0) / v.recent.length;
@@ -364,7 +378,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
     }
 
     return items.sort((a, b) => (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1));
-  }, [machineSnapshots, machines, machineToLine, paretoData, now, days, periodStart]);
+  }, [machineSnapshots, machines, machineToLine, paretoData, dates.nowMs, days, dates.periodStartMs]);
 
   return {
     summary,
