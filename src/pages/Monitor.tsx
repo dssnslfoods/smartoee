@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { MonitorMachineCard } from '@/components/monitor/MonitorMachineCard';
+import { MonitorControlSheet } from '@/components/monitor/MonitorControlSheet';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -32,6 +33,8 @@ export default function MonitorPage() {
   const { isFullscreen, isKiosk, toggleFullscreen, enterKiosk, enterFullscreen } = useFullscreen();
   const [selectedLine, setSelectedLine] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
+  const [controlSheetOpen, setControlSheetOpen] = useState(false);
 
   const companyId = company?.id;
 
@@ -153,10 +156,32 @@ export default function MonitorPage() {
       ) : (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
           {filteredMachines.map(machine => (
-            <MonitorMachineCard key={machine.id} machine={machine} />
+            <MonitorMachineCard
+              key={machine.id}
+              machine={machine}
+              onClick={() => {
+                setSelectedMachineId(machine.id);
+                setControlSheetOpen(true);
+              }}
+            />
           ))}
         </div>
       )}
+
+      {/* Control Sheet */}
+      {selectedMachineId && (() => {
+        const selectedMachine = data?.machines.find(m => m.id === selectedMachineId);
+        return (
+          <MonitorControlSheet
+            machineId={selectedMachineId}
+            machineName={selectedMachine?.name}
+            machineCode={selectedMachine?.code}
+            machineStatus={selectedMachine?.status}
+            open={controlSheetOpen}
+            onOpenChange={setControlSheetOpen}
+          />
+        );
+      })()}
     </div>
   );
 

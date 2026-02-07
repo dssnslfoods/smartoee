@@ -57,9 +57,10 @@ function formatElapsed(startTs: string): string {
 
 interface MonitorMachineCardProps {
   machine: MonitorMachine;
+  onClick?: () => void;
 }
 
-export function MonitorMachineCard({ machine }: MonitorMachineCardProps) {
+export function MonitorMachineCard({ machine, onClick }: MonitorMachineCardProps) {
   const config = statusConfig[machine.status];
   const StatusIcon = config.icon;
   const [elapsed, setElapsed] = useState(machine.startTs ? formatElapsed(machine.startTs) : '');
@@ -78,12 +79,16 @@ export function MonitorMachineCard({ machine }: MonitorMachineCardProps) {
   }, [machine.startTs]);
 
   return (
-    <Card className={cn(
-      'relative overflow-hidden border-l-4 transition-all',
-      config.borderClass,
-      config.glowClass,
-      machine.status === 'running' && 'hover:shadow-[0_0_30px_-5px_hsl(var(--status-running)/0.5)]',
-    )}>
+    <Card
+      className={cn(
+        'relative overflow-hidden border-l-4 transition-all cursor-pointer',
+        config.borderClass,
+        config.glowClass,
+        machine.status === 'running' && 'hover:shadow-[0_0_30px_-5px_hsl(var(--status-running)/0.5)]',
+        'hover:bg-muted/30 active:scale-[0.99]',
+      )}
+      onClick={onClick}
+    >
       <CardContent className="p-4 space-y-3">
         {/* Header: Name + Status */}
         <div className="flex items-start justify-between gap-2">
