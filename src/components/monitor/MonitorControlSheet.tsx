@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EventControls } from '@/components/shopfloor/EventControls';
 import { AddCountsForm } from '@/components/shopfloor/AddCountsForm';
 import { SKUSelector } from '@/components/shopfloor/SKUSelector';
+import { InlineStandardDialog } from '@/components/shopfloor/InlineStandardDialog';
 import { Activity, Package, Play, Pause, AlertTriangle, Wrench, Cpu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -57,6 +58,7 @@ export function MonitorControlSheet({
 
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('control');
+  const [standardDialogProduct, setStandardDialogProduct] = useState<Product | null>(null);
 
   // Fetch machine details
   const { data: machine } = useQuery({
@@ -275,7 +277,7 @@ export function MonitorControlSheet({
                   isLoading={false}
                   disabled={false}
                   canCreateStandard={canCreateStandard}
-                  onCreateStandard={() => {}}
+                  onCreateStandard={(product) => setStandardDialogProduct(product)}
                 />
               </CardContent>
             </Card>
@@ -343,6 +345,21 @@ export function MonitorControlSheet({
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Inline Standard Dialog for Admin/Supervisor */}
+        {machine && standardDialogProduct && companyId && (
+          <InlineStandardDialog
+            open={!!standardDialogProduct}
+            onOpenChange={(open) => { if (!open) setStandardDialogProduct(null); }}
+            machine={machine}
+            product={standardDialogProduct}
+            companyId={companyId}
+            onCreated={() => {
+              setStandardDialogProduct(null);
+              queryClient.invalidateQueries({ queryKey: ['machineStandards', machineId] });
+            }}
+          />
+        )}
       </SheetContent>
     </Sheet>
   );
