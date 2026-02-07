@@ -220,7 +220,13 @@ export function UserManager() {
     onSuccess: () => {
       toast.success('อัปเดตบัญชีสำเร็จ');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => {
+      if (error.message.includes('already') || error.message.includes('duplicate') || error.message.includes('unique')) {
+        toast.error('อีเมลนี้ถูกใช้งานแล้วในระบบ กรุณาใช้อีเมลอื่น');
+      } else {
+        toast.error(error.message);
+      }
+    },
   });
 
   // Delete user mutation
