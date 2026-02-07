@@ -1,0 +1,197 @@
+import { useState, useMemo } from 'react';
+import { cn } from '@/lib/utils';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { MonitorMachineCard } from '@/components/monitor/MonitorMachineCard';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/useAuth';
+import { useMonitorData } from '@/hooks/useMonitorData';
+import { useFullscreen } from '@/hooks/useFullscreen';
+import { FullscreenToggle, FullscreenContainer } from '@/components/ui/FullscreenToggle';
+import { useQuery } from '@tanstack/react-query';
+import { getLines } from '@/services/oeeApi';
+import {
+  Monitor as MonitorIcon,
+  Play,
+  Pause,
+  AlertTriangle,
+  Wrench,
+  Factory,
+  Building2,
+  Wifi,
+} from 'lucide-react';
+
+type StatusFilter = 'all' | 'running' | 'idle' | 'stopped' | 'maintenance';
+
+export default function MonitorPage() {
+  const { company, isAdmin } = useAuth();
+  const { data, isLoading } = useMonitorData();
+  const { isFullscreen, isKiosk, toggleFullscreen, enterKiosk, enterFullscreen } = useFullscreen();
+  const [selectedLine, setSelectedLine] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+
+  const companyId = company?.id;
+
+  const { data: lines } = useQuery({
+    queryKey: ['lines', companyId],
+    queryFn: () => getLines(undefined, companyId),
+    enabled: !!companyId || !isAdmin(),
+  });
+
+  // Filter machines
+  const filteredMachines = useMemo(() => {
+    if (!data?.machines) return [];
+    let result = data.machines;
+    if (selectedLine !== 'all') {
+      result = result.filter(m => m.line_id === selectedLine);
+    }
+    if (statusFilter !== 'all') {
+      result = result.filter(m => m.status === statusFilter);
+    }
+    return result;
+  }, [data?.machines, selectedLine, statusFilter]);
+
+  // Calculate filtered stats
+  const filteredStats = useMemo(() => {
+    const stats = { running: 0, idle: 0, stopped: 0, maintenance: 0, total: 0 };
+    for (const m of filteredMachines) {
+      stats[m.status]++;
+      stats.total++;
+    }
+    return stats;
+  }, [filteredMachines]);
+
+  const stats = filteredStats;
+
+  const content = (
+    <div className="page-container space-y-5">
+      {/* Header */}
+      <PageHeader
+        title="Production Monitor"
+        description="สถานะเครื่องจักรแบบ Real-time"
+        icon={MonitorIcon}
+      >
+        {!isKiosk && (
+          <FullscreenToggle
+            isFullscreen={isFullscreen}
+            isKiosk={isKiosk}
+            onToggle={toggleFullscreen}
+            onEnterKiosk={enterKiosk}
+            onEnterFullscreen={enterFullscreen}
+          />
+        )}
+
+        {/* Realtime indicator */}
+        <Badge variant="outline" className="gap-1.5 px-2.5 py-1 text-xs font-medium border-status-running/30 text-status-running bg-status-running/5">
+          <Wifi className="h-3 w-3 animate-pulse" />
+          Live
+        </Badge>
+
+        {!isKiosk && isAdmin() && company && (
+          <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary/5 border-primary/20">
+            <Building2 className="h-3.5 w-3.5" />
+            {company.name}
+          </Badge>
+        )}
+
+        {!isKiosk && (
+          <>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+              <SelectTrigger className="w-[140px] bg-background border-border/50">
+                <SelectValue placeholder="สถานะ" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกสถานะ</SelectItem>
+                <SelectItem value="running">🟢 Running</SelectItem>
+                <SelectItem value="stopped">🔴 Stopped</SelectItem>
+                <SelectItem value="maintenance">🟡 Setup</SelectItem>
+                <SelectItem value="idle">⚪ Idle</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedLine} onValueChange={setSelectedLine}>
+              <SelectTrigger className="w-[160px] bg-background border-border/50">
+                <Factory className="mr-2 h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder="เลือกไลน์" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกไลน์</SelectItem>
+                {lines?.map(line => (
+                  <SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
+      </PageHeader>
+
+      {/* Quick Stats Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatPill icon={Play} label="Running" count={stats.running} colorClass="text-status-running" bgClass="bg-status-running/10" />
+        <StatPill icon={AlertTriangle} label="Stopped" count={stats.stopped} colorClass="text-status-stopped" bgClass="bg-status-stopped/10" />
+        <StatPill icon={Wrench} label="Setup" count={stats.maintenance} colorClass="text-status-maintenance" bgClass="bg-status-maintenance/10" />
+        <StatPill icon={Pause} label="Idle" count={stats.idle} colorClass="text-status-idle" bgClass="bg-status-idle/10" />
+      </div>
+
+      {/* Machine Grid */}
+      {isLoading ? (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-40 rounded-lg" />
+          ))}
+        </div>
+      ) : filteredMachines.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <MonitorIcon className="h-10 w-10 mx-auto mb-3 opacity-50" />
+            <p>ไม่พบเครื่องจักร{statusFilter !== 'all' ? ` ในสถานะ ${statusFilter}` : ''}</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+          {filteredMachines.map(machine => (
+            <MonitorMachineCard key={machine.id} machine={machine} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  if (isFullscreen || isKiosk) {
+    return (
+      <FullscreenContainer isFullscreen={isFullscreen} isKiosk={isKiosk}>
+        {content}
+      </FullscreenContainer>
+    );
+  }
+
+  return <AppLayout>{content}</AppLayout>;
+}
+
+// Small stat pill component
+function StatPill({
+  icon: Icon,
+  label,
+  count,
+  colorClass,
+  bgClass,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  count: number;
+  colorClass: string;
+  bgClass: string;
+}) {
+  return (
+    <div className={cn('flex items-center gap-3 rounded-lg border px-4 py-3', bgClass, 'border-transparent')}>
+      <Icon className={cn('h-5 w-5', colorClass)} />
+      <div>
+        <p className={cn('text-2xl font-bold tabular-nums', colorClass)}>{count}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  );
+}

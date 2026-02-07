@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ScrollText,
+  Monitor,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,11 @@ const navItems: NavItem[] = [
     title: "Shopfloor",
     href: "/shopfloor",
     icon: Factory,
+  },
+  {
+    title: "Monitor",
+    href: "/monitor",
+    icon: Monitor,
   },
   {
     title: "Supervisor",

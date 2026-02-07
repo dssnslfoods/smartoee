@@ -13,6 +13,7 @@ import Executive from "./pages/Executive";
 import Admin from "./pages/Admin";
 import ActivityLog from "./pages/ActivityLog";
 import RecentActivity from "./pages/RecentActivity";
+import Monitor from "./pages/Monitor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/admin" element={<Admin />} />
             <Route path="/activity-log" element={<ActivityLog />} />
             <Route path="/recent-activity" element={<RecentActivity />} />
+            <Route path="/monitor" element={<Monitor />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
