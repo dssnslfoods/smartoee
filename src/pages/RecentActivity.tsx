@@ -14,9 +14,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Navigate } from 'react-router-dom';
-import { EntityTypeChips, matchesChipFilter } from '@/components/recent-activity/EntityTypeChips';
 import { EditEventDialog } from '@/components/recent-activity/EditEventDialog';
-import { EditCountDialog } from '@/components/recent-activity/EditCountDialog';
 import { DeleteActivityDialog } from '@/components/recent-activity/DeleteActivityDialog';
 import { ActivitySessionCard } from '@/components/recent-activity/ActivitySessionCard';
 import { groupActivitiesIntoSessions } from '@/components/recent-activity/groupActivities';
@@ -39,22 +37,7 @@ interface LookupData {
   reasons: Map<string, { name: string; category: string }>;
 }
 
-const ENTITY_TYPE_LABELS: Record<string, string> = {
-  production_events: 'เหตุการณ์การผลิต',
-  production_counts: 'บันทึกจำนวนผลิต',
-  shift_approvals: 'อนุมัติกะ',
-  oee_snapshots: 'OEE Snapshot',
-  machines: 'เครื่องจักร',
-  lines: 'ไลน์',
-  plants: 'โรงงาน',
-  products: 'สินค้า',
-  production_standards: 'มาตรฐานการผลิต',
-  shifts: 'กะการทำงาน',
-  downtime_reasons: 'สาเหตุหยุดเครื่อง',
-  defect_reasons: 'สาเหตุของเสีย',
-};
-
-const EDITABLE_TYPES = new Set(['production_events', 'production_counts']);
+const EDITABLE_TYPES = new Set(['production_events']);
 
 function canEditLog(
   log: AuditLog,
@@ -64,7 +47,6 @@ function canEditLog(
 ): boolean {
   if (!EDITABLE_TYPES.has(log.entity_type)) return false;
   if (log.action === 'DELETE') return false;
-  // Entity was deleted after this audit log entry — cannot edit
   if (deletedEntityIds.has(log.entity_id)) return false;
   if (role === 'ADMIN' || role === 'SUPERVISOR') return true;
   return log.actor_user_id === userId;
@@ -72,12 +54,10 @@ function canEditLog(
 
 export default function RecentActivity() {
   const { user, profile, company, isLoading: authLoading } = useAuth();
-  const [chipFilter, setChipFilter] = useState<string>('all');
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const [editingEvent, setEditingEvent] = useState<AuditLog | null>(null);
-  const [editingCount, setEditingCount] = useState<AuditLog | null>(null);
   const [deletingLog, setDeletingLog] = useState<AuditLog | null>(null);
 
   const isStaff = profile?.role === 'STAFF';
@@ -133,6 +113,7 @@ export default function RecentActivity() {
       let query = supabase
         .from('v_audit_logs_readable')
         .select('*')
+        .eq('entity_type', 'production_events')
         .order('ts', { ascending: false })
         .limit(300);
 
@@ -147,37 +128,33 @@ export default function RecentActivity() {
     enabled: !!profile,
   });
 
-  // Apply chip filter + search
+  // Apply search
   const filteredLogs = useMemo(() => {
-    let result = logs.filter((log) =>
-      matchesChipFilter(chipFilter, log.entity_type, log.after_json, log.before_json)
-    );
+    if (!searchQuery.trim()) return logs;
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter((log) => {
-        if (log.actor_name?.toLowerCase().includes(q)) return true;
-        if ((ENTITY_TYPE_LABELS[log.entity_type] || log.entity_type).toLowerCase().includes(q)) return true;
-        const data = log.after_json || log.before_json;
-        if (data) {
-          const machineId = data.machine_id as string;
-          const productId = data.product_id as string;
-          const machine = machineId ? lookup.machines.get(machineId) : null;
-          const product = productId ? lookup.products.get(productId) : null;
-          if (machine && (machine.name.toLowerCase().includes(q) || machine.code.toLowerCase().includes(q))) return true;
-          if (product && (product.name.toLowerCase().includes(q) || product.code.toLowerCase().includes(q))) return true;
-        }
-        return false;
-      });
-    }
-    return result;
-  }, [logs, chipFilter, searchQuery, lookup]);
+    const q = searchQuery.toLowerCase();
+    return logs.filter((log) => {
+      if (log.actor_name?.toLowerCase().includes(q)) return true;
+      const data = log.after_json || log.before_json;
+      if (data) {
+        const machineId = data.machine_id as string;
+        const productId = data.product_id as string;
+        const machine = machineId ? lookup.machines.get(machineId) : null;
+        const product = productId ? lookup.products.get(productId) : null;
+        if (machine && (machine.name.toLowerCase().includes(q) || machine.code.toLowerCase().includes(q))) return true;
+        if (product && (product.name.toLowerCase().includes(q) || product.code.toLowerCase().includes(q))) return true;
+        const eventType = (data.event_type as string)?.toLowerCase();
+        if (eventType && eventType.includes(q)) return true;
+      }
+      return false;
+    });
+  }, [logs, searchQuery, lookup]);
 
-  // Build set of entity IDs that have been deleted (to hide edit buttons)
+  // Build set of entity IDs that have been deleted
   const deletedEntityIds = useMemo(() => {
     const deleted = new Set<string>();
     for (const log of logs) {
-      if (log.action === 'DELETE' && EDITABLE_TYPES.has(log.entity_type)) {
+      if (log.action === 'DELETE') {
         deleted.add(log.entity_id);
       }
     }
@@ -202,8 +179,6 @@ export default function RecentActivity() {
   const handleEdit = (log: AuditLog) => {
     if (log.entity_type === 'production_events') {
       setEditingEvent(log);
-    } else if (log.entity_type === 'production_counts') {
-      setEditingCount(log);
     }
   };
 
@@ -217,15 +192,6 @@ export default function RecentActivity() {
       event_type: (data?.event_type as string) || 'RUN',
       start_ts: (data?.start_ts as string) || '',
       end_ts: (data?.end_ts as string) || null,
-      notes: (data?.notes as string) || null,
-    };
-  };
-
-  const getEditCountData = (log: AuditLog) => {
-    const data = log.after_json || log.before_json;
-    return {
-      good_qty: (data?.good_qty as number) ?? 0,
-      reject_qty: (data?.reject_qty as number) ?? 0,
       notes: (data?.notes as string) || null,
     };
   };
@@ -256,10 +222,12 @@ export default function RecentActivity() {
             <div>
               <h1 className="text-2xl font-bold flex items-center gap-2">
                 <ScrollText className="h-6 w-6" />
-                Recent Activity
+                เหตุการณ์การผลิต
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                {isStaff ? 'ตรวจสอบสิ่งที่คุณบันทึกล่าสุด' : 'ตรวจสอบกิจกรรมล่าสุดของทุกคน'}
+                {isStaff
+                  ? 'ตรวจสอบเหตุการณ์การผลิตของคุณก่อน Supervisor อนุมัติกะ'
+                  : 'ตรวจสอบเหตุการณ์การผลิตทั้งหมดก่อนอนุมัติกะ'}
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
@@ -268,10 +236,7 @@ export default function RecentActivity() {
             </Button>
           </div>
 
-          {/* Toggle Chips Filter */}
-          <EntityTypeChips selected={chipFilter} onSelect={setChipFilter} />
-
-          {/* Secondary filters */}
+          {/* Filters */}
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Action</Label>
@@ -305,7 +270,7 @@ export default function RecentActivity() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center justify-between">
                 <span className="flex items-center gap-2">
-                  กิจกรรมล่าสุด
+                  เหตุการณ์การผลิตล่าสุด
                   <Badge variant="secondary" className="text-xs">{filteredLogs.length} รายการ</Badge>
                   {sessions.length !== filteredLogs.length && (
                     <Badge variant="outline" className="text-xs gap-1">
@@ -322,7 +287,7 @@ export default function RecentActivity() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[calc(100vh-400px)] min-h-[300px]">
+              <ScrollArea className="h-[calc(100vh-340px)] min-h-[300px]">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -330,7 +295,7 @@ export default function RecentActivity() {
                 ) : filteredLogs.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                     <ScrollText className="h-12 w-12 mb-4 opacity-50" />
-                    <p>ไม่พบกิจกรรมล่าสุด</p>
+                    <p>ไม่พบเหตุการณ์การผลิต</p>
                   </div>
                 ) : (
                   <div className="space-y-5 pr-3">
@@ -378,17 +343,6 @@ export default function RecentActivity() {
         />
       )}
 
-      {/* Edit Count Dialog */}
-      {editingCount && (
-        <EditCountDialog
-          open={!!editingCount}
-          onOpenChange={(open) => !open && setEditingCount(null)}
-          entityId={editingCount.entity_id}
-          initialData={getEditCountData(editingCount)}
-          machineName={getMachineName(editingCount)}
-        />
-      )}
-
       {/* Delete Dialog */}
       {deletingLog && (
         <DeleteActivityDialog
@@ -396,7 +350,7 @@ export default function RecentActivity() {
           onOpenChange={(open) => !open && setDeletingLog(null)}
           entityType={deletingLog.entity_type}
           entityId={deletingLog.entity_id}
-          description={`คุณต้องการลบรายการ "${ENTITY_TYPE_LABELS[deletingLog.entity_type] || deletingLog.entity_type}" นี้ใช่หรือไม่?`}
+          description="คุณต้องการลบเหตุการณ์การผลิตนี้ใช่หรือไม่?"
         />
       )}
     </div>
