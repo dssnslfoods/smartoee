@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo, useEffect } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Play, Pause, Wrench, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ interface EditEventDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   entityId: string;
+  /** Fallback data from audit log — used only while fetching real data */
   initialData: {
     event_type: string;
     start_ts: string;
@@ -49,20 +50,72 @@ const EVENT_OPTIONS = [
 export function EditEventDialog({ open, onOpenChange, entityId, initialData, machineName }: EditEventDialogProps) {
   const queryClient = useQueryClient();
 
-  // Convert UTC timestamps to local timezone for display
-  const origStartLocal = useMemo(() => initialData.start_ts ? toLocalDatetimeString(initialData.start_ts) : '', [initialData.start_ts]);
-  const origEndLocal = useMemo(() => initialData.end_ts ? toLocalDatetimeString(initialData.end_ts) : '', [initialData.end_ts]);
+  // Fetch REAL current data from production_events (not stale audit log data)
+  const { data: liveEvent, isLoading: isLoadingEvent, error: fetchError } = useQuery({
+    queryKey: ['editEvent', entityId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('production_events')
+        .select('event_type, start_ts, end_ts, notes')
+        .eq('id', entityId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: open && !!entityId,
+    staleTime: 0,
+  });
 
-  const [eventType, setEventType] = useState(initialData.event_type);
+  // Use live data when available, otherwise fall back to audit log data
+  const resolvedData = useMemo(() => {
+    if (liveEvent) {
+      return {
+        event_type: liveEvent.event_type,
+        start_ts: liveEvent.start_ts,
+        end_ts: liveEvent.end_ts,
+        notes: liveEvent.notes,
+      };
+    }
+    return initialData;
+  }, [liveEvent, initialData]);
+
+  // Convert UTC timestamps to local timezone for display
+  const origStartLocal = useMemo(() => resolvedData.start_ts ? toLocalDatetimeString(resolvedData.start_ts) : '', [resolvedData.start_ts]);
+  const origEndLocal = useMemo(() => resolvedData.end_ts ? toLocalDatetimeString(resolvedData.end_ts) : '', [resolvedData.end_ts]);
+
+  const [eventType, setEventType] = useState(resolvedData.event_type);
   const [startTs, setStartTs] = useState(origStartLocal);
   const [endTs, setEndTs] = useState(origEndLocal);
-  const [notes, setNotes] = useState(initialData.notes || '');
+  const [notes, setNotes] = useState(resolvedData.notes || '');
   const [showCascadeConfirm, setShowCascadeConfirm] = useState(false);
+  const [formReady, setFormReady] = useState(false);
+
+  // Reset form fields when live data is loaded
+  useEffect(() => {
+    if (liveEvent) {
+      const startLocal = liveEvent.start_ts ? toLocalDatetimeString(liveEvent.start_ts) : '';
+      const endLocal = liveEvent.end_ts ? toLocalDatetimeString(liveEvent.end_ts) : '';
+      setEventType(liveEvent.event_type);
+      setStartTs(startLocal);
+      setEndTs(endLocal);
+      setNotes(liveEvent.notes || '');
+      setFormReady(true);
+    }
+  }, [liveEvent]);
+
+  // Handle event not found in DB
+  useEffect(() => {
+    if (!isLoadingEvent && !liveEvent && open && !fetchError) {
+      toast.error('ไม่พบเหตุการณ์นี้ — อาจถูกลบหรือถูกแทนที่ไปแล้ว');
+      onOpenChange(false);
+    }
+  }, [isLoadingEvent, liveEvent, open, fetchError, onOpenChange]);
 
   // Detect if time fields have changed (comparing local timezone strings)
   const hasTimeChanged = useMemo(() => {
+    if (!formReady) return false;
     return startTs !== origStartLocal || endTs !== origEndLocal;
-  }, [startTs, endTs, origStartLocal, origEndLocal]);
+  }, [startTs, endTs, origStartLocal, origEndLocal, formReady]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -81,6 +134,8 @@ export function EditEventDialog({ open, onOpenChange, entityId, initialData, mac
           ? 'SHIFT_LOCKED'
           : result?.error === 'NOT_FOUND'
           ? 'NOT_FOUND'
+          : result?.error === 'OVERLAP_EVENT'
+          ? 'OVERLAP_EVENT'
           : result?.message || 'Unknown error');
       }
       return result;
@@ -126,6 +181,8 @@ export function EditEventDialog({ open, onOpenChange, entityId, initialData, mac
     mutation.mutate();
   };
 
+  const isFormLoading = isLoadingEvent || !formReady;
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -136,69 +193,79 @@ export function EditEventDialog({ open, onOpenChange, entityId, initialData, mac
               {machineName && `เครื่อง: ${machineName}`}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>ประเภทเหตุการณ์</Label>
-              <Select value={eventType} onValueChange={setEventType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {EVENT_OPTIONS.map((opt) => {
-                    const Icon = opt.icon;
-                    return (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        <span className="flex items-center gap-2">
-                          <Icon className={`h-4 w-4 ${opt.color}`} />
-                          {opt.label}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+
+          {isFormLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">กำลังโหลดข้อมูล...</span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>เวลาเริ่ม</Label>
-                <Input
-                  type="datetime-local"
-                  value={startTs}
-                  onChange={(e) => setStartTs(e.target.value)}
-                />
+          ) : (
+            <>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>ประเภทเหตุการณ์</Label>
+                  <Select value={eventType} onValueChange={setEventType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EVENT_OPTIONS.map((opt) => {
+                        const Icon = opt.icon;
+                        return (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            <span className="flex items-center gap-2">
+                              <Icon className={`h-4 w-4 ${opt.color}`} />
+                              {opt.label}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>เวลาเริ่ม</Label>
+                    <Input
+                      type="datetime-local"
+                      value={startTs}
+                      onChange={(e) => setStartTs(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>เวลาสิ้นสุด</Label>
+                    <Input
+                      type="datetime-local"
+                      value={endTs}
+                      onChange={(e) => setEndTs(e.target.value)}
+                    />
+                  </div>
+                </div>
+                {hasTimeChanged && (
+                  <div className="flex items-start gap-2 rounded-md border border-warning/50 bg-warning/10 p-3 text-sm text-warning">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span>การเปลี่ยนเวลาจะปรับเวลาของ event ที่อยู่ติดกันให้ต่อเนื่องโดยอัตโนมัติ</span>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label>หมายเหตุ</Label>
+                  <Textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="หมายเหตุ (ไม่จำเป็น)"
+                    rows={2}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>เวลาสิ้นสุด</Label>
-                <Input
-                  type="datetime-local"
-                  value={endTs}
-                  onChange={(e) => setEndTs(e.target.value)}
-                />
-              </div>
-            </div>
-            {hasTimeChanged && (
-              <div className="flex items-start gap-2 rounded-md border border-warning/50 bg-warning/10 p-3 text-sm text-warning">
-                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                <span>การเปลี่ยนเวลาจะปรับเวลาของ event ที่อยู่ติดกันให้ต่อเนื่องโดยอัตโนมัติ</span>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label>หมายเหตุ</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="หมายเหตุ (ไม่จำเป็น)"
-                rows={2}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
-            <Button onClick={handleSave} disabled={mutation.isPending}>
-              {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              บันทึก
-            </Button>
-          </DialogFooter>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
+                <Button onClick={handleSave} disabled={mutation.isPending}>
+                  {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  บันทึก
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
