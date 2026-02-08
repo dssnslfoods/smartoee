@@ -21,6 +21,7 @@ export default function RecentActivity() {
   const { user, profile, company, isLoading: authLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<string>('today');
+  const [machineFilter, setMachineFilter] = useState<string>('all');
   const [deletingEvent, setDeletingEvent] = useState<TimelineEvent | null>(null);
 
   const isStaff = profile?.role === 'STAFF';
@@ -99,22 +100,44 @@ export default function RecentActivity() {
     enabled: !!profile,
   });
 
-  // Search filter
+  // Unique machines for filter dropdown
+  const machineOptions = useMemo(() => {
+    const seen = new Map<string, { name: string; code: string }>();
+    for (const e of events) {
+      if (e.machine && !seen.has(e.machine_id)) {
+        seen.set(e.machine_id, e.machine);
+      }
+    }
+    return [...seen.entries()].sort((a, b) => a[1].name.localeCompare(b[1].name));
+  }, [events]);
+
+  // Machine + search filter
   const filteredEvents = useMemo(() => {
-    if (!searchQuery.trim()) return events;
-    const q = searchQuery.toLowerCase();
-    return events.filter((e) => {
-      if (e.machine?.name.toLowerCase().includes(q)) return true;
-      if (e.machine?.code.toLowerCase().includes(q)) return true;
-      if (e.product?.name.toLowerCase().includes(q)) return true;
-      if (e.product?.code.toLowerCase().includes(q)) return true;
-      if (e.reason?.name.toLowerCase().includes(q)) return true;
-      if (e.event_type.toLowerCase().includes(q)) return true;
-      if (e.creator?.full_name.toLowerCase().includes(q)) return true;
-      if (e.notes?.toLowerCase().includes(q)) return true;
-      return false;
-    });
-  }, [events, searchQuery]);
+    let result = events;
+
+    // Machine filter
+    if (machineFilter !== 'all') {
+      result = result.filter((e) => e.machine_id === machineFilter);
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((e) => {
+        if (e.machine?.name.toLowerCase().includes(q)) return true;
+        if (e.machine?.code.toLowerCase().includes(q)) return true;
+        if (e.product?.name.toLowerCase().includes(q)) return true;
+        if (e.product?.code.toLowerCase().includes(q)) return true;
+        if (e.reason?.name.toLowerCase().includes(q)) return true;
+        if (e.event_type.toLowerCase().includes(q)) return true;
+        if (e.creator?.full_name.toLowerCase().includes(q)) return true;
+        if (e.notes?.toLowerCase().includes(q)) return true;
+        return false;
+      });
+    }
+
+    return result;
+  }, [events, machineFilter, searchQuery]);
 
   // Group by machine
   const groupedByMachine = useMemo(() => {
@@ -206,6 +229,24 @@ export default function RecentActivity() {
                   if (e.target.value) setDateFilter(e.target.value);
                 }}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1">
+                <Cpu className="h-3 w-3" /> เครื่องจักร
+              </Label>
+              <Select value={machineFilter} onValueChange={setMachineFilter}>
+                <SelectTrigger className="w-44 h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทุกเครื่อง ({machineOptions.length})</SelectItem>
+                  {machineOptions.map(([id, m]) => (
+                    <SelectItem key={id} value={id}>
+                      {m.name} ({m.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5 flex-1 min-w-[160px]">
               <Label className="text-xs flex items-center gap-1">
