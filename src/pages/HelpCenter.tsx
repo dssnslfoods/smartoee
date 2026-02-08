@@ -528,7 +528,7 @@ export default function HelpCenter() {
     <div class="subtitle">คู่มือการใช้งานระบบ</div>
     <div class="meta">
       วันที่พิมพ์: ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}<br/>
-      จำนวน ${helpSections.reduce((s, sec) => s + sec.items.length, 0)} คำถาม ใน ${helpSections.length} หมวด
+     © 2026 PNF OEE System. Designed and Developed by Arnon Arpaket. All rights reserved.
     </div>
   </div>
 
@@ -545,7 +545,7 @@ export default function HelpCenter() {
   ${sectionsHTML}
 
   <div class="footer-note">
-    PNF OEE System — Manual v1.0 — 
+    PNF OEE System — Help Center Manual — สร้างอัตโนมัติจากระบบ
   </div>
 </body>
 </html>`);
