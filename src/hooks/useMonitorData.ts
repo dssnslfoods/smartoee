@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { getPermittedMachineIds } from '@/services/oeeApi';
 
 export interface MonitorMachine {
   id: string;
@@ -117,15 +118,40 @@ async function fetchMonitorData(companyId?: string): Promise<{ machines: Monitor
 }
 
 export function useMonitorData() {
-  const { company } = useAuth();
+  const { company, hasRole, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const companyId = company?.id;
+  const isStaff = hasRole('STAFF') && !isAdmin() && !hasRole('SUPERVISOR');
 
   const query = useQuery({
     queryKey: ['monitor-machines', companyId],
     queryFn: () => fetchMonitorData(companyId),
     refetchInterval: 15000, // Fallback polling every 15s
   });
+
+  // Fetch permitted machine IDs for STAFF
+  const { data: permittedIds } = useQuery({
+    queryKey: ['permittedMachineIds'],
+    queryFn: () => getPermittedMachineIds(),
+    enabled: isStaff,
+  });
+
+  // Filter machines for STAFF role
+  const filteredData = useMemo(() => {
+    if (!query.data) return query.data;
+    if (!isStaff || !permittedIds) return query.data;
+
+    const idSet = new Set(permittedIds);
+    const machines = query.data.machines.filter(m => idSet.has(m.id));
+
+    // Recalculate stats for filtered machines
+    const stats: MonitorStats = { running: 0, idle: 0, stopped: 0, maintenance: 0, total: machines.length };
+    for (const m of machines) {
+      stats[m.status]++;
+    }
+
+    return { machines, stats };
+  }, [query.data, isStaff, permittedIds]);
 
   // Realtime subscription for instant updates
   useEffect(() => {
@@ -139,7 +165,6 @@ export function useMonitorData() {
           table: 'production_events',
         },
         () => {
-          // Refetch on any production event change
           queryClient.invalidateQueries({ queryKey: ['monitor-machines'] });
         }
       )
@@ -150,5 +175,8 @@ export function useMonitorData() {
     };
   }, [queryClient]);
 
-  return query;
+  return {
+    ...query,
+    data: filteredData,
+  };
 }
