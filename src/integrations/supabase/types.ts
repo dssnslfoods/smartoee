@@ -1242,6 +1242,16 @@ export type Database = {
         Args: { p_machine_id: string; p_notes?: string }
         Returns: Json
       }
+      rpc_update_event: {
+        Args: {
+          p_end_ts?: string
+          p_event_id: string
+          p_event_type: Database["public"]["Enums"]["event_type"]
+          p_notes?: string
+          p_start_ts: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "STAFF" | "SUPERVISOR" | "EXECUTIVE" | "ADMIN"
