@@ -77,6 +77,7 @@ const navItems: NavItem[] = [
     title: "Help Center",
     href: "/help",
     icon: HelpCircle,
+    roles: ["ADMIN", "EXECUTIVE", "SUPERVISOR"],
   },
 ];
 
