@@ -128,7 +128,7 @@ const helpSections: HelpSection[] = [
     items: [
       {
         q: 'Dashboard แสดงอะไรบ้าง?',
-        a: 'Dashboard แสดง: (1) OEE Gauge รวม (World Class ≥85%, Acceptable 60-84%, Needs Improvement <60%) (2) Gauge แยก A/P/Q (3) สรุปสถานะเครื่องจักร (Running/Idle/Stopped/Maintenance) (4) กราฟ OEE Trend (5) Grid เครื่องจักรทั้งหมด',
+        a: 'Dashboard แสดง: (1) OEE Gauge รวม (World Class ≥85%, Acceptable 60-84%, Needs Improvement <60%) (2) Gauge แยก A/P/Q (3) สรุปสถานะเครื่องจักร (Running/Idle/Stopped/Maintenance) (4) กราฟ OEE Trend (5) Grid เครื่องจักรทั้งหมด พร้อมตัวกรองโรงงาน (Plant) และสายการผลิต (Line) แบบ Cascading',
       },
       {
         q: 'วิธีดูรายละเอียดเครื่องจักร',
@@ -193,8 +193,8 @@ const helpSections: HelpSection[] = [
         a: 'หน้า Monitor แสดงสถานะเครื่องจักรทั้งหมดแบบ Real-time เหมาะสำหรับแสดงบน TV หรือจอขนาดใหญ่ในโรงงาน มีไฟ Live สีเขียวกะพริบแสดงว่าข้อมูลอัปเดตอัตโนมัติ',
       },
       {
-        q: 'สามารถกรองสถานะเครื่องจักรได้หรือไม่?',
-        a: 'ได้ สามารถกรองตาม: สถานะ (Running/Stopped/Setup/Idle) และ สายการผลิต (Line) ตัวกรองจะซ่อนเมื่ออยู่ใน Kiosk Mode',
+        q: 'สามารถกรองเครื่องจักรได้หรือไม่?',
+        a: 'ได้ สามารถกรองตาม: โรงงาน (Plant), สายการผลิต (Line) แบบ Cascading (เลือก Plant แล้ว Line จะแสดงเฉพาะใน Plant นั้น) และ สถานะ (Running/Stopped/Setup/Idle) ตัวกรองจะซ่อนเมื่ออยู่ใน Kiosk Mode',
       },
     ],
   },

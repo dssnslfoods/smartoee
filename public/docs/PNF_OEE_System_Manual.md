@@ -390,7 +390,8 @@ Displays all machines as cards showing:
 ### 3.3.5 Filters
 
 - **Time Period** (Supervisor, Executive, Admin only): Select from Today, Yesterday, 7 days, 14 days, 30 days, or 60 days.
-- **Line Filter:** Filter machines by production line.
+- **Plant Filter:** Filter machines by plant (factory). When a plant is selected, the Line filter automatically shows only lines within that plant.
+- **Line Filter:** Filter machines by production line. Options are cascaded based on the selected plant.
 
 ### 3.3.6 Fullscreen and Kiosk Modes
 
@@ -517,7 +518,7 @@ This tab displays cards for all machines you have permission to operate, showing
 - **Status summary bar:** Shows counts of Running, Stopped, Setup, and Idle machines.
 - **Machine grid:** Cards for each machine showing status, current event, and OEE.
 - **Live indicator:** A pulsing "Live" badge confirms real-time data updates.
-- **Filters:** Filter by status or production line.
+- **Filters:** Filter by plant (factory), production line (cascading from plant selection), and status.
 - **Fullscreen/Kiosk modes:** Same as Dashboard for TV display.
 
 **Interaction:** Click any machine card to open a control sheet showing event details and production information.
