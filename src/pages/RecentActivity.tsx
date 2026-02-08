@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Navigate } from 'react-router-dom';
-import { EditEventDialog } from '@/components/recent-activity/EditEventDialog';
 import { DeleteActivityDialog } from '@/components/recent-activity/DeleteActivityDialog';
 import { ActivitySessionCard } from '@/components/recent-activity/ActivitySessionCard';
 import { groupActivitiesIntoSessions } from '@/components/recent-activity/groupActivities';
@@ -58,7 +57,6 @@ export default function RecentActivity() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<string>('today');
 
-  const [editingEvent, setEditingEvent] = useState<AuditLog | null>(null);
   const [deletingLog, setDeletingLog] = useState<AuditLog | null>(null);
 
   const isStaff = profile?.role === 'STAFF';
@@ -202,31 +200,8 @@ export default function RecentActivity() {
     return groups;
   }, [sessions]);
 
-  // Handlers
-  const handleEdit = (log: AuditLog) => {
-    if (log.entity_type === 'production_events') {
-      setEditingEvent(log);
-    }
-  };
-
   const handleDelete = (log: AuditLog) => {
     setDeletingLog(log);
-  };
-
-  const getEditEventData = (log: AuditLog) => {
-    const data = log.after_json || log.before_json;
-    return {
-      event_type: (data?.event_type as string) || 'RUN',
-      start_ts: (data?.start_ts as string) || '',
-      end_ts: (data?.end_ts as string) || null,
-      notes: (data?.notes as string) || null,
-    };
-  };
-
-  const getMachineName = (log: AuditLog) => {
-    const data = log.after_json || log.before_json;
-    const machineId = data?.machine_id as string;
-    return machineId ? lookup.machines.get(machineId)?.name : undefined;
   };
 
   if (authLoading) {
@@ -371,7 +346,6 @@ export default function RecentActivity() {
                               showActor={showActor}
                               lookup={lookup}
                               canEditFn={(log) => canEditLog(log, profile?.user_id, profile?.role, deletedEntityIds)}
-                              onEdit={handleEdit}
                               onDelete={handleDelete}
                             />
                           ))}
@@ -385,17 +359,6 @@ export default function RecentActivity() {
           </Card>
         </div>
       </main>
-
-      {/* Edit Event Dialog */}
-      {editingEvent && (
-        <EditEventDialog
-          open={!!editingEvent}
-          onOpenChange={(open) => !open && setEditingEvent(null)}
-          entityId={editingEvent.entity_id}
-          initialData={getEditEventData(editingEvent)}
-          machineName={getMachineName(editingEvent)}
-        />
-      )}
 
       {/* Delete Dialog */}
       {deletingLog && (
