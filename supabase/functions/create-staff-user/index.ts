@@ -86,8 +86,16 @@ Deno.serve(async (req) => {
       targetRole = role || "STAFF";
       targetCompanyId = companyId || profile.company_id;
     } else {
-      // Supervisor can only create STAFF in their company
-      targetRole = "STAFF";
+      // Supervisor can create STAFF or SUPERVISOR in their company
+      const allowedRoles = ["STAFF", "SUPERVISOR"];
+      const requestedRole = role || "STAFF";
+      if (!allowedRoles.includes(requestedRole)) {
+        return new Response(
+          JSON.stringify({ success: false, error: "PERMISSION_DENIED", message: "Supervisors can only create STAFF or SUPERVISOR users" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      targetRole = requestedRole;
       targetCompanyId = profile.company_id;
     }
 
