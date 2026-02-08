@@ -219,18 +219,18 @@ function SessionLogEntry({
           </div>
 
           {/* Row 2: Inline time inputs */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-muted-foreground w-8">เริ่ม</span>
+          <div className="flex items-center gap-3 flex-wrap bg-muted/40 rounded-lg px-3 py-2 border border-border/50">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-medium min-w-[2.5rem]">เริ่ม</span>
               <InlineTimeInput
                 value={editStartTime}
                 onChange={setEditStartTime}
                 disabled={!editable || mutation.isPending}
               />
             </div>
-            <span className="text-muted-foreground text-sm">→</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-muted-foreground w-12">สิ้นสุด</span>
+            <span className="text-muted-foreground font-bold">→</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-medium min-w-[3rem]">สิ้นสุด</span>
               {origEndLocal ? (
                 <InlineTimeInput
                   value={editEndTime}
@@ -248,6 +248,12 @@ function SessionLogEntry({
                 <Clock className="h-2.5 w-2.5" />
                 {formatDuration(editedDuration)}
               </Badge>
+            )}
+
+            {editable && !hasChanged && (
+              <span className="text-[10px] text-muted-foreground italic ml-auto hidden sm:inline">
+                คลิกที่ตัวเลขเพื่อแก้ไข
+              </span>
             )}
           </div>
 
