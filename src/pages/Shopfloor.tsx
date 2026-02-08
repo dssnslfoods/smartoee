@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PlantLineSelector } from '@/components/shopfloor/PlantLineSelector';
 import { MachineSelector } from '@/components/shopfloor/MachineSelector';
+import { StaffMachineSelector } from '@/components/shopfloor/StaffMachineSelector';
 import { SKUSelector } from '@/components/shopfloor/SKUSelector';
 import { CurrentShiftBanner } from '@/components/shopfloor/CurrentShiftBanner';
 import { EventControls } from '@/components/shopfloor/EventControls';
@@ -69,40 +70,52 @@ export default function Shopfloor() {
 
   const companyId = company?.id;
 
+  // Determine if user is STAFF (not admin/supervisor)
+  const isStaff = hasRole('STAFF') && !isAdmin() && !hasRole('SUPERVISOR');
+
+  // ---- STAFF: fetch all permitted machines directly ----
+  const { data: staffMachines = [], isLoading: staffMachinesLoading } = useQuery({
+    queryKey: ['staffPermittedMachines', companyId],
+    queryFn: async () => {
+      const ids = await getPermittedMachineIds();
+      if (ids.length === 0) return [];
+      // Fetch full machine data with line/plant info
+      const allM = await getMachines(undefined, companyId);
+      const idSet = new Set(ids);
+      return allM.filter(m => idSet.has(m.id));
+    },
+    enabled: isStaff && isAuthenticated === true,
+    staleTime: 60000,
+  });
+
+  // ---- NON-STAFF: existing Plant → Line → Machine flow ----
   const { data: plants = [], isLoading: plantsLoading } = useQuery({
     queryKey: ['plants', companyId],
     queryFn: () => getPlants(companyId),
-    enabled: isAuthenticated === true,
+    enabled: !isStaff && isAuthenticated === true,
   });
 
   const { data: lines = [], isLoading: linesLoading } = useQuery({
     queryKey: ['lines', selectedPlantId, companyId],
     queryFn: () => getLines(selectedPlantId!, companyId),
-    enabled: !!selectedPlantId,
+    enabled: !isStaff && !!selectedPlantId,
   });
 
-  const { data: allMachines = [], isLoading: machinesLoading } = useQuery({
+  const { data: machines = [], isLoading: machinesLoading } = useQuery({
     queryKey: ['machines', selectedLineId, companyId],
     queryFn: () => getMachines(selectedLineId!, companyId),
-    enabled: !!selectedLineId,
+    enabled: !isStaff && !!selectedLineId,
   });
 
-  // For STAFF, fetch permitted machine IDs to filter the list
-  const isStaff = hasRole('STAFF') && !isAdmin() && !hasRole('SUPERVISOR');
-  
-  const { data: permittedIds } = useQuery({
-    queryKey: ['permittedMachineIds'],
-    queryFn: () => getPermittedMachineIds(),
-    enabled: isStaff && isAuthenticated === true,
-    staleTime: 60000,
-  });
+  // Determine the effective plant ID for shift calendar
+  // For STAFF: derive from the selected machine's line.plant
+  const selectedMachine = isStaff
+    ? staffMachines.find(m => m.id === selectedMachineId)
+    : machines.find(m => m.id === selectedMachineId);
 
-  // Filter machines: STAFF sees only permitted machines, others see all
-  const machines = useMemo(() => {
-    if (!isStaff || !permittedIds) return allMachines;
-    const idSet = new Set(permittedIds);
-    return allMachines.filter(m => idSet.has(m.id));
-  }, [allMachines, permittedIds, isStaff]);
+  const effectivePlantId = isStaff
+    ? selectedMachine?.line?.plant?.id ?? null
+    : selectedPlantId;
 
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ['products', companyId],
@@ -111,9 +124,9 @@ export default function Shopfloor() {
   });
 
   const { data: shiftCalendar = [] } = useQuery({
-    queryKey: ['shiftCalendar', selectedPlantId],
-    queryFn: () => getTodayShiftCalendar(selectedPlantId!),
-    enabled: !!selectedPlantId,
+    queryKey: ['shiftCalendar', effectivePlantId],
+    queryFn: () => getTodayShiftCalendar(effectivePlantId!),
+    enabled: !!effectivePlantId,
     refetchInterval: 60000,
   });
 
@@ -180,7 +193,7 @@ export default function Shopfloor() {
     enabled: isAuthenticated === true,
   });
 
-  const selectedMachine = machines.find(m => m.id === selectedMachineId);
+  // selectedMachine is already defined above based on role
   const selectedProduct = products.find(p => p.id === selectedProductId) || null;
 
   // Fetch production standard for current machine+SKU pair
@@ -309,14 +322,19 @@ export default function Shopfloor() {
     startEventMutation.mutate({ eventType: 'RUN' });
   };
 
+  // Reset effects only for non-STAFF flow
   useEffect(() => {
-    setSelectedLineId(null);
-    setSelectedMachineId(null);
-  }, [selectedPlantId]);
+    if (!isStaff) {
+      setSelectedLineId(null);
+      setSelectedMachineId(null);
+    }
+  }, [selectedPlantId, isStaff]);
 
   useEffect(() => {
-    setSelectedMachineId(null);
-  }, [selectedLineId]);
+    if (!isStaff) {
+      setSelectedMachineId(null);
+    }
+  }, [selectedLineId, isStaff]);
 
   if (isAuthenticated === null) {
     return (
@@ -382,14 +400,14 @@ export default function Shopfloor() {
           <TabsContent value="capture" className="space-y-5 mt-5">
             {isLocked && <LockedBanner />}
 
-            {/* Plant/Line/Machine Selection */}
+            {/* Machine Selection */}
             <Card className="overflow-hidden">
               <CardHeader className="pb-3 bg-muted/30">
                 <CardTitle className="flex items-center gap-3 text-base sm:text-lg">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
                     <Factory className="h-5 w-5 text-primary" />
                   </div>
-                  เลือกเครื่องจักร
+                  {isStaff ? 'เครื่องจักรของฉัน' : 'เลือกเครื่องจักร'}
                   {selectedMachine && (
                     <Badge variant="secondary" className="font-medium text-xs">
                       {selectedMachine.name}
@@ -398,30 +416,40 @@ export default function Shopfloor() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4 space-y-4">
-                {/* Plant & Line row */}
-                <PlantLineSelector
-                  plants={plants}
-                  lines={lines}
-                  selectedPlantId={selectedPlantId}
-                  selectedLineId={selectedLineId}
-                  onPlantChange={setSelectedPlantId}
-                  onLineChange={setSelectedLineId}
-                  isLoading={plantsLoading || linesLoading}
-                />
+                {isStaff ? (
+                  /* STAFF: show all permitted machines with plant/line labels */
+                  <StaffMachineSelector
+                    machines={staffMachines}
+                    selectedMachineId={selectedMachineId}
+                    onMachineChange={setSelectedMachineId}
+                    isLoading={staffMachinesLoading}
+                  />
+                ) : (
+                  /* NON-STAFF: Plant → Line → Machine flow */
+                  <>
+                    <PlantLineSelector
+                      plants={plants}
+                      lines={lines}
+                      selectedPlantId={selectedPlantId}
+                      selectedLineId={selectedLineId}
+                      onPlantChange={setSelectedPlantId}
+                      onLineChange={setSelectedLineId}
+                      isLoading={plantsLoading || linesLoading}
+                    />
 
-                {/* Divider */}
-                {selectedLineId && (
-                  <div className="border-t border-border" />
+                    {selectedLineId && (
+                      <div className="border-t border-border" />
+                    )}
+
+                    <MachineSelector
+                      machines={machines}
+                      selectedMachineId={selectedMachineId}
+                      onMachineChange={setSelectedMachineId}
+                      isLoading={machinesLoading}
+                      disabled={!selectedLineId}
+                    />
+                  </>
                 )}
-
-                {/* Machine grid */}
-                <MachineSelector
-                  machines={machines}
-                  selectedMachineId={selectedMachineId}
-                  onMachineChange={setSelectedMachineId}
-                  isLoading={machinesLoading}
-                  disabled={!selectedLineId}
-                />
               </CardContent>
             </Card>
 
