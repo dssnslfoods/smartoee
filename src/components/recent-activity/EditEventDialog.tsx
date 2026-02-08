@@ -79,6 +79,11 @@ export function EditEventDialog({ open, onOpenChange, entityId, initialData, mac
         toast.error('ไม่สามารถแก้ไขได้ — กะถูกล็อกแล้ว');
       } else if (err.message.includes('OVERLAP_EVENT')) {
         toast.error('การเปลี่ยนเวลาทำให้เกิดเหตุการณ์ซ้อนทับกัน');
+      } else if (err.message.includes('Event not found') || err.message.includes('NOT_FOUND')) {
+        toast.error('ไม่พบเหตุการณ์นี้ — อาจถูกลบหรือถูกแทนที่ไปแล้ว');
+        onOpenChange(false);
+      } else if (err.message.includes('PERMISSION_DENIED')) {
+        toast.error('ไม่มีสิทธิ์แก้ไขเหตุการณ์นี้');
       } else {
         toast.error(err.message);
       }
