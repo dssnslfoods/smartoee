@@ -223,21 +223,29 @@ export function EditEventDialog({ open, onOpenChange, entityId, initialData, mac
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>เวลาเริ่ม</Label>
                     <Input
-                      type="datetime-local"
-                      value={startTs}
-                      onChange={(e) => setStartTs(e.target.value)}
+                      type="time"
+                      step="1"
+                      value={startTs.split('T')[1] || ''}
+                      onChange={(e) => {
+                        const datePart = startTs.split('T')[0];
+                        if (datePart) setStartTs(`${datePart}T${e.target.value}`);
+                      }}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>เวลาสิ้นสุด</Label>
                     <Input
-                      type="datetime-local"
-                      value={endTs}
-                      onChange={(e) => setEndTs(e.target.value)}
+                      type="time"
+                      step="1"
+                      value={endTs.split('T')[1] || ''}
+                      onChange={(e) => {
+                        const datePart = endTs.split('T')[0] || startTs.split('T')[0];
+                        if (datePart) setEndTs(`${datePart}T${e.target.value}`);
+                      }}
                     />
                   </div>
                 </div>
