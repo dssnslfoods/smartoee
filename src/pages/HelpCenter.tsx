@@ -530,8 +530,8 @@ export default function HelpCenter() {
     <div class="line"></div>
     <div class="subtitle">คู่มือการใช้งานระบบ</div>
     <div class="meta">
-      วันที่พิมพ์: ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}<br/>
-      จำนวน ${helpSections.reduce((s, sec) => s + sec.items.length, 0)} คำถาม ใน ${helpSections.length} หมวด
+      วันที่พิมพ์: ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}<br/><p>
+   © 2026 PNF OEE System. Designed and Developed by Arnon Arpaket. All rights reserved.
     </div>
   </div>
 
@@ -561,7 +561,7 @@ export default function HelpCenter() {
   }, []);
 
   // Only ADMIN, EXECUTIVE, SUPERVISOR can access
-  const canAccess = hasRole('ADMIN') || hasRole('EXECUTIVE') || hasRole('SUPERVISOR');
+  const canAccess = hasRole("ADMIN") || hasRole("EXECUTIVE") || hasRole("SUPERVISOR");
   if (!canAccess) {
     return <Navigate to="/dashboard" replace />;
   }
