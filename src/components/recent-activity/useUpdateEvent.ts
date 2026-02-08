@@ -36,6 +36,7 @@ export function useUpdateEvent(onSuccess?: () => void) {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['recentActivity'] });
+      queryClient.invalidateQueries({ queryKey: ['shopfloorTimeline'] });
       const cascadedParts: string[] = [];
       if (result.cascaded_next) cascadedParts.push('event ถัดไป');
       if (result.cascaded_prev) cascadedParts.push('event ก่อนหน้า');
