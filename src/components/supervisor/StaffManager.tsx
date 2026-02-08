@@ -59,7 +59,7 @@ export function StaffManager() {
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [permissionUser, setPermissionUser] = useState<{ userId: string; name: string } | null>(null);
   const [editUser, setEditUser] = useState<StaffUser | null>(null);
-  const [editForm, setEditForm] = useState({ fullName: '', newPassword: '', newEmail: '' });
+  const [editForm, setEditForm] = useState({ fullName: '', newPassword: '', newEmail: '', role: 'STAFF' as 'STAFF' | 'SUPERVISOR' });
   const [newUserForm, setNewUserForm] = useState({
     email: '',
     password: '',
@@ -131,13 +131,18 @@ export function StaffManager() {
     },
   });
 
-  // Update staff user mutation
+  // Update user mutation
   const updateStaffMutation = useMutation({
-    mutationFn: async ({ userId, fullName, newPassword, newEmail }: { userId: string; fullName: string; newPassword?: string; newEmail?: string }) => {
-      // Update profile name
+    mutationFn: async ({ userId, fullName, newPassword, newEmail, newRole, currentRole }: { userId: string; fullName: string; newPassword?: string; newEmail?: string; newRole?: string; currentRole?: string }) => {
+      // Update profile name and role
+      const profileUpdate: Record<string, string> = { full_name: fullName };
+      if (newRole && newRole !== currentRole) {
+        profileUpdate.role = newRole;
+      }
+
       const { error: profileError } = await supabase
         .from('user_profiles')
-        .update({ full_name: fullName })
+        .update(profileUpdate)
         .eq('user_id', userId);
       
       if (profileError) throw profileError;
@@ -156,7 +161,7 @@ export function StaffManager() {
       toast({ title: 'สำเร็จ', description: 'อัปเดตข้อมูลผู้ใช้เรียบร้อยแล้ว' });
       queryClient.invalidateQueries({ queryKey: ['team-users'] });
       setEditUser(null);
-      setEditForm({ fullName: '', newPassword: '', newEmail: '' });
+      setEditForm({ fullName: '', newPassword: '', newEmail: '', role: 'STAFF' });
     },
     onError: (error: Error) => {
       toast({ title: 'เกิดข้อผิดพลาด', description: error.message, variant: 'destructive' });
@@ -227,12 +232,14 @@ export function StaffManager() {
       fullName: editForm.fullName,
       newPassword: editForm.newPassword || undefined,
       newEmail: editForm.newEmail || undefined,
+      newRole: editForm.role,
+      currentRole: editUser.role,
     });
   };
 
   const openEditDialog = (user: StaffUser) => {
     setEditUser(user);
-    setEditForm({ fullName: user.full_name, newPassword: '', newEmail: '' });
+    setEditForm({ fullName: user.full_name, newPassword: '', newEmail: '', role: user.role as 'STAFF' | 'SUPERVISOR' });
   };
 
   if (!company) {
@@ -434,6 +441,21 @@ export function StaffManager() {
           </DialogHeader>
           <form onSubmit={handleEditSubmit}>
             <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>ตำแหน่ง</Label>
+                <Select
+                  value={editForm.role}
+                  onValueChange={(v) => setEditForm(prev => ({ ...prev, role: v as 'STAFF' | 'SUPERVISOR' }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="STAFF">Staff</SelectItem>
+                    <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="editFullName">ชื่อ-นามสกุล</Label>
                 <Input
