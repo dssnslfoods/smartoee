@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Navigate } from 'react-router-dom';
 import { DeleteActivityDialog } from '@/components/recent-activity/DeleteActivityDialog';
 import { EventTimelineEditable, type TimelineEvent } from '@/components/recent-activity/EventTimelineEditable';
-import { CreateManualEventDialog } from '@/components/recent-activity/CreateManualEventDialog';
+import { CreateManualEventDialog, type ManualEventDefaults } from '@/components/recent-activity/CreateManualEventDialog';
 
 export default function RecentActivity() {
   const { user, profile, company, isLoading: authLoading } = useAuth();
@@ -25,6 +25,7 @@ export default function RecentActivity() {
   const [machineFilter, setMachineFilter] = useState<string>('all');
   const [deletingEvent, setDeletingEvent] = useState<TimelineEvent | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [createDefaults, setCreateDefaults] = useState<ManualEventDefaults | undefined>();
 
   const isStaff = profile?.role === 'STAFF';
   const showActor = !isStaff;
@@ -169,6 +170,22 @@ export default function RecentActivity() {
     setDeletingEvent(event);
   };
 
+  const handleAddNext = (event: TimelineEvent) => {
+    // Use end_ts if available, otherwise use start_ts as the starting point
+    const refTs = event.end_ts || event.start_ts;
+    const d = new Date(refTs);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+    const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    setCreateDefaults({
+      machineId: event.machine_id,
+      eventDate: dateStr,
+      startTime: timeStr,
+    });
+    setShowCreateDialog(true);
+  };
+
   if (authLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -198,7 +215,7 @@ export default function RecentActivity() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+              <Button size="sm" onClick={() => { setCreateDefaults(undefined); setShowCreateDialog(true); }}>
                 <Plus className="h-4 w-4 mr-1" />
                 สร้าง Manual
               </Button>
@@ -325,6 +342,7 @@ export default function RecentActivity() {
                           editable={profile?.role === 'ADMIN' || profile?.role === 'SUPERVISOR' || isStaff}
                           showActor={showActor}
                           onDelete={handleDelete}
+                          onAddNext={handleAddNext}
                         />
                       </div>
                     ))}
@@ -350,8 +368,12 @@ export default function RecentActivity() {
       {/* Create Manual Event Dialog */}
       <CreateManualEventDialog
         open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
+        onOpenChange={(open) => {
+          setShowCreateDialog(open);
+          if (!open) setCreateDefaults(undefined);
+        }}
         companyId={companyId}
+        defaults={createDefaults}
       />
     </div>
   );

@@ -1,12 +1,12 @@
 import { useState, useMemo, useCallback } from 'react';
 import { format, differenceInSeconds, differenceInMinutes } from 'date-fns';
 import {
-  Play, Pause, Wrench, Clock, Timer, Package, Trash2,
+  Play, Pause, Wrench, Clock, Timer, Package, Trash2, Plus,
   Check, X, Loader2, AlertTriangle, User,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { InlineTimeInput } from './InlineTimeInput';
 import { useUpdateEvent } from './useUpdateEvent';
@@ -94,11 +94,13 @@ function TimelineEventRow({
   editable,
   showActor,
   onDelete,
+  onAddNext,
 }: {
   event: TimelineEvent;
   editable: boolean;
   showActor: boolean;
   onDelete?: (event: TimelineEvent) => void;
+  onAddNext?: (event: TimelineEvent) => void;
 }) {
   const config = EVENT_CONFIG[event.event_type] || EVENT_CONFIG.RUN;
   const Icon = config.icon;
@@ -199,6 +201,26 @@ function TimelineEventRow({
               <Timer className="h-3 w-3" />
               <span>{duration} นาที</span>
             </div>
+
+            {editable && onAddNext && (
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-primary hover:text-primary shrink-0"
+                      onClick={() => onAddNext(event)}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    เพิ่มเหตุการณ์ต่อจากนี้
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
 
             {editable && onDelete && (
               <Button
@@ -336,6 +358,7 @@ interface EventTimelineEditableProps {
   editable: boolean;
   showActor: boolean;
   onDelete?: (event: TimelineEvent) => void;
+  onAddNext?: (event: TimelineEvent) => void;
 }
 
 export function EventTimelineEditable({
@@ -343,6 +366,7 @@ export function EventTimelineEditable({
   editable,
   showActor,
   onDelete,
+  onAddNext,
 }: EventTimelineEditableProps) {
   if (events.length === 0) {
     return (
@@ -366,6 +390,7 @@ export function EventTimelineEditable({
             editable={editable}
             showActor={showActor}
             onDelete={onDelete}
+            onAddNext={onAddNext}
           />
         ))}
       </div>
