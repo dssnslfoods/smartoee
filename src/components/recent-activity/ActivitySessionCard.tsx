@@ -79,6 +79,13 @@ function getActionBadge(action: string) {
 }
 
 // --- Single log entry inside a session ---
+function formatTimeLocal(isoString: string): string {
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '--:--';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 function SessionLogEntry({
   log, lookup, editable, onEdit, onDelete,
 }: {
@@ -127,83 +134,86 @@ function SessionLogEntry({
   }, [log, data, lookup]);
 
   return (
-    <div className="flex items-start gap-3 group">
-      {/* Timeline dot & line */}
-      <div className="flex flex-col items-center pt-1.5 shrink-0">
-        <div className={cn(
-          'h-2.5 w-2.5 rounded-full border-2',
-          description.type === 'event' && description.config
-            ? `${description.config.colorClass} border-current`
-            : 'border-primary bg-primary/20',
-        )} />
+    <div
+      className={cn(
+        'flex items-start gap-3 group rounded-lg px-2 py-2 -mx-2 transition-colors',
+        editable && 'hover:bg-muted/50 cursor-pointer',
+      )}
+      onClick={() => editable && onEdit(log)}
+    >
+      {/* Timeline dot */}
+      <div className="flex flex-col items-center pt-1 shrink-0">
+        {description.type === 'event' && description.config ? (
+          (() => {
+            const Icon = description.config.icon;
+            return (
+              <div className={cn('h-8 w-8 rounded-full flex items-center justify-center border', description.config.bgClass)}>
+                <Icon className={cn('h-4 w-4', description.config.colorClass)} />
+              </div>
+            );
+          })()
+        ) : (
+          <div className="h-8 w-8 rounded-full flex items-center justify-center border bg-primary/10 border-primary/20">
+            <Hash className="h-4 w-4 text-primary" />
+          </div>
+        )}
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0 pb-3">
+      <div className="flex-1 min-w-0 pb-1">
+        {/* Row 1: Event type + action badge */}
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[11px] text-muted-foreground font-mono">
-            {format(new Date(log.ts), 'HH:mm:ss')}
-          </span>
+          {description.type === 'event' && description.config && (
+            <span className={cn('text-sm font-semibold', description.config.colorClass)}>
+              {description.config.label}
+            </span>
+          )}
+          {description.type === 'count' && (
+            <span className="text-sm font-semibold text-primary">บันทึกจำนวน</span>
+          )}
+          {description.type === 'other' && (
+            <span className="text-sm font-semibold">{description.entityLabel}</span>
+          )}
           {getActionBadge(log.action)}
-
-          {description.type === 'event' && description.config && (() => {
-            const Icon = description.config.icon;
-            return (
-              <span className={cn('flex items-center gap-1 text-xs font-medium', description.config.colorClass)}>
-                <Icon className="h-3.5 w-3.5" />
-                {description.config.label}
-              </span>
-            );
-          })()}
-
           {description.type === 'event' && description.isOngoing && (
             <Badge variant="outline" className="text-[10px] animate-pulse border-status-running/40 text-status-running px-1.5 py-0">
               กำลังดำเนินการ
             </Badge>
           )}
 
-          {description.type === 'event' && description.duration != null && (
-            <Badge variant="secondary" className="text-[10px] gap-1 px-1.5 py-0">
-              <Clock className="h-2.5 w-2.5" />
-              {formatDuration(description.duration)}
-            </Badge>
-          )}
-
-          {description.type === 'count' && (
-            <>
-              <span className="flex items-center gap-1 text-xs font-medium text-primary">
-                <Hash className="h-3.5 w-3.5" />
-                บันทึกจำนวน
-              </span>
-              <Badge className="bg-status-running/10 text-status-running border-status-running/20 text-[10px] px-1.5 py-0">
-                ✓ {description.good}
-              </Badge>
-              {description.reject > 0 && (
-                <Badge className="bg-destructive/10 text-destructive border-destructive/20 text-[10px] px-1.5 py-0">
-                  ✗ {description.reject}
-                </Badge>
-              )}
-            </>
-          )}
-
-          {description.type === 'other' && (
-            <span className="text-xs font-medium">{description.entityLabel}</span>
-          )}
-
-          {/* Edit/Delete buttons */}
+          {/* Edit/Delete buttons - always visible on mobile, hover on desktop */}
           {editable && (
-            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-auto" onClick={(e) => e.stopPropagation()}>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(log)}>
-                <Pencil className="h-3 w-3" />
+            <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity ml-auto" onClick={(e) => e.stopPropagation()}>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(log)}>
+                <Pencil className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => onDelete(log)}>
-                <Trash2 className="h-3 w-3" />
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(log)}>
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </div>
           )}
         </div>
 
-        {/* Extra details */}
+        {/* Row 2: Time range — prominent display */}
+        {description.type === 'event' && description.startTs && (
+          <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-1.5 font-mono text-sm tabular-nums">
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-medium">{formatTimeLocal(description.startTs)}</span>
+              <span className="text-muted-foreground">→</span>
+              <span className="font-medium">
+                {description.endTs ? formatTimeLocal(description.endTs) : '--:--:--'}
+              </span>
+            </div>
+            {description.duration != null && (
+              <Badge variant="secondary" className="text-[10px] gap-1 px-1.5 py-0">
+                {formatDuration(description.duration)}
+              </Badge>
+            )}
+          </div>
+        )}
+
+        {/* Row 3: Extra details */}
         {description.type === 'event' && (
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
             {description.product && (
@@ -220,8 +230,21 @@ function SessionLogEntry({
             {description.notes && <span className="italic">📝 {description.notes}</span>}
           </div>
         )}
-        {description.type === 'count' && description.notes && (
-          <p className="text-xs text-muted-foreground italic mt-1">📝 {description.notes}</p>
+
+        {description.type === 'count' && (
+          <div className="flex items-center gap-2 mt-1">
+            <Badge className="bg-status-running/10 text-status-running border-status-running/20 text-[10px] px-1.5 py-0">
+              ✓ {(description as any).good}
+            </Badge>
+            {(description as any).reject > 0 && (
+              <Badge className="bg-destructive/10 text-destructive border-destructive/20 text-[10px] px-1.5 py-0">
+                ✗ {(description as any).reject}
+              </Badge>
+            )}
+            {(description as any).notes && (
+              <span className="text-xs text-muted-foreground italic">📝 {(description as any).notes}</span>
+            )}
+          </div>
         )}
       </div>
     </div>
