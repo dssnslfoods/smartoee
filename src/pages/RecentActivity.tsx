@@ -56,9 +56,16 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
 
 const EDITABLE_TYPES = new Set(['production_events', 'production_counts']);
 
-function canEditLog(log: AuditLog, userId: string | undefined, role: string | undefined): boolean {
+function canEditLog(
+  log: AuditLog,
+  userId: string | undefined,
+  role: string | undefined,
+  deletedEntityIds: Set<string>,
+): boolean {
   if (!EDITABLE_TYPES.has(log.entity_type)) return false;
   if (log.action === 'DELETE') return false;
+  // Entity was deleted after this audit log entry — cannot edit
+  if (deletedEntityIds.has(log.entity_id)) return false;
   if (role === 'ADMIN' || role === 'SUPERVISOR') return true;
   return log.actor_user_id === userId;
 }
@@ -165,6 +172,17 @@ export default function RecentActivity() {
     }
     return result;
   }, [logs, chipFilter, searchQuery, lookup]);
+
+  // Build set of entity IDs that have been deleted (to hide edit buttons)
+  const deletedEntityIds = useMemo(() => {
+    const deleted = new Set<string>();
+    for (const log of logs) {
+      if (log.action === 'DELETE' && EDITABLE_TYPES.has(log.entity_type)) {
+        deleted.add(log.entity_id);
+      }
+    }
+    return deleted;
+  }, [logs]);
 
   // Group into sessions
   const sessions = useMemo(() => groupActivitiesIntoSessions(filteredLogs), [filteredLogs]);
@@ -333,7 +351,7 @@ export default function RecentActivity() {
                               session={session}
                               showActor={showActor}
                               lookup={lookup}
-                              canEditFn={(log) => canEditLog(log, profile?.user_id, profile?.role)}
+                              canEditFn={(log) => canEditLog(log, profile?.user_id, profile?.role, deletedEntityIds)}
                               onEdit={handleEdit}
                               onDelete={handleDelete}
                             />
