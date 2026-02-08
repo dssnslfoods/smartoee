@@ -7,13 +7,13 @@ import { OEETrendChart } from '@/components/dashboard/OEETrendChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { OEECardSkeleton, StatsCardSkeleton, MachineCardSkeleton, ChartCardSkeleton } from '@/components/ui/skeletons';
-import { Calendar, Factory, AlertTriangle, LayoutDashboard, Play, Pause, Wrench, Building2 } from 'lucide-react';
+import { Calendar, Factory, AlertTriangle, LayoutDashboard, Play, Pause, Wrench, Building2, MapPin } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useFullscreen } from '@/hooks/useFullscreen';
 import { FullscreenToggle, FullscreenContainer } from '@/components/ui/FullscreenToggle';
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
-import { getDashboardOEE, getMachinesWithStatus, getOEETrend, getLines } from '@/services/oeeApi';
+import { getDashboardOEE, getMachinesWithStatus, getOEETrend, getLines, getPlants } from '@/services/oeeApi';
 import { useState, useMemo } from 'react';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
 
@@ -48,6 +48,7 @@ function getDateRange(period: PeriodOption): { startDate: string; endDate: strin
 
 export default function Dashboard() {
   const { company, isAdmin, hasRole } = useAuth();
+  const [selectedPlant, setSelectedPlant] = useState<string>('all');
   const [selectedLine, setSelectedLine] = useState<string>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodOption>('today');
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
@@ -87,6 +88,13 @@ export default function Dashboard() {
     refetchInterval: 30000,
   });
 
+  // Fetch plants for filter
+  const { data: plants } = useQuery({
+    queryKey: ['plants', companyId],
+    queryFn: () => getPlants(companyId),
+    enabled: !!companyId || !isAdmin(),
+  });
+
   // Fetch lines for filter
   const { data: lines } = useQuery({
     queryKey: ['lines', companyId],
@@ -94,23 +102,42 @@ export default function Dashboard() {
     enabled: !!companyId || !isAdmin(),
   });
 
-  // Filter machines by selected line
+  // Filter lines based on selected plant
+  const filteredLines = useMemo(() => {
+    if (!lines) return [];
+    if (selectedPlant === 'all') return lines;
+    return lines.filter(l => l.plant_id === selectedPlant);
+  }, [lines, selectedPlant]);
+
+  // Reset line filter when plant changes
+  const handlePlantChange = (plantId: string) => {
+    setSelectedPlant(plantId);
+    setSelectedLine('all');
+  };
+
+  // Filter machines by selected plant and line
   const filteredMachines = useMemo(() => {
     if (!machineData?.machines) return [];
-    if (selectedLine === 'all') return machineData.machines;
-    return machineData.machines.filter(m => m.line_id === selectedLine);
-  }, [machineData?.machines, selectedLine]);
+    let result = machineData.machines;
+    if (selectedPlant !== 'all') {
+      result = result.filter(m => m.plant_id === selectedPlant);
+    }
+    if (selectedLine !== 'all') {
+      result = result.filter(m => m.line_id === selectedLine);
+    }
+    return result;
+  }, [machineData?.machines, selectedPlant, selectedLine]);
 
   // Recalculate stats based on filtered machines
   const filteredStats = useMemo(() => {
-    if (selectedLine === 'all') return machineData?.stats;
+    if (selectedPlant === 'all' && selectedLine === 'all') return machineData?.stats;
     
     const stats = { running: 0, idle: 0, stopped: 0, maintenance: 0 };
     filteredMachines.forEach(machine => {
       stats[machine.status]++;
     });
     return stats;
-  }, [filteredMachines, selectedLine, machineData?.stats]);
+  }, [filteredMachines, selectedPlant, selectedLine, machineData?.stats]);
 
   const stats = filteredStats || { running: 0, idle: 0, stopped: 0, maintenance: 0 };
   const oee = oeeData || { availability: 0, performance: 0, quality: 0, oee: 0 };
@@ -165,6 +192,18 @@ export default function Dashboard() {
                   </SelectContent>
                 </Select>
               )}
+              <Select value={selectedPlant} onValueChange={handlePlantChange}>
+                <SelectTrigger className="w-[140px] sm:w-[160px] bg-background border-border/50">
+                  <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="Select plant" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Plants</SelectItem>
+                  {plants?.map(plant => (
+                    <SelectItem key={plant.id} value={plant.id}>{plant.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
              <Select value={selectedLine} onValueChange={setSelectedLine}>
                <SelectTrigger className="w-[140px] sm:w-[160px] bg-background border-border/50">
                  <Factory className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -172,7 +211,7 @@ export default function Dashboard() {
                </SelectTrigger>
                <SelectContent>
                  <SelectItem value="all">All Lines</SelectItem>
-                 {lines?.map(line => (
+                 {filteredLines?.map(line => (
                    <SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>
                  ))}
                </SelectContent>

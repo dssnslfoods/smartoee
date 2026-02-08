@@ -530,6 +530,8 @@ export interface MachineWithOEE {
   code: string;
   line_id: string;
   line_name?: string;
+  plant_id?: string;
+  plant_name?: string;
   status: 'running' | 'idle' | 'stopped' | 'maintenance';
   oee: number;
   currentProduct?: string;
@@ -700,6 +702,8 @@ export async function getMachinesWithStatus(companyId?: string): Promise<{ machi
       code: machine.code,
       line_id: machine.line_id,
       line_name: machine.line?.name,
+      plant_id: machine.line?.plant_id,
+      plant_name: machine.line?.plant?.name,
       status,
       oee: Math.round(oee * 10) / 10,
       currentProduct: undefined, // Would need product tracking to implement
