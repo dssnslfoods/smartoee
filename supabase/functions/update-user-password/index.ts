@@ -120,25 +120,26 @@
  
      // Admin can update any user
      // Supervisor can only update STAFF in the same company
-     if (isAdmin) {
+    if (isAdmin) {
       console.log("Admin updating user account");
-     } else if (isSupervisor) {
-       // Supervisor can only update STAFF in their company
-       if (targetProfile.role !== "STAFF") {
-         console.error("Supervisor cannot update non-STAFF users");
-         return new Response(
-           JSON.stringify({ success: false, error: "PERMISSION_DENIED", message: "Supervisors can only update STAFF users" }),
-           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-         );
-       }
-       if (targetProfile.company_id !== requesterProfile.company_id) {
-         console.error("Supervisor cannot update users from different company");
-         return new Response(
-           JSON.stringify({ success: false, error: "PERMISSION_DENIED", message: "Supervisors can only update staff in their own company" }),
-           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-         );
-       }
-      console.log("Supervisor updating staff account");
+    } else if (isSupervisor) {
+      // Supervisor can update STAFF and SUPERVISOR in their company
+      const allowedTargetRoles = ["STAFF", "SUPERVISOR"];
+      if (!allowedTargetRoles.includes(targetProfile.role)) {
+        console.error("Supervisor cannot update users with role:", targetProfile.role);
+        return new Response(
+          JSON.stringify({ success: false, error: "PERMISSION_DENIED", message: "Supervisors can only update STAFF or SUPERVISOR users" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (targetProfile.company_id !== requesterProfile.company_id) {
+        console.error("Supervisor cannot update users from different company");
+        return new Response(
+          JSON.stringify({ success: false, error: "PERMISSION_DENIED", message: "Supervisors can only update users in their own company" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      console.log("Supervisor updating user account:", targetProfile.role);
      } else {
        console.error("Insufficient permissions:", requesterProfile.role);
        return new Response(

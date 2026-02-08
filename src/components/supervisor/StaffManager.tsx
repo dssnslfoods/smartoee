@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, User, Loader2, Settings, KeyRound, Pencil } from 'lucide-react';
+import { Plus, Trash2, User, Loader2, Settings, KeyRound, Pencil, ShieldCheck } from 'lucide-react';
 import { Mail } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -63,11 +64,12 @@ export function StaffManager() {
     email: '',
     password: '',
     fullName: '',
+    role: 'STAFF' as 'STAFF' | 'SUPERVISOR',
   });
 
-  // Fetch staff users in the same company
-  const { data: staffUsers = [], isLoading } = useQuery({
-    queryKey: ['staff-users', profile?.company_id],
+  // Fetch staff + supervisor users in the same company
+  const { data: teamUsers = [], isLoading } = useQuery({
+    queryKey: ['team-users', profile?.company_id],
     queryFn: async () => {
       if (!profile?.company_id) return [];
       
@@ -75,7 +77,8 @@ export function StaffManager() {
         .from('user_profiles')
         .select('*')
         .eq('company_id', profile.company_id)
-        .eq('role', 'STAFF')
+        .in('role', ['STAFF', 'SUPERVISOR'])
+        .order('role')
         .order('full_name');
       
       if (error) throw error;
@@ -86,12 +89,11 @@ export function StaffManager() {
 
   // Create staff user mutation via edge function (doesn't affect current session)
   const createStaffMutation = useMutation({
-    mutationFn: async ({ email, password, fullName }: { email: string; password: string; fullName: string }) => {
+    mutationFn: async ({ email, password, fullName, role }: { email: string; password: string; fullName: string; role: string }) => {
       if (!profile?.company_id) throw new Error('ไม่พบข้อมูลบริษัท');
 
-      // Call edge function to create user without affecting current session
       const response = await supabase.functions.invoke<{ success: boolean; message?: string; error?: string; user?: { id: string; email: string } }>('create-staff-user', {
-        body: { email, password, fullName },
+        body: { email, password, fullName, role },
       });
       
       // Handle edge function errors - check data first as it may contain error info
@@ -119,10 +121,10 @@ export function StaffManager() {
       return response.data.user;
     },
     onSuccess: () => {
-      toast({ title: 'สำเร็จ', description: 'สร้างผู้ใช้ Staff เรียบร้อยแล้ว' });
-      queryClient.invalidateQueries({ queryKey: ['staff-users'] });
+      toast({ title: 'สำเร็จ', description: 'สร้างผู้ใช้เรียบร้อยแล้ว' });
+      queryClient.invalidateQueries({ queryKey: ['team-users'] });
       setIsAddDialogOpen(false);
-      setNewUserForm({ email: '', password: '', fullName: '' });
+      setNewUserForm({ email: '', password: '', fullName: '', role: 'STAFF' });
     },
     onError: (error: Error) => {
       toast({ title: 'เกิดข้อผิดพลาด', description: error.message, variant: 'destructive' });
@@ -152,7 +154,7 @@ export function StaffManager() {
     },
     onSuccess: () => {
       toast({ title: 'สำเร็จ', description: 'อัปเดตข้อมูลผู้ใช้เรียบร้อยแล้ว' });
-      queryClient.invalidateQueries({ queryKey: ['staff-users'] });
+      queryClient.invalidateQueries({ queryKey: ['team-users'] });
       setEditUser(null);
       setEditForm({ fullName: '', newPassword: '', newEmail: '' });
     },
@@ -173,7 +175,7 @@ export function StaffManager() {
     },
     onSuccess: () => {
       toast({ title: 'สำเร็จ', description: 'ลบผู้ใช้เรียบร้อยแล้ว' });
-      queryClient.invalidateQueries({ queryKey: ['staff-users'] });
+      queryClient.invalidateQueries({ queryKey: ['team-users'] });
       setDeleteUserId(null);
     },
     onError: (error: Error) => {
@@ -198,6 +200,7 @@ export function StaffManager() {
       email: newUserForm.email,
       password: newUserForm.password,
       fullName: newUserForm.fullName,
+      role: newUserForm.role,
     });
   };
 
@@ -248,15 +251,15 @@ export function StaffManager() {
         <div>
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
-            จัดการพนักงาน (Staff)
+            จัดการทีมงาน
           </CardTitle>
           <CardDescription>
-            จัดการผู้ใช้ระดับ Staff ใน {company.name}
+            จัดการผู้ใช้ระดับ Staff และ Supervisor ใน {company.name}
           </CardDescription>
         </div>
         <Button onClick={() => setIsAddDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
-          เพิ่มพนักงาน
+          เพิ่มผู้ใช้
         </Button>
       </CardHeader>
       <CardContent>
@@ -264,9 +267,9 @@ export function StaffManager() {
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : staffUsers.length === 0 ? (
+        ) : teamUsers.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            ยังไม่มีพนักงานในระบบ
+            ยังไม่มีผู้ใช้ในระบบ
           </div>
         ) : (
           <Table>
@@ -280,7 +283,7 @@ export function StaffManager() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {staffUsers.map((user) => (
+              {teamUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.full_name}</TableCell>
                   <TableCell>
@@ -290,7 +293,10 @@ export function StaffManager() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">STAFF</Badge>
+                    <Badge variant={user.role === 'SUPERVISOR' ? 'default' : 'secondary'} className="gap-1">
+                      {user.role === 'SUPERVISOR' && <ShieldCheck className="h-3 w-3" />}
+                      {user.role}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     {new Date(user.created_at).toLocaleDateString('th-TH')}
@@ -309,18 +315,20 @@ export function StaffManager() {
                         </TooltipTrigger>
                         <TooltipContent>แก้ไขข้อมูล / รหัสผ่าน</TooltipContent>
                       </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setPermissionUser({ userId: user.user_id, name: user.full_name })}
-                          >
-                            <Settings className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>กำหนดสิทธิเครื่องจักร</TooltipContent>
-                      </Tooltip>
+                      {user.role === 'STAFF' && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setPermissionUser({ userId: user.user_id, name: user.full_name })}
+                            >
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>กำหนดสิทธิเครื่องจักร</TooltipContent>
+                        </Tooltip>
+                      )}
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -347,13 +355,28 @@ export function StaffManager() {
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>เพิ่มพนักงานใหม่</DialogTitle>
+            <DialogTitle>เพิ่มผู้ใช้ใหม่</DialogTitle>
             <DialogDescription>
-              สร้างบัญชีผู้ใช้ระดับ Staff ใน {company.name}
+              สร้างบัญชีผู้ใช้ใน {company.name}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddSubmit}>
             <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="role">ตำแหน่ง</Label>
+                <Select
+                  value={newUserForm.role}
+                  onValueChange={(v) => setNewUserForm(prev => ({ ...prev, role: v as 'STAFF' | 'SUPERVISOR' }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="STAFF">Staff</SelectItem>
+                    <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="fullName">ชื่อ-นามสกุล</Label>
                 <Input
