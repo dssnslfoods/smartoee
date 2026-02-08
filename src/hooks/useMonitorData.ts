@@ -10,6 +10,7 @@ export interface MonitorMachine {
   code: string;
   line_id: string;
   line_name?: string;
+  plant_id?: string;
   plant_name?: string;
   status: 'running' | 'idle' | 'stopped' | 'maintenance';
   eventType?: string;
@@ -33,7 +34,7 @@ async function fetchMonitorData(companyId?: string): Promise<{ machines: Monitor
   // Get machines the user can see (RLS handles permissions)
   let machineQuery = supabase
     .from('machines')
-    .select('id, name, code, line_id, is_active, lines(name, plants(name))')
+    .select('id, name, code, line_id, is_active, lines(name, plant_id, plants(name))')
     .eq('is_active', true)
     .order('name');
 
@@ -80,7 +81,7 @@ async function fetchMonitorData(companyId?: string): Promise<{ machines: Monitor
   const stats: MonitorStats = { running: 0, idle: 0, stopped: 0, maintenance: 0, total: machines.length };
 
   const result: MonitorMachine[] = machines.map(machine => {
-    const line = machine.lines as { name: string; plants: { name: string } | null } | null;
+    const line = machine.lines as { name: string; plant_id: string; plants: { name: string } | null } | null;
     const ev = eventMap.get(machine.id);
 
     let status: MonitorMachine['status'] = 'idle';
@@ -102,6 +103,7 @@ async function fetchMonitorData(companyId?: string): Promise<{ machines: Monitor
       code: machine.code,
       line_id: machine.line_id,
       line_name: line?.name,
+      plant_id: line?.plant_id,
       plant_name: line?.plants?.name,
       status,
       eventType: ev?.event_type,
