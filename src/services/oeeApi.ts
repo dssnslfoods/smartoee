@@ -299,6 +299,18 @@ export async function getMachinesByPlant(plantId: string): Promise<Machine[]> {
   return data || [];
 }
 
+/**
+ * Get machine IDs that the current user has permission to access.
+ * Uses the database function get_user_permitted_machine_ids() which handles
+ * role-based logic: ADMIN sees all, SUPERVISOR sees company machines,
+ * STAFF sees only assigned machines (direct + group-based).
+ */
+export async function getPermittedMachineIds(): Promise<string[]> {
+  const { data, error } = await supabase.rpc('get_user_permitted_machine_ids');
+  if (error) throw error;
+  return (data as string[]) || [];
+}
+
 // =============================================
 // QUERY FUNCTIONS - Shifts
 // =============================================
@@ -1035,6 +1047,7 @@ const oeeApi = {
   getMachines,
   getMachineById,
   getMachinesByPlant,
+  getPermittedMachineIds,
 
   // Shifts
   getShifts,

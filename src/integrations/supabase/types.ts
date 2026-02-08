@@ -1171,6 +1171,7 @@ export type Database = {
     Functions: {
       get_line_from_machine: { Args: { _machine_id: string }; Returns: string }
       get_user_company: { Args: { _user_id: string }; Returns: string }
+      get_user_permitted_machine_ids: { Args: never; Returns: string[] }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
