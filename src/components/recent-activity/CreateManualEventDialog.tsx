@@ -15,10 +15,17 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 
+export interface ManualEventDefaults {
+  machineId?: string;
+  eventDate?: string;
+  startTime?: string;
+}
+
 interface CreateManualEventDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companyId: string | undefined;
+  defaults?: ManualEventDefaults;
 }
 
 const EVENT_TYPES = [
@@ -27,18 +34,27 @@ const EVENT_TYPES = [
   { value: 'SETUP', label: 'Setup', icon: Wrench, color: 'text-warning' },
 ] as const;
 
-export function CreateManualEventDialog({ open, onOpenChange, companyId }: CreateManualEventDialogProps) {
+export function CreateManualEventDialog({ open, onOpenChange, companyId, defaults }: CreateManualEventDialogProps) {
   const queryClient = useQueryClient();
 
-  const [machineId, setMachineId] = useState('');
+  const [machineId, setMachineId] = useState(defaults?.machineId || '');
   const [eventType, setEventType] = useState<string>('RUN');
-  const [startTime, setStartTime] = useState('08:00:00');
+  const [startTime, setStartTime] = useState(defaults?.startTime || '08:00:00');
   const [endTime, setEndTime] = useState('09:00:00');
   const [hasEndTime, setHasEndTime] = useState(true);
   const [productId, setProductId] = useState('');
   const [reasonId, setReasonId] = useState('');
   const [notes, setNotes] = useState('');
-  const [eventDate, setEventDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [eventDate, setEventDate] = useState(defaults?.eventDate || format(new Date(), 'yyyy-MM-dd'));
+
+  // Sync defaults when dialog opens with new defaults
+  const [lastDefaults, setLastDefaults] = useState(defaults);
+  if (open && defaults && defaults !== lastDefaults) {
+    setLastDefaults(defaults);
+    if (defaults.machineId) setMachineId(defaults.machineId);
+    if (defaults.startTime) setStartTime(defaults.startTime);
+    if (defaults.eventDate) setEventDate(defaults.eventDate);
+  }
 
   // Fetch machines
   const { data: machines = [] } = useQuery({
