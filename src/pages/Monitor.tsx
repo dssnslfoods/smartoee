@@ -13,7 +13,7 @@ import { useMonitorData } from '@/hooks/useMonitorData';
 import { useFullscreen } from '@/hooks/useFullscreen';
 import { FullscreenToggle, FullscreenContainer } from '@/components/ui/FullscreenToggle';
 import { useQuery } from '@tanstack/react-query';
-import { getLines } from '@/services/oeeApi';
+import { getLines, getPlants } from '@/services/oeeApi';
 import {
   Monitor as MonitorIcon,
   Play,
@@ -23,6 +23,7 @@ import {
   Factory,
   Building2,
   Wifi,
+  MapPin,
 } from 'lucide-react';
 
 type StatusFilter = 'all' | 'running' | 'idle' | 'stopped' | 'maintenance';
@@ -31,6 +32,7 @@ export default function MonitorPage() {
   const { company, isAdmin } = useAuth();
   const { data, isLoading } = useMonitorData();
   const { isFullscreen, isKiosk, toggleFullscreen, enterKiosk, enterFullscreen } = useFullscreen();
+  const [selectedPlant, setSelectedPlant] = useState<string>('all');
   const [selectedLine, setSelectedLine] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
@@ -38,16 +40,38 @@ export default function MonitorPage() {
 
   const companyId = company?.id;
 
+  const { data: plants } = useQuery({
+    queryKey: ['plants', companyId],
+    queryFn: () => getPlants(companyId),
+    enabled: !!companyId || !isAdmin(),
+  });
+
   const { data: lines } = useQuery({
     queryKey: ['lines', companyId],
     queryFn: () => getLines(undefined, companyId),
     enabled: !!companyId || !isAdmin(),
   });
 
+  // Filter lines based on selected plant
+  const filteredLines = useMemo(() => {
+    if (!lines) return [];
+    if (selectedPlant === 'all') return lines;
+    return lines.filter(l => l.plant_id === selectedPlant);
+  }, [lines, selectedPlant]);
+
+  // Reset line filter when plant changes
+  const handlePlantChange = (plantId: string) => {
+    setSelectedPlant(plantId);
+    setSelectedLine('all');
+  };
+
   // Filter machines
   const filteredMachines = useMemo(() => {
     if (!data?.machines) return [];
     let result = data.machines;
+    if (selectedPlant !== 'all') {
+      result = result.filter(m => m.plant_id === selectedPlant);
+    }
     if (selectedLine !== 'all') {
       result = result.filter(m => m.line_id === selectedLine);
     }
@@ -55,7 +79,7 @@ export default function MonitorPage() {
       result = result.filter(m => m.status === statusFilter);
     }
     return result;
-  }, [data?.machines, selectedLine, statusFilter]);
+  }, [data?.machines, selectedPlant, selectedLine, statusFilter]);
 
   // Calculate filtered stats
   const filteredStats = useMemo(() => {
@@ -115,6 +139,19 @@ export default function MonitorPage() {
               </SelectContent>
             </Select>
 
+            <Select value={selectedPlant} onValueChange={handlePlantChange}>
+              <SelectTrigger className="w-[160px] bg-background border-border/50">
+                <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder="เลือกโรงงาน" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกโรงงาน</SelectItem>
+                {plants?.map(plant => (
+                  <SelectItem key={plant.id} value={plant.id}>{plant.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={selectedLine} onValueChange={setSelectedLine}>
               <SelectTrigger className="w-[160px] bg-background border-border/50">
                 <Factory className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -122,7 +159,7 @@ export default function MonitorPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">ทุกไลน์</SelectItem>
-                {lines?.map(line => (
+                {filteredLines?.map(line => (
                   <SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>
                 ))}
               </SelectContent>
