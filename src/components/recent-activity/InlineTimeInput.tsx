@@ -27,9 +27,11 @@ export function InlineTimeInput({ value, onChange, disabled, className }: Inline
   }, [time, onChange]);
 
   const segmentClass = cn(
-    "w-8 h-7 text-center font-mono text-sm tabular-nums px-0 border rounded bg-background",
+    "w-9 h-8 text-center font-mono text-sm tabular-nums px-0 rounded-md bg-background",
+    "border-2 border-input hover:border-primary/50",
     "focus:ring-2 focus:ring-primary focus:border-primary outline-none",
-    disabled && "opacity-50 cursor-not-allowed",
+    "transition-colors cursor-text",
+    disabled && "opacity-50 cursor-not-allowed hover:border-input",
     className,
   );
 
