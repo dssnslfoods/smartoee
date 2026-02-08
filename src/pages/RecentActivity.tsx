@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { ScrollText, RefreshCw, Search, Clock, CalendarDays } from 'lucide-react';
+import { ScrollText, RefreshCw, Search, CalendarDays, Cpu } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -15,193 +15,133 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Navigate } from 'react-router-dom';
 import { DeleteActivityDialog } from '@/components/recent-activity/DeleteActivityDialog';
-import { ActivitySessionCard } from '@/components/recent-activity/ActivitySessionCard';
-import { groupActivitiesIntoSessions } from '@/components/recent-activity/groupActivities';
-
-interface AuditLog {
-  id: string;
-  entity_type: string;
-  entity_id: string;
-  action: string;
-  before_json: Record<string, unknown> | null;
-  after_json: Record<string, unknown> | null;
-  actor_name: string | null;
-  actor_user_id: string | null;
-  ts: string;
-}
-
-interface LookupData {
-  machines: Map<string, { name: string; code: string }>;
-  products: Map<string, { name: string; code: string }>;
-  reasons: Map<string, { name: string; category: string }>;
-}
-
-const EDITABLE_TYPES = new Set(['production_events']);
-
-function canEditLog(
-  log: AuditLog,
-  userId: string | undefined,
-  role: string | undefined,
-  deletedEntityIds: Set<string>,
-): boolean {
-  if (!EDITABLE_TYPES.has(log.entity_type)) return false;
-  if (log.action === 'DELETE') return false;
-  if (deletedEntityIds.has(log.entity_id)) return false;
-  if (role === 'ADMIN' || role === 'SUPERVISOR') return true;
-  return log.actor_user_id === userId;
-}
+import { EventTimelineEditable, type TimelineEvent } from '@/components/recent-activity/EventTimelineEditable';
 
 export default function RecentActivity() {
   const { user, profile, company, isLoading: authLoading } = useAuth();
-  const [actionFilter, setActionFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<string>('today');
-
-  const [deletingLog, setDeletingLog] = useState<AuditLog | null>(null);
+  const [deletingEvent, setDeletingEvent] = useState<TimelineEvent | null>(null);
 
   const isStaff = profile?.role === 'STAFF';
   const showActor = !isStaff;
   const companyId = company?.id;
 
-  // Lookup data
-  const { data: machinesData = [] } = useQuery({
-    queryKey: ['ra-machines', companyId],
-    queryFn: async () => {
-      let q = supabase.from('machines').select('id, name, code').eq('is_active', true);
-      if (companyId) q = q.eq('company_id', companyId);
-      const { data, error } = await q;
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!profile,
-  });
-
-  const { data: productsData = [] } = useQuery({
-    queryKey: ['ra-products', companyId],
-    queryFn: async () => {
-      let q = supabase.from('products').select('id, name, code').eq('is_active', true);
-      if (companyId) q = q.eq('company_id', companyId);
-      const { data, error } = await q;
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!profile,
-  });
-
-  const { data: reasonsData = [] } = useQuery({
-    queryKey: ['ra-reasons', companyId],
-    queryFn: async () => {
-      let q = supabase.from('downtime_reasons').select('id, name, category').eq('is_active', true);
-      if (companyId) q = q.eq('company_id', companyId);
-      const { data, error } = await q;
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!profile,
-  });
-
-  const lookup: LookupData = useMemo(() => ({
-    machines: new Map(machinesData.map(m => [m.id, { name: m.name, code: m.code }])),
-    products: new Map(productsData.map(p => [p.id, { name: p.name, code: p.code }])),
-    reasons: new Map(reasonsData.map(r => [r.id, { name: r.name, category: r.category }])),
-  }), [machinesData, productsData, reasonsData]);
-
   // Compute date range from filter
   const dateRange = useMemo(() => {
     const now = new Date();
-    if (dateFilter === 'today') {
-      return { from: startOfDay(now), to: endOfDay(now) };
-    }
+    if (dateFilter === 'today') return { from: startOfDay(now), to: endOfDay(now) };
     if (dateFilter === 'yesterday') {
       const y = subDays(now, 1);
       return { from: startOfDay(y), to: endOfDay(y) };
     }
-    if (dateFilter === '3days') {
-      return { from: startOfDay(subDays(now, 2)), to: endOfDay(now) };
-    }
-    if (dateFilter === '7days') {
-      return { from: startOfDay(subDays(now, 6)), to: endOfDay(now) };
-    }
-    // custom date: dateFilter is yyyy-MM-dd
+    if (dateFilter === '3days') return { from: startOfDay(subDays(now, 2)), to: endOfDay(now) };
+    if (dateFilter === '7days') return { from: startOfDay(subDays(now, 6)), to: endOfDay(now) };
     const d = new Date(dateFilter);
-    if (!isNaN(d.getTime())) {
-      return { from: startOfDay(d), to: endOfDay(d) };
-    }
+    if (!isNaN(d.getTime())) return { from: startOfDay(d), to: endOfDay(d) };
     return { from: startOfDay(now), to: endOfDay(now) };
   }, [dateFilter]);
 
-  const { data: logs = [], isLoading, refetch } = useQuery({
-    queryKey: ['recentActivity', actionFilter, profile?.user_id, dateFilter],
+  // Fetch production events directly
+  const { data: events = [], isLoading, refetch } = useQuery({
+    queryKey: ['recentActivity', 'events', companyId, dateFilter, profile?.user_id],
     queryFn: async () => {
       let query = supabase
-        .from('v_audit_logs_readable')
-        .select('*')
-        .eq('entity_type', 'production_events')
-        .gte('ts', dateRange.from.toISOString())
-        .lte('ts', dateRange.to.toISOString())
-        .order('ts', { ascending: false })
+        .from('production_events')
+        .select(`
+          id, event_type, start_ts, end_ts, notes, machine_id, product_id, reason_id, created_by,
+          machines!production_events_machine_id_fkey ( name, code ),
+          products!production_events_product_id_fkey ( name, code ),
+          downtime_reasons!production_events_reason_id_fkey ( name, category )
+        `)
+        .gte('start_ts', dateRange.from.toISOString())
+        .lte('start_ts', dateRange.to.toISOString())
+        .order('start_ts', { ascending: false })
         .limit(500);
 
-      if (actionFilter !== 'all') {
-        query = query.eq('action', actionFilter);
+      // Staff: show only own events
+      if (isStaff) {
+        query = query.eq('created_by', profile!.user_id);
       }
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []) as AuditLog[];
+
+      // Fetch creator names for non-staff
+      let creatorsMap = new Map<string, string>();
+      if (showActor && data && data.length > 0) {
+        const creatorIds = [...new Set(data.map(e => e.created_by))];
+        const { data: profiles } = await supabase
+          .from('user_profiles')
+          .select('user_id, full_name')
+          .in('user_id', creatorIds);
+        if (profiles) {
+          creatorsMap = new Map(profiles.map(p => [p.user_id, p.full_name]));
+        }
+      }
+
+      return (data || []).map((e: any): TimelineEvent => ({
+        id: e.id,
+        event_type: e.event_type,
+        start_ts: e.start_ts,
+        end_ts: e.end_ts,
+        notes: e.notes,
+        machine_id: e.machine_id,
+        product_id: e.product_id,
+        reason_id: e.reason_id,
+        created_by: e.created_by,
+        machine: e.machines ? { name: e.machines.name, code: e.machines.code } : null,
+        product: e.products ? { name: e.products.name, code: e.products.code } : null,
+        reason: e.downtime_reasons ? { name: e.downtime_reasons.name, category: e.downtime_reasons.category } : null,
+        creator: creatorsMap.has(e.created_by) ? { full_name: creatorsMap.get(e.created_by)! } : null,
+      }));
     },
     enabled: !!profile,
   });
 
-  // Apply search
-  const filteredLogs = useMemo(() => {
-    if (!searchQuery.trim()) return logs;
-
+  // Search filter
+  const filteredEvents = useMemo(() => {
+    if (!searchQuery.trim()) return events;
     const q = searchQuery.toLowerCase();
-    return logs.filter((log) => {
-      if (log.actor_name?.toLowerCase().includes(q)) return true;
-      const data = log.after_json || log.before_json;
-      if (data) {
-        const machineId = data.machine_id as string;
-        const productId = data.product_id as string;
-        const machine = machineId ? lookup.machines.get(machineId) : null;
-        const product = productId ? lookup.products.get(productId) : null;
-        if (machine && (machine.name.toLowerCase().includes(q) || machine.code.toLowerCase().includes(q))) return true;
-        if (product && (product.name.toLowerCase().includes(q) || product.code.toLowerCase().includes(q))) return true;
-        const eventType = (data.event_type as string)?.toLowerCase();
-        if (eventType && eventType.includes(q)) return true;
-      }
+    return events.filter((e) => {
+      if (e.machine?.name.toLowerCase().includes(q)) return true;
+      if (e.machine?.code.toLowerCase().includes(q)) return true;
+      if (e.product?.name.toLowerCase().includes(q)) return true;
+      if (e.product?.code.toLowerCase().includes(q)) return true;
+      if (e.reason?.name.toLowerCase().includes(q)) return true;
+      if (e.event_type.toLowerCase().includes(q)) return true;
+      if (e.creator?.full_name.toLowerCase().includes(q)) return true;
+      if (e.notes?.toLowerCase().includes(q)) return true;
       return false;
     });
-  }, [logs, searchQuery, lookup]);
+  }, [events, searchQuery]);
 
-  // Build set of entity IDs that have been deleted
-  const deletedEntityIds = useMemo(() => {
-    const deleted = new Set<string>();
-    for (const log of logs) {
-      if (log.action === 'DELETE') {
-        deleted.add(log.entity_id);
+  // Group by machine
+  const groupedByMachine = useMemo(() => {
+    const groups = new Map<string, { machine: { name: string; code: string } | null; events: TimelineEvent[] }>();
+    for (const event of filteredEvents) {
+      const key = event.machine_id;
+      if (!groups.has(key)) {
+        groups.set(key, { machine: event.machine, events: [] });
       }
-    }
-    return deleted;
-  }, [logs]);
-
-  // Group into sessions
-  const sessions = useMemo(() => groupActivitiesIntoSessions(filteredLogs), [filteredLogs]);
-
-  // Group sessions by date
-  const groupedByDate = useMemo(() => {
-    const groups = new Map<string, typeof sessions>();
-    for (const session of sessions) {
-      const dateKey = format(new Date(session.endTs), 'yyyy-MM-dd');
-      if (!groups.has(dateKey)) groups.set(dateKey, []);
-      groups.get(dateKey)!.push(session);
+      groups.get(key)!.events.push(event);
     }
     return groups;
-  }, [sessions]);
+  }, [filteredEvents]);
 
-  const handleDelete = (log: AuditLog) => {
-    setDeletingLog(log);
+  // Can edit?
+  const canEdit = (event: TimelineEvent): boolean => {
+    if (profile?.role === 'ADMIN' || profile?.role === 'SUPERVISOR') return true;
+    return event.created_by === profile?.user_id;
+  };
+
+  const editable = useMemo(() => {
+    // All events are editable based on user role
+    return events.some(e => canEdit(e));
+  }, [events, profile]);
+
+  const handleDelete = (event: TimelineEvent) => {
+    setDeletingEvent(event);
   };
 
   if (authLoading) {
@@ -224,12 +164,12 @@ export default function RecentActivity() {
             <div>
               <h1 className="text-2xl font-bold flex items-center gap-2">
                 <ScrollText className="h-6 w-6" />
-                เหตุการณ์การผลิต
+                Timeline เหตุการณ์การผลิต
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
                 {isStaff
-                  ? 'ตรวจสอบเหตุการณ์การผลิตของคุณก่อน Supervisor อนุมัติกะ'
-                  : 'ตรวจสอบเหตุการณ์การผลิตทั้งหมดก่อนอนุมัติกะ'}
+                  ? 'ตรวจสอบและแก้ไขเหตุการณ์การผลิตของคุณ'
+                  : 'ตรวจสอบและแก้ไขเหตุการณ์การผลิตทั้งหมด — คลิกที่เวลาเพื่อแก้ไข'}
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
@@ -267,20 +207,6 @@ export default function RecentActivity() {
                 }}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Action</Label>
-              <Select value={actionFilter} onValueChange={setActionFilter}>
-                <SelectTrigger className="w-28 h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">ทั้งหมด</SelectItem>
-                  <SelectItem value="INSERT">สร้าง</SelectItem>
-                  <SelectItem value="UPDATE">แก้ไข</SelectItem>
-                  <SelectItem value="DELETE">ลบ</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             <div className="space-y-1.5 flex-1 min-w-[160px]">
               <Label className="text-xs flex items-center gap-1">
                 <Search className="h-3 w-3" /> ค้นหา
@@ -299,14 +225,12 @@ export default function RecentActivity() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center justify-between">
                 <span className="flex items-center gap-2">
-                  เหตุการณ์การผลิตล่าสุด
-                  <Badge variant="secondary" className="text-xs">{filteredLogs.length} รายการ</Badge>
-                  {sessions.length !== filteredLogs.length && (
-                    <Badge variant="outline" className="text-xs gap-1">
-                      <Clock className="h-3 w-3" />
-                      {sessions.length} เซสชัน
-                    </Badge>
-                  )}
+                  Timeline ล่าสุด
+                  <Badge variant="secondary" className="text-xs">{filteredEvents.length} เหตุการณ์</Badge>
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <Cpu className="h-3 w-3" />
+                    {groupedByMachine.size} เครื่อง
+                  </Badge>
                 </span>
                 {isStaff && (
                   <Badge variant="secondary" className="text-xs">
@@ -321,35 +245,38 @@ export default function RecentActivity() {
                   <div className="flex items-center justify-center py-12">
                     <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : filteredLogs.length === 0 ? (
+                ) : filteredEvents.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                     <ScrollText className="h-12 w-12 mb-4 opacity-50" />
                     <p>ไม่พบเหตุการณ์การผลิต</p>
                   </div>
                 ) : (
-                  <div className="space-y-5 pr-3">
-                    {[...groupedByDate.entries()].map(([dateKey, dateSessions]) => (
-                      <div key={dateKey}>
-                        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-1.5 mb-2">
-                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            {format(new Date(dateKey), 'EEEE dd MMMM yyyy', { locale: th })}
+                  <div className="space-y-6 pr-3">
+                    {[...groupedByMachine.entries()].map(([machineId, group]) => (
+                      <div key={machineId}>
+                        {/* Machine header */}
+                        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2 mb-3 flex items-center gap-2 border-b border-border/50 pb-2">
+                          <Cpu className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-semibold">
+                            {group.machine?.name || 'Unknown'}
                           </span>
-                          <span className="text-xs text-muted-foreground ml-2">
-                            ({dateSessions.reduce((sum, s) => sum + s.logs.length, 0)})
-                          </span>
+                          {group.machine?.code && (
+                            <span className="text-xs font-mono text-muted-foreground">
+                              ({group.machine.code})
+                            </span>
+                          )}
+                          <Badge variant="secondary" className="text-[10px] ml-auto">
+                            {group.events.length} events
+                          </Badge>
                         </div>
-                        <div className="space-y-2">
-                          {dateSessions.map((session) => (
-                            <ActivitySessionCard
-                              key={session.key}
-                              session={session}
-                              showActor={showActor}
-                              lookup={lookup}
-                              canEditFn={(log) => canEditLog(log, profile?.user_id, profile?.role, deletedEntityIds)}
-                              onDelete={handleDelete}
-                            />
-                          ))}
-                        </div>
+
+                        {/* Timeline */}
+                        <EventTimelineEditable
+                          events={group.events}
+                          editable={profile?.role === 'ADMIN' || profile?.role === 'SUPERVISOR' || isStaff}
+                          showActor={showActor}
+                          onDelete={handleDelete}
+                        />
                       </div>
                     ))}
                   </div>
@@ -361,12 +288,12 @@ export default function RecentActivity() {
       </main>
 
       {/* Delete Dialog */}
-      {deletingLog && (
+      {deletingEvent && (
         <DeleteActivityDialog
-          open={!!deletingLog}
-          onOpenChange={(open) => !open && setDeletingLog(null)}
-          entityType={deletingLog.entity_type}
-          entityId={deletingLog.entity_id}
+          open={!!deletingEvent}
+          onOpenChange={(open) => !open && setDeletingEvent(null)}
+          entityType="production_events"
+          entityId={deletingEvent.id}
           description="คุณต้องการลบเหตุการณ์การผลิตนี้ใช่หรือไม่?"
         />
       )}
