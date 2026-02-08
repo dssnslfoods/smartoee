@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { ScrollText, RefreshCw, Search, Clock } from 'lucide-react';
+import { ScrollText, RefreshCw, Search, Clock, CalendarDays } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -56,6 +56,7 @@ export default function RecentActivity() {
   const { user, profile, company, isLoading: authLoading } = useAuth();
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState<string>('today');
 
   const [editingEvent, setEditingEvent] = useState<AuditLog | null>(null);
   const [deletingLog, setDeletingLog] = useState<AuditLog | null>(null);
@@ -107,15 +108,41 @@ export default function RecentActivity() {
     reasons: new Map(reasonsData.map(r => [r.id, { name: r.name, category: r.category }])),
   }), [machinesData, productsData, reasonsData]);
 
+  // Compute date range from filter
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    if (dateFilter === 'today') {
+      return { from: startOfDay(now), to: endOfDay(now) };
+    }
+    if (dateFilter === 'yesterday') {
+      const y = subDays(now, 1);
+      return { from: startOfDay(y), to: endOfDay(y) };
+    }
+    if (dateFilter === '3days') {
+      return { from: startOfDay(subDays(now, 2)), to: endOfDay(now) };
+    }
+    if (dateFilter === '7days') {
+      return { from: startOfDay(subDays(now, 6)), to: endOfDay(now) };
+    }
+    // custom date: dateFilter is yyyy-MM-dd
+    const d = new Date(dateFilter);
+    if (!isNaN(d.getTime())) {
+      return { from: startOfDay(d), to: endOfDay(d) };
+    }
+    return { from: startOfDay(now), to: endOfDay(now) };
+  }, [dateFilter]);
+
   const { data: logs = [], isLoading, refetch } = useQuery({
-    queryKey: ['recentActivity', actionFilter, profile?.user_id],
+    queryKey: ['recentActivity', actionFilter, profile?.user_id, dateFilter],
     queryFn: async () => {
       let query = supabase
         .from('v_audit_logs_readable')
         .select('*')
         .eq('entity_type', 'production_events')
+        .gte('ts', dateRange.from.toISOString())
+        .lte('ts', dateRange.to.toISOString())
         .order('ts', { ascending: false })
-        .limit(300);
+        .limit(500);
 
       if (actionFilter !== 'all') {
         query = query.eq('action', actionFilter);
@@ -239,9 +266,36 @@ export default function RecentActivity() {
           {/* Filters */}
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1">
+                <CalendarDays className="h-3 w-3" /> วันที่
+              </Label>
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="w-36 h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">วันนี้</SelectItem>
+                  <SelectItem value="yesterday">เมื่อวาน</SelectItem>
+                  <SelectItem value="3days">3 วันล่าสุด</SelectItem>
+                  <SelectItem value="7days">7 วันล่าสุด</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">หรือเลือกวัน</Label>
+              <Input
+                type="date"
+                className="w-40 h-9"
+                value={dateFilter.match(/^\d{4}-\d{2}-\d{2}$/) ? dateFilter : ''}
+                onChange={(e) => {
+                  if (e.target.value) setDateFilter(e.target.value);
+                }}
+              />
+            </div>
+            <div className="space-y-1.5">
               <Label className="text-xs">Action</Label>
               <Select value={actionFilter} onValueChange={setActionFilter}>
-                <SelectTrigger className="w-32 h-9">
+                <SelectTrigger className="w-28 h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -257,7 +311,7 @@ export default function RecentActivity() {
                 <Search className="h-3 w-3" /> ค้นหา
               </Label>
               <Input
-                placeholder="ค้นหาชื่อเครื่อง, สินค้า, ผู้ใช้..."
+                placeholder="ชื่อเครื่อง, สินค้า, ผู้ใช้..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-9"
