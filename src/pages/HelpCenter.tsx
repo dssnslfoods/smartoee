@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Accordion,
@@ -26,6 +27,7 @@ import {
   Shield,
   Monitor,
   ScrollText,
+  FileDown,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -392,15 +394,198 @@ export default function HelpCenter() {
 
   const totalQuestions = filteredSections.reduce((sum, s) => sum + s.items.length, 0);
 
+  const handleExportPDF = useCallback(() => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const sectionsHTML = helpSections
+      .map(
+        (section, sIdx) => `
+        <div class="section" ${sIdx > 0 ? 'style="page-break-before: auto;"' : ''}>
+          <h2>${section.title}${section.badge ? ` <span class="badge">${section.badge}</span>` : ''}</h2>
+          ${section.items
+            .map(
+              (item, idx) => `
+            <div class="qa">
+              <div class="question">${sIdx + 1}.${idx + 1} ${item.q}</div>
+              <div class="answer">${item.a}</div>
+            </div>`
+            )
+            .join('')}
+        </div>`
+      )
+      .join('');
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>PNF OEE System - คู่มือการใช้งาน</title>
+  <style>
+    @page { margin: 20mm 18mm; size: A4; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Sarabun', 'Noto Sans Thai', 'Segoe UI', sans-serif;
+      font-size: 11pt;
+      line-height: 1.6;
+      color: #1a1a1a;
+    }
+    .cover {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 85vh;
+      text-align: center;
+      page-break-after: always;
+    }
+    .cover h1 {
+      font-size: 28pt;
+      font-weight: 700;
+      color: #1e3a5f;
+      margin-bottom: 8px;
+    }
+    .cover .subtitle {
+      font-size: 16pt;
+      color: #475569;
+      margin-bottom: 32px;
+    }
+    .cover .meta {
+      font-size: 10pt;
+      color: #94a3b8;
+      margin-top: 48px;
+    }
+    .cover .line {
+      width: 80px;
+      height: 4px;
+      background: #3b82f6;
+      border-radius: 2px;
+      margin: 24px auto;
+    }
+    /* TOC */
+    .toc {
+      page-break-after: always;
+    }
+    .toc h2 {
+      font-size: 18pt;
+      color: #1e3a5f;
+      margin-bottom: 16px;
+      border-bottom: 2px solid #3b82f6;
+      padding-bottom: 8px;
+    }
+    .toc-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 6px 0;
+      border-bottom: 1px dotted #cbd5e1;
+      font-size: 11pt;
+    }
+    .toc-item .toc-title { font-weight: 600; color: #334155; }
+    .toc-item .toc-count { color: #64748b; font-size: 9pt; }
+    /* Sections */
+    .section { margin-bottom: 24px; }
+    .section h2 {
+      font-size: 15pt;
+      font-weight: 700;
+      color: #1e3a5f;
+      border-bottom: 2px solid #3b82f6;
+      padding-bottom: 6px;
+      margin-bottom: 14px;
+      margin-top: 28px;
+    }
+    .badge {
+      display: inline-block;
+      background: #dbeafe;
+      color: #1e40af;
+      font-size: 8pt;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+    .qa {
+      margin-bottom: 14px;
+      padding-left: 12px;
+      border-left: 3px solid #e2e8f0;
+    }
+    .question {
+      font-weight: 700;
+      font-size: 11pt;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+    .answer {
+      font-size: 10.5pt;
+      color: #475569;
+      line-height: 1.7;
+    }
+    .footer-note {
+      margin-top: 48px;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 9pt;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="cover">
+    <h1>PNF OEE System</h1>
+    <div class="line"></div>
+    <div class="subtitle">คู่มือการใช้งานระบบ</div>
+    <div class="meta">
+      วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
+      จำนวน ${helpSections.reduce((s, sec) => s + sec.items.length, 0)} คำถาม ใน ${helpSections.length} หมวด
+    </div>
+  </div>
+
+  <div class="toc">
+    <h2>สารบัญ</h2>
+    ${helpSections
+      .map(
+        (s, i) => `<div class="toc-item"><span class="toc-title">${i + 1}. ${s.title}</span><span class="toc-count">${s.items.length} คำถาม</span></div>`
+      )
+      .join('')}
+  </div>
+
+  ${sectionsHTML}
+
+  <div class="footer-note">
+    PNF OEE System — Help Center Manual — สร้างอัตโนมัติจากระบบ
+  </div>
+</body>
+</html>`);
+
+    printWindow.document.close();
+    // Wait for content to render then trigger print
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  }, []);
+
   return (
     <AppLayout>
       <div className="page-container space-y-6 max-w-4xl mx-auto">
         {/* Header */}
-        <PageHeader
-          title="Help Center"
-          description="คู่มือการใช้งานระบบ PNF OEE"
-          icon={HelpCircle}
-        />
+        <div className="flex items-start justify-between gap-4">
+          <PageHeader
+            title="Help Center"
+            description="คู่มือการใช้งานระบบ PNF OEE"
+            icon={HelpCircle}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPDF}
+            className="shrink-0 gap-2 mt-1"
+          >
+            <FileDown className="h-4 w-4" />
+            Export PDF
+          </Button>
+        </div>
 
         {/* Search */}
         <Card>
