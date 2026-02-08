@@ -1,14 +1,14 @@
 import { useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
-/** Parse "HH:MM:SS" or "HH:MM" into { h, m, s } */
-function parseTime(timeStr: string): { h: number; m: number; s: number } {
+/** Parse "HH:MM:SS" or "HH:MM" into { h, m } */
+function parseTime(timeStr: string): { h: number; m: number } {
   const parts = timeStr.split(':').map(Number);
-  return { h: parts[0] || 0, m: parts[1] || 0, s: parts[2] || 0 };
+  return { h: parts[0] || 0, m: parts[1] || 0 };
 }
 
 interface InlineTimeInputProps {
-  value: string; // "HH:MM:SS"
+  value: string; // "HH:MM:SS" or "HH:MM"
   onChange: (v: string) => void;
   disabled?: boolean;
   className?: string;
@@ -17,13 +17,13 @@ interface InlineTimeInputProps {
 export function InlineTimeInput({ value, onChange, disabled, className }: InlineTimeInputProps) {
   const time = parseTime(value);
 
-  const handleChange = useCallback((field: 'h' | 'm' | 's', raw: string) => {
+  const handleChange = useCallback((field: 'h' | 'm', raw: string) => {
     const num = raw === '' ? 0 : parseInt(raw, 10);
     if (isNaN(num)) return;
     const clamped = field === 'h' ? Math.min(23, Math.max(0, num)) : Math.min(59, Math.max(0, num));
     const newTime = { ...time, [field]: clamped };
     const pad = (n: number) => String(n).padStart(2, '0');
-    onChange(`${pad(newTime.h)}:${pad(newTime.m)}:${pad(newTime.s)}`);
+    onChange(`${pad(newTime.h)}:${pad(newTime.m)}:00`);
   }, [time, onChange]);
 
   const segmentClass = cn(
@@ -59,18 +59,6 @@ export function InlineTimeInput({ value, onChange, disabled, className }: Inline
         onFocus={(e) => e.target.select()}
         disabled={disabled}
         aria-label="นาที"
-      />
-      <span className="text-xs font-bold text-muted-foreground">:</span>
-      <input
-        type="text"
-        inputMode="numeric"
-        maxLength={2}
-        className={segmentClass}
-        value={String(time.s).padStart(2, '0')}
-        onChange={(e) => handleChange('s', e.target.value)}
-        onFocus={(e) => e.target.select()}
-        disabled={disabled}
-        aria-label="วินาที"
       />
     </div>
   );
