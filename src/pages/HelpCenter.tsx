@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback } from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -365,6 +367,7 @@ const helpSections: HelpSection[] = [
 /* ------------------------------------------------------------------ */
 
 export default function HelpCenter() {
+  const { hasRole } = useAuth();
   const [search, setSearch] = useState("");
 
   // Filter sections and items by search
@@ -556,6 +559,12 @@ export default function HelpCenter() {
       printWindow.print();
     }, 500);
   }, []);
+
+  // Only ADMIN, EXECUTIVE, SUPERVISOR can access
+  const canAccess = hasRole('ADMIN') || hasRole('EXECUTIVE') || hasRole('SUPERVISOR');
+  if (!canAccess) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <AppLayout>
