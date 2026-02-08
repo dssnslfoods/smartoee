@@ -16,6 +16,17 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
+/**
+ * Convert an ISO/UTC timestamp string to a local datetime-local input value.
+ * e.g. "2026-02-07T15:14:02+00:00" → "2026-02-07T22:14:02" (for UTC+7)
+ */
+function toLocalDatetimeString(isoString: string): string {
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 interface EditEventDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -29,23 +40,33 @@ interface EditEventDialogProps {
   machineName?: string;
 }
 
+const EVENT_OPTIONS = [
+  { value: 'RUN', label: 'Running', icon: Play, color: 'text-status-running' },
+  { value: 'DOWNTIME', label: 'Downtime', icon: Pause, color: 'text-destructive' },
+  { value: 'SETUP', label: 'Setup', icon: Wrench, color: 'text-warning' },
+];
+
 export function EditEventDialog({ open, onOpenChange, entityId, initialData, machineName }: EditEventDialogProps) {
   const queryClient = useQueryClient();
+
+  // Convert UTC timestamps to local timezone for display
+  const origStartLocal = useMemo(() => initialData.start_ts ? toLocalDatetimeString(initialData.start_ts) : '', [initialData.start_ts]);
+  const origEndLocal = useMemo(() => initialData.end_ts ? toLocalDatetimeString(initialData.end_ts) : '', [initialData.end_ts]);
+
   const [eventType, setEventType] = useState(initialData.event_type);
-  const [startTs, setStartTs] = useState(initialData.start_ts ? initialData.start_ts.slice(0, 19) : '');
-  const [endTs, setEndTs] = useState(initialData.end_ts ? initialData.end_ts.slice(0, 19) : '');
+  const [startTs, setStartTs] = useState(origStartLocal);
+  const [endTs, setEndTs] = useState(origEndLocal);
   const [notes, setNotes] = useState(initialData.notes || '');
   const [showCascadeConfirm, setShowCascadeConfirm] = useState(false);
 
-  // Detect if time fields have changed
+  // Detect if time fields have changed (comparing local timezone strings)
   const hasTimeChanged = useMemo(() => {
-    const origStart = initialData.start_ts ? initialData.start_ts.slice(0, 19) : '';
-    const origEnd = initialData.end_ts ? initialData.end_ts.slice(0, 19) : '';
-    return startTs !== origStart || endTs !== origEnd;
-  }, [startTs, endTs, initialData.start_ts, initialData.end_ts]);
+    return startTs !== origStartLocal || endTs !== origEndLocal;
+  }, [startTs, endTs, origStartLocal, origEndLocal]);
 
   const mutation = useMutation({
     mutationFn: async () => {
+      // new Date(localString) parses as local time, .toISOString() converts to UTC
       const { data, error } = await supabase.rpc('rpc_update_event' as any, {
         p_event_id: entityId,
         p_event_type: eventType,
@@ -58,6 +79,8 @@ export function EditEventDialog({ open, onOpenChange, entityId, initialData, mac
       if (!result?.success) {
         throw new Error(result?.error === 'SHIFT_LOCKED'
           ? 'SHIFT_LOCKED'
+          : result?.error === 'NOT_FOUND'
+          ? 'NOT_FOUND'
           : result?.message || 'Unknown error');
       }
       return result;
@@ -79,7 +102,7 @@ export function EditEventDialog({ open, onOpenChange, entityId, initialData, mac
         toast.error('ไม่สามารถแก้ไขได้ — กะถูกล็อกแล้ว');
       } else if (err.message.includes('OVERLAP_EVENT')) {
         toast.error('การเปลี่ยนเวลาทำให้เกิดเหตุการณ์ซ้อนทับกัน');
-      } else if (err.message.includes('Event not found') || err.message.includes('NOT_FOUND')) {
+      } else if (err.message.includes('NOT_FOUND')) {
         toast.error('ไม่พบเหตุการณ์นี้ — อาจถูกลบหรือถูกแทนที่ไปแล้ว');
         onOpenChange(false);
       } else if (err.message.includes('PERMISSION_DENIED')) {
@@ -102,12 +125,6 @@ export function EditEventDialog({ open, onOpenChange, entityId, initialData, mac
     setShowCascadeConfirm(false);
     mutation.mutate();
   };
-
-  const EVENT_OPTIONS = [
-    { value: 'RUN', label: 'Running', icon: Play, color: 'text-status-running' },
-    { value: 'DOWNTIME', label: 'Downtime', icon: Pause, color: 'text-destructive' },
-    { value: 'SETUP', label: 'Setup', icon: Wrench, color: 'text-warning' },
-  ];
 
   return (
     <>
