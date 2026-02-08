@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { ScrollText, RefreshCw, Search, CalendarDays, Cpu } from 'lucide-react';
+import { ScrollText, RefreshCw, Search, CalendarDays, Cpu, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Navigate } from 'react-router-dom';
 import { DeleteActivityDialog } from '@/components/recent-activity/DeleteActivityDialog';
 import { EventTimelineEditable, type TimelineEvent } from '@/components/recent-activity/EventTimelineEditable';
+import { CreateManualEventDialog } from '@/components/recent-activity/CreateManualEventDialog';
 
 export default function RecentActivity() {
   const { user, profile, company, isLoading: authLoading } = useAuth();
@@ -23,6 +24,7 @@ export default function RecentActivity() {
   const [dateFilter, setDateFilter] = useState<string>('today');
   const [machineFilter, setMachineFilter] = useState<string>('all');
   const [deletingEvent, setDeletingEvent] = useState<TimelineEvent | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const isStaff = profile?.role === 'STAFF';
   const showActor = !isStaff;
@@ -195,10 +197,16 @@ export default function RecentActivity() {
                   : 'ตรวจสอบและแก้ไขเหตุการณ์การผลิตทั้งหมด — คลิกที่เวลาเพื่อแก้ไข'}
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              รีเฟรช
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                สร้าง Manual
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                รีเฟรช
+              </Button>
+            </div>
           </div>
 
           {/* Filters */}
@@ -338,6 +346,13 @@ export default function RecentActivity() {
           description="คุณต้องการลบเหตุการณ์การผลิตนี้ใช่หรือไม่?"
         />
       )}
+
+      {/* Create Manual Event Dialog */}
+      <CreateManualEventDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        companyId={companyId}
+      />
     </div>
   );
 }

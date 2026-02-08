@@ -1213,6 +1213,18 @@ export type Database = {
         Args: { p_shift_calendar_id: string }
         Returns: Json
       }
+      rpc_create_manual_event: {
+        Args: {
+          p_end_ts?: string
+          p_event_type: Database["public"]["Enums"]["event_type"]
+          p_machine_id: string
+          p_notes?: string
+          p_product_id?: string
+          p_reason_id?: string
+          p_start_ts: string
+        }
+        Returns: Json
+      }
       rpc_lock_shift: { Args: { p_shift_calendar_id: string }; Returns: Json }
       rpc_recalc_oee_for_shift: {
         Args: { p_shift_calendar_id: string }
