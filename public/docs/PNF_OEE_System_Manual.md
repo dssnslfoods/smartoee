@@ -168,8 +168,9 @@ The system implements four distinct roles. Each role has specific capabilities a
 - Recalculate OEE for any shift in their company
 - Approve shifts after OEE calculation
 - Lock shifts to prevent further modifications
-- Create new Staff accounts within their company
-- Edit Staff account information (name, email, password)
+- Create new Staff and Supervisor accounts within their company
+- Edit Staff and Supervisor account information (name, email, password)
+- Switch user roles between Staff and Supervisor within their company
 - Create and manage machine permission groups
 - Assign Staff members to permission groups
 - Create production standards (machine-SKU benchmarks) inline from the Shopfloor page
@@ -179,7 +180,7 @@ The system implements four distinct roles. Each role has specific capabilities a
 **What they cannot do:**
 - Access the Admin Setup page
 - Access the Activity Log (raw audit trail)
-- Create Supervisor, Executive, or Admin accounts
+- Create Executive or Admin accounts
 - Manage users outside their company
 - Modify master data (plants, lines, machines, products, reasons)
 - Manage company-level settings
@@ -187,7 +188,7 @@ The system implements four distinct roles. Each role has specific capabilities a
 **Responsibility:**
 - Ensure data quality by reviewing shift data before approval
 - Follow the workflow: Review, Recalculate, Approve, Lock
-- Manage Staff accounts and machine permissions
+- Manage Staff and Supervisor accounts and machine permissions
 - Monitor production performance and address issues
 
 ## 2.3 EXECUTIVE
