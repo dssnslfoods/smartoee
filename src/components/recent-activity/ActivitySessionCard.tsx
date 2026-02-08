@@ -1,14 +1,20 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { format, differenceInSeconds } from 'date-fns';
 import { th } from 'date-fns/locale';
 import {
   ChevronDown, ChevronRight, Clock, User, Cpu, Play, Pause, Wrench,
-  Hash, Package, Pencil, Trash2,
+  Hash, Package, Trash2, Check, X, Loader2, AlertTriangle,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { InlineTimeInput } from './InlineTimeInput';
+import { useUpdateEvent } from './useUpdateEvent';
 import type { ActivitySession } from './groupActivities';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface AuditLog {
   id: string;
@@ -40,22 +46,8 @@ const ACTION_LABELS: Record<string, string> = {
   DELETE: 'ลบ',
 };
 
-const ENTITY_TYPE_LABELS: Record<string, string> = {
-  production_events: 'เหตุการณ์การผลิต',
-  production_counts: 'บันทึกจำนวนผลิต',
-  shift_approvals: 'อนุมัติกะ',
-  oee_snapshots: 'OEE Snapshot',
-  machines: 'เครื่องจักร',
-  lines: 'ไลน์',
-  plants: 'โรงงาน',
-  products: 'สินค้า',
-  production_standards: 'มาตรฐานการผลิต',
-  shifts: 'กะการทำงาน',
-  downtime_reasons: 'สาเหตุหยุดเครื่อง',
-  defect_reasons: 'สาเหตุของเสีย',
-};
-
 function formatDuration(seconds: number): string {
+  if (seconds < 0) return 'ไม่ถูกต้อง';
   if (seconds < 60) return `${Math.round(seconds)}s`;
   const mins = Math.floor(seconds / 60);
   const secs = Math.round(seconds % 60);
@@ -78,176 +70,260 @@ function getActionBadge(action: string) {
   }
 }
 
-// --- Single log entry inside a session ---
-function formatTimeLocal(isoString: string): string {
+/** Convert ISO string to local "HH:MM:SS" */
+function toLocalTime(isoString: string): string {
   const d = new Date(isoString);
-  if (isNaN(d.getTime())) return '--:--';
+  if (isNaN(d.getTime())) return '00:00:00';
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+/** Convert ISO string to local "YYYY-MM-DDTHH:MM:SS" */
+function toLocalDatetime(isoString: string): string {
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+// --- Single log entry with inline editing ---
 function SessionLogEntry({
-  log, lookup, editable, onEdit, onDelete,
+  log, lookup, editable, onDelete,
 }: {
   log: AuditLog;
   lookup: LookupData;
   editable: boolean;
-  onEdit: (log: AuditLog) => void;
   onDelete: (log: AuditLog) => void;
 }) {
   const data = (log.action === 'DELETE' ? log.before_json : log.after_json) as Record<string, unknown> | null;
 
-  const description = useMemo(() => {
-    if (log.entity_type === 'production_events') {
-      const eventType = data?.event_type as string;
-      const config = EVENT_TYPE_CONFIG[eventType];
-      const startTs = data?.start_ts as string | null;
-      const endTs = data?.end_ts as string | null;
-      const duration = startTs && endTs ? differenceInSeconds(new Date(endTs), new Date(startTs)) : null;
-      const isOngoing = startTs && !endTs && log.action !== 'DELETE';
-      const productId = data?.product_id as string | null;
-      const product = productId ? lookup.products.get(productId) : null;
-      const reasonId = data?.reason_id as string | null;
-      const reason = reasonId ? lookup.reasons.get(reasonId) : null;
-      const notes = data?.notes as string | null;
-
-      return {
-        type: 'event' as const,
-        config,
-        eventType,
-        duration,
-        isOngoing,
-        product,
-        reason,
-        notes,
-        startTs,
-        endTs,
-      };
-    }
-    if (log.entity_type === 'production_counts') {
-      const good = (data?.good_qty as number) ?? 0;
-      const reject = (data?.reject_qty as number) ?? 0;
-      const notes = data?.notes as string | null;
-      return { type: 'count' as const, good, reject, notes };
-    }
-    return { type: 'other' as const, entityLabel: ENTITY_TYPE_LABELS[log.entity_type] || log.entity_type };
+  const eventInfo = useMemo(() => {
+    if (log.entity_type !== 'production_events') return null;
+    const eventType = data?.event_type as string;
+    const config = EVENT_TYPE_CONFIG[eventType];
+    const startTs = data?.start_ts as string | null;
+    const endTs = data?.end_ts as string | null;
+    const isOngoing = startTs && !endTs && log.action !== 'DELETE';
+    const productId = data?.product_id as string | null;
+    const product = productId ? lookup.products.get(productId) : null;
+    const reasonId = data?.reason_id as string | null;
+    const reason = reasonId ? lookup.reasons.get(reasonId) : null;
+    const notes = data?.notes as string | null;
+    return { config, eventType, startTs, endTs, isOngoing, product, reason, notes };
   }, [log, data, lookup]);
 
+  // Inline edit state
+  const origStartLocal = eventInfo?.startTs ? toLocalDatetime(eventInfo.startTs) : '';
+  const origEndLocal = eventInfo?.endTs ? toLocalDatetime(eventInfo.endTs) : '';
+  const origStartTime = origStartLocal ? origStartLocal.split('T')[1] || '00:00:00' : '00:00:00';
+  const origEndTime = origEndLocal ? origEndLocal.split('T')[1] || '00:00:00' : '00:00:00';
+
+  const [editStartTime, setEditStartTime] = useState(origStartTime);
+  const [editEndTime, setEditEndTime] = useState(origEndTime);
+  const [showCascadeConfirm, setShowCascadeConfirm] = useState(false);
+
+  const hasChanged = editStartTime !== origStartTime || editEndTime !== origEndTime;
+
+  // Build full datetime strings for save
+  const buildFullDatetime = useCallback((timePart: string, origFull: string) => {
+    const datePart = origFull.split('T')[0];
+    if (!datePart) return '';
+    return `${datePart}T${timePart}`;
+  }, []);
+
+  const mutation = useUpdateEvent(() => {
+    // Reset to new values after success — the query invalidation will refetch
+  });
+
+  const handleSave = useCallback(() => {
+    if (hasChanged) {
+      setShowCascadeConfirm(true);
+    }
+  }, [hasChanged]);
+
+  const handleConfirmSave = useCallback(() => {
+    setShowCascadeConfirm(false);
+    if (!eventInfo) return;
+    const newStartFull = buildFullDatetime(editStartTime, origStartLocal);
+    const newEndFull = origEndLocal ? buildFullDatetime(editEndTime, origEndLocal) : null;
+    mutation.mutate({
+      eventId: log.entity_id,
+      eventType: eventInfo.eventType,
+      startTs: new Date(newStartFull).toISOString(),
+      endTs: newEndFull ? new Date(newEndFull).toISOString() : null,
+      notes: eventInfo.notes,
+    });
+  }, [eventInfo, editStartTime, editEndTime, origStartLocal, origEndLocal, buildFullDatetime, log.entity_id, mutation]);
+
+  const handleCancel = useCallback(() => {
+    setEditStartTime(origStartTime);
+    setEditEndTime(origEndTime);
+  }, [origStartTime, origEndTime]);
+
+  // Compute edited duration
+  const editedDuration = useMemo(() => {
+    if (!origStartLocal || !origEndLocal) return null;
+    const startFull = buildFullDatetime(editStartTime, origStartLocal);
+    const endFull = buildFullDatetime(editEndTime, origEndLocal);
+    const diff = differenceInSeconds(new Date(endFull), new Date(startFull));
+    return diff;
+  }, [editStartTime, editEndTime, origStartLocal, origEndLocal, buildFullDatetime]);
+
+  if (!eventInfo) return null;
+
+  const { config, isOngoing, product, reason, notes } = eventInfo;
+
   return (
-    <div
-      className={cn(
-        'flex items-start gap-3 group rounded-lg px-2 py-2 -mx-2 transition-colors',
-        editable && 'hover:bg-muted/50 cursor-pointer',
-      )}
-      onClick={() => editable && onEdit(log)}
-    >
-      {/* Timeline dot */}
-      <div className="flex flex-col items-center pt-1 shrink-0">
-        {description.type === 'event' && description.config ? (
-          (() => {
-            const Icon = description.config.icon;
-            return (
-              <div className={cn('h-8 w-8 rounded-full flex items-center justify-center border', description.config.bgClass)}>
-                <Icon className={cn('h-4 w-4', description.config.colorClass)} />
-              </div>
-            );
-          })()
-        ) : (
-          <div className="h-8 w-8 rounded-full flex items-center justify-center border bg-primary/10 border-primary/20">
-            <Hash className="h-4 w-4 text-primary" />
-          </div>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0 pb-1">
-        {/* Row 1: Event type + action badge */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {description.type === 'event' && description.config && (
-            <span className={cn('text-sm font-semibold', description.config.colorClass)}>
-              {description.config.label}
-            </span>
-          )}
-          {description.type === 'count' && (
-            <span className="text-sm font-semibold text-primary">บันทึกจำนวน</span>
-          )}
-          {description.type === 'other' && (
-            <span className="text-sm font-semibold">{description.entityLabel}</span>
-          )}
-          {getActionBadge(log.action)}
-          {description.type === 'event' && description.isOngoing && (
-            <Badge variant="outline" className="text-[10px] animate-pulse border-status-running/40 text-status-running px-1.5 py-0">
-              กำลังดำเนินการ
-            </Badge>
-          )}
-
-          {/* Edit/Delete buttons - always visible on mobile, hover on desktop */}
-          {editable && (
-            <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity ml-auto" onClick={(e) => e.stopPropagation()}>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(log)}>
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(log)}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+    <>
+      <div className="flex items-start gap-3 rounded-lg px-2 py-2.5 -mx-2 transition-colors hover:bg-muted/30">
+        {/* Icon */}
+        <div className="flex flex-col items-center pt-0.5 shrink-0">
+          {config ? (
+            <div className={cn('h-9 w-9 rounded-full flex items-center justify-center border', config.bgClass)}>
+              {(() => { const Icon = config.icon; return <Icon className={cn('h-4 w-4', config.colorClass)} />; })()}
+            </div>
+          ) : (
+            <div className="h-9 w-9 rounded-full flex items-center justify-center border bg-muted">
+              <Hash className="h-4 w-4" />
             </div>
           )}
         </div>
 
-        {/* Row 2: Time range — prominent display */}
-        {description.type === 'event' && description.startTs && (
-          <div className="flex items-center gap-2 mt-1">
-            <div className="flex items-center gap-1.5 font-mono text-sm tabular-nums">
-              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="font-medium">{formatTimeLocal(description.startTs)}</span>
-              <span className="text-muted-foreground">→</span>
-              <span className="font-medium">
-                {description.endTs ? formatTimeLocal(description.endTs) : '--:--:--'}
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          {/* Row 1: Event type + badges */}
+          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+            {config && (
+              <span className={cn('text-sm font-semibold', config.colorClass)}>
+                {config.label}
+              </span>
+            )}
+            {getActionBadge(log.action)}
+            {isOngoing && (
+              <Badge variant="outline" className="text-[10px] animate-pulse border-status-running/40 text-status-running px-1.5 py-0">
+                กำลังดำเนินการ
+              </Badge>
+            )}
+
+            {/* Delete button */}
+            {editable && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-destructive hover:text-destructive ml-auto"
+                onClick={() => onDelete(log)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+
+          {/* Row 2: Inline time inputs */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground w-8">เริ่ม</span>
+              <InlineTimeInput
+                value={editStartTime}
+                onChange={setEditStartTime}
+                disabled={!editable || mutation.isPending}
+              />
+            </div>
+            <span className="text-muted-foreground text-sm">→</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground w-12">สิ้นสุด</span>
+              {origEndLocal ? (
+                <InlineTimeInput
+                  value={editEndTime}
+                  onChange={setEditEndTime}
+                  disabled={!editable || mutation.isPending}
+                />
+              ) : (
+                <span className="text-sm font-mono text-muted-foreground">--:--:--</span>
+              )}
+            </div>
+
+            {/* Duration */}
+            {editedDuration != null && (
+              <Badge variant="secondary" className={cn("text-[10px] gap-1 px-1.5 py-0", editedDuration < 0 && "bg-destructive/10 text-destructive")}>
+                <Clock className="h-2.5 w-2.5" />
+                {formatDuration(editedDuration)}
+              </Badge>
+            )}
+          </div>
+
+          {/* Row 3: Save/Cancel when changed */}
+          {hasChanged && editable && (
+            <div className="flex items-center gap-2 mt-2">
+              <Button
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={handleSave}
+                disabled={mutation.isPending}
+              >
+                {mutation.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Check className="h-3 w-3" />
+                )}
+                บันทึก
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs gap-1"
+                onClick={handleCancel}
+                disabled={mutation.isPending}
+              >
+                <X className="h-3 w-3" />
+                ยกเลิก
+              </Button>
+              <span className="text-[10px] text-warning flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                event ถัดไปจะเลื่อนตาม
               </span>
             </div>
-            {description.duration != null && (
-              <Badge variant="secondary" className="text-[10px] gap-1 px-1.5 py-0">
-                {formatDuration(description.duration)}
-              </Badge>
-            )}
-          </div>
-        )}
+          )}
 
-        {/* Row 3: Extra details */}
-        {description.type === 'event' && (
+          {/* Row 4: Extra details */}
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
-            {description.product && (
+            {product && (
               <span className="flex items-center gap-1">
                 <Package className="h-3 w-3" />
-                {description.product.name}
+                {product.name}
               </span>
             )}
-            {description.reason && (
-              <span className="flex items-center gap-1">
-                📋 {description.reason.name}
-              </span>
+            {reason && (
+              <span className="flex items-center gap-1">📋 {reason.name}</span>
             )}
-            {description.notes && <span className="italic">📝 {description.notes}</span>}
+            {notes && <span className="italic">📝 {notes}</span>}
           </div>
-        )}
-
-        {description.type === 'count' && (
-          <div className="flex items-center gap-2 mt-1">
-            <Badge className="bg-status-running/10 text-status-running border-status-running/20 text-[10px] px-1.5 py-0">
-              ✓ {(description as any).good}
-            </Badge>
-            {(description as any).reject > 0 && (
-              <Badge className="bg-destructive/10 text-destructive border-destructive/20 text-[10px] px-1.5 py-0">
-                ✗ {(description as any).reject}
-              </Badge>
-            )}
-            {(description as any).notes && (
-              <span className="text-xs text-muted-foreground italic">📝 {(description as any).notes}</span>
-            )}
-          </div>
-        )}
+        </div>
       </div>
-    </div>
+
+      {/* Cascade confirm */}
+      <AlertDialog open={showCascadeConfirm} onOpenChange={setShowCascadeConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+              ยืนยันการเปลี่ยนเวลา
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-left space-y-2">
+              <p>การเปลี่ยนเวลาจะส่งผลต่อ event ถัดไปในกะเดียวกัน:</p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>เวลาสิ้นสุดของ event ก่อนหน้าจะถูกปรับตาม</li>
+                <li>event ถัดไปทั้งหมดจะเลื่อนเวลาโดยคง duration เดิม</li>
+              </ul>
+              <p className="font-medium">ต้องการดำเนินการต่อหรือไม่?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSave}>ยืนยัน</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -257,34 +333,17 @@ interface ActivitySessionCardProps {
   showActor: boolean;
   lookup: LookupData;
   canEditFn: (log: AuditLog) => boolean;
-  onEdit: (log: AuditLog) => void;
   onDelete: (log: AuditLog) => void;
 }
 
 export function ActivitySessionCard({
-  session, showActor, lookup, canEditFn, onEdit, onDelete,
+  session, showActor, lookup, canEditFn, onDelete,
 }: ActivitySessionCardProps) {
   const isSingleEntry = session.logs.length === 1;
-  const [isExpanded, setIsExpanded] = useState(!isSingleEntry);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const machine = session.machineId ? lookup.machines.get(session.machineId) : null;
   const sessionDuration = differenceInSeconds(new Date(session.endTs), new Date(session.startTs));
-
-  // For single non-machine entries, render simpler
-  if (isSingleEntry && !machine) {
-    const log = session.logs[0];
-    return (
-      <div className="border rounded-lg p-3 hover:bg-muted/30 transition-colors">
-        <SessionLogEntry
-          log={log}
-          lookup={lookup}
-          editable={canEditFn(log)}
-          onEdit={onEdit}
-          onDelete={onDelete}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="border rounded-lg overflow-hidden hover:shadow-sm transition-shadow">
@@ -330,14 +389,13 @@ export function ActivitySessionCard({
 
       {/* Expanded log entries */}
       {isExpanded && (
-        <div className="px-4 pt-3 pb-1 border-t border-border/50">
+        <div className="px-4 pt-2 pb-1 border-t border-border/50 divide-y divide-border/30">
           {session.logs.map((log) => (
             <SessionLogEntry
               key={log.id}
               log={log}
               lookup={lookup}
               editable={canEditFn(log)}
-              onEdit={onEdit}
               onDelete={onDelete}
             />
           ))}
