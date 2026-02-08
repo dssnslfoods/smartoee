@@ -37,6 +37,7 @@ import {
   stopEvent,
   addCounts,
   getSession,
+  getPermittedMachineIds,
 } from '@/services';
 import type { 
   ShiftCalendar, 
@@ -80,11 +81,28 @@ export default function Shopfloor() {
     enabled: !!selectedPlantId,
   });
 
-  const { data: machines = [], isLoading: machinesLoading } = useQuery({
+  const { data: allMachines = [], isLoading: machinesLoading } = useQuery({
     queryKey: ['machines', selectedLineId, companyId],
     queryFn: () => getMachines(selectedLineId!, companyId),
     enabled: !!selectedLineId,
   });
+
+  // For STAFF, fetch permitted machine IDs to filter the list
+  const isStaff = hasRole('STAFF') && !isAdmin() && !hasRole('SUPERVISOR');
+  
+  const { data: permittedIds } = useQuery({
+    queryKey: ['permittedMachineIds'],
+    queryFn: () => getPermittedMachineIds(),
+    enabled: isStaff && isAuthenticated === true,
+    staleTime: 60000,
+  });
+
+  // Filter machines: STAFF sees only permitted machines, others see all
+  const machines = useMemo(() => {
+    if (!isStaff || !permittedIds) return allMachines;
+    const idSet = new Set(permittedIds);
+    return allMachines.filter(m => idSet.has(m.id));
+  }, [allMachines, permittedIds, isStaff]);
 
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ['products', companyId],

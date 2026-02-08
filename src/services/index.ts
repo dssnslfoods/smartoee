@@ -30,6 +30,7 @@ export {
   getMachines,
   getMachineById,
   getMachinesByPlant,
+  getPermittedMachineIds,
 
   // Query Functions - Shifts
   getShifts,
