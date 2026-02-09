@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Loader2, Factory, Layers, Cpu } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -40,6 +41,7 @@ interface UserProfile {
   user_id: string;
   full_name: string;
   role: string;
+  company_id: string | null;
 }
 
 interface PlantPermission {
@@ -65,48 +67,71 @@ interface MachinePermission {
 
 export function UserPermissionManager() {
   const queryClient = useQueryClient();
+  const { company, isAdmin } = useAuth();
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'plant' | 'line' | 'machine'; id: string } | null>(null);
   const [permType, setPermType] = useState<'plant' | 'line' | 'machine'>('plant');
   const [selectedEntityId, setSelectedEntityId] = useState<string>('');
 
-  // Fetch users
+  // Company ID for scoping: Admin uses selected company, Supervisor uses own company
+  const scopeCompanyId = company?.id;
+
+  // Fetch users - scoped by company for Supervisors
   const { data: users } = useQuery({
-    queryKey: ['admin-users'],
+    queryKey: ['admin-users', scopeCompanyId, isAdmin()],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('user_profiles')
         .select('*')
         .order('full_name');
+      
+      // Supervisor sees only users in their company
+      if (!isAdmin() && scopeCompanyId) {
+        query = query.eq('company_id', scopeCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as UserProfile[];
     },
   });
 
-  // Fetch entities for dropdown
+  // Fetch entities for dropdown - scoped by company
   const { data: plants } = useQuery({
-    queryKey: ['admin-plants-perm'],
+    queryKey: ['admin-plants-perm', scopeCompanyId, isAdmin()],
     queryFn: async () => {
-      const { data, error } = await supabase.from('plants').select('id, name').eq('is_active', true).order('name');
+      let query = supabase.from('plants').select('id, name, company_id').eq('is_active', true).order('name');
+      if (!isAdmin() && scopeCompanyId) {
+        query = query.eq('company_id', scopeCompanyId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
   });
 
   const { data: lines } = useQuery({
-    queryKey: ['admin-lines-perm'],
+    queryKey: ['admin-lines-perm', scopeCompanyId, isAdmin()],
     queryFn: async () => {
-      const { data, error } = await supabase.from('lines').select('id, name, plants(name)').eq('is_active', true).order('name');
+      let query = supabase.from('lines').select('id, name, company_id, plants(name)').eq('is_active', true).order('name');
+      if (!isAdmin() && scopeCompanyId) {
+        query = query.eq('company_id', scopeCompanyId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
   });
 
   const { data: machines } = useQuery({
-    queryKey: ['admin-machines-perm'],
+    queryKey: ['admin-machines-perm', scopeCompanyId, isAdmin()],
     queryFn: async () => {
-      const { data, error } = await supabase.from('machines').select('id, name, lines(name)').eq('is_active', true).order('name');
+      let query = supabase.from('machines').select('id, name, company_id, lines(name)').eq('is_active', true).order('name');
+      if (!isAdmin() && scopeCompanyId) {
+        query = query.eq('company_id', scopeCompanyId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
