@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Loader2, Clock, Factory } from 'lucide-react';
+import { Plus, Pencil, Loader2, Clock, Factory, CalendarDays } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { ChangeHistory } from './ChangeHistory';
 
 interface PlannedTimeTemplate {
   id: string;
@@ -29,6 +31,7 @@ interface PlannedTimeTemplate {
   other_minutes: number;
   other_label: string | null;
   is_active: boolean;
+  effective_from: string;
   plants?: { id: string; name: string; code: string | null } | null;
   shifts?: { id: string; name: string; start_time: string; end_time: string } | null;
 }
@@ -43,6 +46,7 @@ const emptyForm = {
   other_minutes: 0,
   other_label: '',
   is_active: true,
+  effective_from: new Date().toISOString().slice(0, 10),
 };
 
 export function PlannedTimeManager() {
@@ -122,6 +126,7 @@ export function PlannedTimeManager() {
         other_minutes: data.other_minutes,
         other_label: data.other_label || null,
         is_active: data.is_active,
+        effective_from: data.effective_from,
       };
 
       if (data.id) {
@@ -164,6 +169,7 @@ export function PlannedTimeManager() {
       other_minutes: t.other_minutes,
       other_label: t.other_label || '',
       is_active: t.is_active,
+      effective_from: t.effective_from || new Date().toISOString().slice(0, 10),
     });
     setIsDialogOpen(true);
   };
@@ -234,6 +240,7 @@ export function PlannedTimeManager() {
             <TableRow>
               <TableHead>Plant</TableHead>
               <TableHead>Shift</TableHead>
+              <TableHead>เริ่มใช้ตั้งแต่</TableHead>
               <TableHead className="text-right">พักเบรค</TableHead>
               <TableHead className="text-right">พักทานอาหาร</TableHead>
               <TableHead className="text-right">ประชุม</TableHead>
@@ -252,7 +259,7 @@ export function PlannedTimeManager() {
               const ppt = shiftDur != null ? shiftDur - ded : null;
               return (
                 <TableRow key={t.id}>
-                  <TableCell className="font-medium">{t.plants?.name || '-'}</TableCell>
+                <TableCell className="font-medium">{t.plants?.name || '-'}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       <Clock className="h-3.5 w-3.5 text-muted-foreground" />
@@ -262,6 +269,14 @@ export function PlannedTimeManager() {
                           ({formatTime(t.shifts.start_time)}-{formatTime(t.shifts.end_time)})
                         </span>
                       )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-sm tabular-nums">
+                        {t.effective_from ? format(new Date(t.effective_from + 'T00:00:00'), 'dd/MM/yyyy') : '-'}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{t.break_minutes}</TableCell>
@@ -294,7 +309,7 @@ export function PlannedTimeManager() {
             })}
             {templates?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                   ยังไม่มี Template — กดปุ่ม "เพิ่ม Template" เพื่อเริ่มกำหนดเวลาหัก
                 </TableCell>
               </TableRow>
@@ -431,6 +446,25 @@ export function PlannedTimeManager() {
               </div>
             </div>
 
+            {/* Effective From */}
+            <div className="space-y-2">
+              <Label htmlFor="ppt-effective-from">
+                <div className="flex items-center gap-1.5">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  เริ่มใช้ตั้งแต่วันที่ *
+                </div>
+              </Label>
+              <Input
+                id="ppt-effective-from"
+                type="date"
+                value={formData.effective_from}
+                onChange={e => setFormData(p => ({ ...p, effective_from: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                การเปลี่ยนแปลงจะมีผลตั้งแต่วันที่นี้เป็นต้นไป — ไม่กระทบข้อมูลที่บันทึกไปแล้ว
+              </p>
+            </div>
+
             <div className="flex items-center gap-2">
               <Switch
                 id="template-active"
@@ -450,6 +484,22 @@ export function PlannedTimeManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Change History */}
+      <ChangeHistory
+        entityType="planned_time_templates"
+        title="ประวัติการเปลี่ยนแปลง Planned Time"
+        displayFields={{
+          break_minutes: 'พักเบรค (นาที)',
+          meal_minutes: 'พักทานอาหาร (นาที)',
+          meeting_minutes: 'ประชุม (นาที)',
+          maintenance_minutes: 'บำรุงรักษา (นาที)',
+          other_minutes: 'อื่นๆ (นาที)',
+          other_label: 'ชื่อรายการอื่นๆ',
+          is_active: 'สถานะ',
+          effective_from: 'เริ่มใช้ตั้งแต่',
+        }}
+      />
     </div>
   );
 }
