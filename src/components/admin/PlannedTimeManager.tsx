@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Loader2, Clock, Factory, CalendarDays } from 'lucide-react';
+import { Plus, Pencil, Trash2, Copy, Loader2, Clock, Factory, CalendarDays } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
@@ -63,6 +63,9 @@ export function PlannedTimeManager() {
   const [formData, setFormData] = useState(emptyForm);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingTemplate, setDeletingTemplate] = useState<PlannedTimeTemplate | null>(null);
+  const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
+  const [copySourcePlantId, setCopySourcePlantId] = useState('');
+  const [copyTargetPlantId, setCopyTargetPlantId] = useState('');
 
   // Fetch plants for the selected company
   const { data: plants } = useQuery({
@@ -201,6 +204,72 @@ export function PlannedTimeManager() {
     },
   });
 
+  const copyFromPlantMutation = useMutation({
+    mutationFn: async ({ sourceId, targetId }: { sourceId: string; targetId: string }) => {
+      if (!selectedCompanyId) throw new Error('กรุณาเลือกบริษัทก่อน');
+      if (sourceId === targetId) throw new Error('ต้นทางและปลายทางต้องเป็นคนละ Plant');
+
+      // Fetch source templates
+      const { data: sourceTemplates, error: fetchErr } = await supabase
+        .from('planned_time_templates')
+        .select('*')
+        .eq('plant_id', sourceId)
+        .eq('company_id', selectedCompanyId)
+        .eq('is_active', true);
+      if (fetchErr) throw fetchErr;
+      if (!sourceTemplates || sourceTemplates.length === 0) {
+        throw new Error('ไม่พบ Template ที่ Active ใน Plant ต้นทาง');
+      }
+
+      // Insert copies for target plant
+      const newRows = sourceTemplates.map(t => ({
+        company_id: selectedCompanyId,
+        plant_id: targetId,
+        shift_id: t.shift_id,
+        break_minutes: t.break_minutes,
+        meal_minutes: t.meal_minutes,
+        meeting_minutes: t.meeting_minutes,
+        maintenance_minutes: t.maintenance_minutes,
+        other_minutes: t.other_minutes,
+        other_label: t.other_label,
+        is_active: true,
+        effective_from: new Date().toISOString().slice(0, 10),
+      }));
+
+      const { error: insertErr } = await supabase.from('planned_time_templates').insert(newRows);
+      if (insertErr) throw insertErr;
+
+      return sourceTemplates.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['planned-time-templates'] });
+      toast.success(`คัดลอก ${count} Template สำเร็จ`);
+      setIsCopyDialogOpen(false);
+      setCopySourcePlantId('');
+      setCopyTargetPlantId('');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const handleDuplicateRow = (t: PlannedTimeTemplate) => {
+    setEditingId(null);
+    setFormData({
+      plant_id: t.plant_id,
+      shift_id: t.shift_id,
+      break_minutes: t.break_minutes,
+      meal_minutes: t.meal_minutes,
+      meeting_minutes: t.meeting_minutes,
+      maintenance_minutes: t.maintenance_minutes,
+      other_minutes: t.other_minutes,
+      other_label: t.other_label || '',
+      is_active: true,
+      effective_from: new Date().toISOString().slice(0, 10),
+    });
+    setIsDialogOpen(true);
+  };
+
   const handleOpenCreate = () => {
     setEditingId(null);
     setFormData(emptyForm);
@@ -274,10 +343,16 @@ export function PlannedTimeManager() {
           <h3 className="text-lg font-semibold">Planned Production Time</h3>
           <p className="text-sm text-muted-foreground">กำหนดเวลาหัก (Deductions) ต่อ Plant + Shift เพื่อคำนวณ Availability</p>
         </div>
-        <Button onClick={handleOpenCreate} size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          เพิ่ม Template
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setIsCopyDialogOpen(true)}>
+            <Copy className="h-4 w-4 mr-2" />
+            คัดลอกจาก Plant อื่น
+          </Button>
+          <Button onClick={handleOpenCreate} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            เพิ่ม Template
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -351,6 +426,9 @@ export function PlannedTimeManager() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleDuplicateRow(t)} title="คัดลอก Template">
+                        <Copy className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(t)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -571,6 +649,68 @@ export function PlannedTimeManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Copy from Plant Dialog */}
+      <Dialog open={isCopyDialogOpen} onOpenChange={setIsCopyDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>คัดลอก Template จาก Plant อื่น</DialogTitle>
+            <DialogDescription>
+              คัดลอก Planned Time Templates ทั้งหมดที่ Active จาก Plant ต้นทาง ไปยัง Plant ปลายทาง
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Plant ต้นทาง (คัดลอกจาก)</Label>
+              <Select value={copySourcePlantId} onValueChange={setCopySourcePlantId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือก Plant ต้นทาง" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plants?.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} {p.code && `(${p.code})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Plant ปลายทาง (คัดลอกไปยัง)</Label>
+              <Select value={copyTargetPlantId} onValueChange={setCopyTargetPlantId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือก Plant ปลายทาง" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plants?.filter(p => p.id !== copySourcePlantId).map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} {p.code && `(${p.code})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {copySourcePlantId && copyTargetPlantId && (
+              <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+                <p>Templates ที่ Active ทั้งหมดจาก <strong>{plants?.find(p => p.id === copySourcePlantId)?.name}</strong> จะถูกคัดลอกไปยัง <strong>{plants?.find(p => p.id === copyTargetPlantId)?.name}</strong></p>
+                <p className="mt-1">วันที่เริ่มใช้จะถูกตั้งเป็นวันนี้</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsCopyDialogOpen(false); setCopySourcePlantId(''); setCopyTargetPlantId(''); }}>
+              ยกเลิก
+            </Button>
+            <Button
+              onClick={() => copyFromPlantMutation.mutate({ sourceId: copySourcePlantId, targetId: copyTargetPlantId })}
+              disabled={!copySourcePlantId || !copyTargetPlantId || copyFromPlantMutation.isPending}
+            >
+              {copyFromPlantMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              คัดลอก
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Change History */}
       <ChangeHistory

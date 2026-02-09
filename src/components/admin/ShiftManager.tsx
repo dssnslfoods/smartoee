@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Loader2, Clock, CalendarDays } from 'lucide-react';
+import { Plus, Pencil, Trash2, Copy, Loader2, Clock, CalendarDays } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -189,6 +189,18 @@ export function ShiftManager() {
     setFormData({ name: '', start_time: '08:00', end_time: '16:00', is_active: true, effective_from: new Date().toISOString().slice(0, 10) });
   };
 
+  const handleDuplicate = (shift: Shift) => {
+    setEditingShift(null);
+    setFormData({
+      name: `${shift.name} (สำเนา)`,
+      start_time: shift.start_time.slice(0, 5),
+      end_time: shift.end_time.slice(0, 5),
+      is_active: true,
+      effective_from: new Date().toISOString().slice(0, 10),
+    });
+    setIsDialogOpen(true);
+  };
+
   const handleSubmit = () => {
     if (!formData.name.trim()) {
       toast.error('Shift name is required');
@@ -294,12 +306,17 @@ export function ShiftManager() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleDuplicate(shift)} title="คัดลอกกะ">
+                        <Copy className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(shift)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => { setDeletingShift(shift); setIsDeleteOpen(true); }}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {shift.is_active && (
+                        <Button variant="ghost" size="icon" onClick={() => { setDeletingShift(shift); setIsDeleteOpen(true); }}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
