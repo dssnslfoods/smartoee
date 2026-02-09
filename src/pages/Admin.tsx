@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom';
-import { Settings, Factory, Layers, Cpu, AlertTriangle, Ban, Users, UserCog, Building2, Loader2, Package, BarChart3, Clock } from 'lucide-react';
+import { Settings, Factory, Layers, Cpu, AlertTriangle, Ban, Users, UserCog, Building2, Loader2, Package, BarChart3, Clock, Timer } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -17,6 +17,7 @@ import {
   UserManager,
   CompanyManager,
   PlannedTimeManager,
+  ShiftManager,
 } from '@/components/admin';
 
 export default function Admin() {
@@ -73,6 +74,13 @@ export default function Admin() {
               >
                 <Building2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Companies</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="shifts" 
+                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Timer className="h-4 w-4" />
+                <span className="hidden sm:inline">Shifts</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="plants" 
@@ -148,6 +156,10 @@ export default function Admin() {
 
               <TabsContent value="companies" className="mt-0">
                 <CompanyManager />
+              </TabsContent>
+
+              <TabsContent value="shifts" className="mt-0">
+                <ShiftManager />
               </TabsContent>
 
               <TabsContent value="plants" className="mt-0">
