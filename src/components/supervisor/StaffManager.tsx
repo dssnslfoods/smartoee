@@ -38,7 +38,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { MachinePermissionManager } from './MachinePermissionManager';
+import { StaffPermissionDialog } from './StaffPermissionDialog';
 
 interface StaffUser {
   id: string;
@@ -536,9 +536,9 @@ export function StaffManager() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Machine Permission Manager */}
+      {/* Staff Permission Dialog */}
       {permissionUser && (
-        <MachinePermissionManager
+        <StaffPermissionDialog
           staffUserId={permissionUser.userId}
           staffName={permissionUser.name}
           isOpen={!!permissionUser}
