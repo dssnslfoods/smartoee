@@ -66,16 +66,18 @@ export function PermissionGroupManager() {
   const [machineDialogGroup, setMachineDialogGroup] = useState<PermissionGroup | null>(null);
   const [newGroupForm, setNewGroupForm] = useState({ name: '', description: '' });
 
+  const companyId = company?.id;
+
   // Fetch permission groups
   const { data: groups = [], isLoading } = useQuery({
-    queryKey: ['permission-groups', profile?.company_id],
+    queryKey: ['permission-groups', companyId],
     queryFn: async () => {
-      if (!profile?.company_id) return [];
+      if (!companyId) return [];
       
       const { data, error } = await supabase
         .from('machine_permission_groups')
         .select('*')
-        .eq('company_id', profile.company_id)
+        .eq('company_id', companyId)
         .order('name');
       
       if (error) throw error;
@@ -104,14 +106,14 @@ export function PermissionGroupManager() {
       
       return groupsWithCounts as PermissionGroup[];
     },
-    enabled: !!profile?.company_id,
+    enabled: !!companyId,
   });
 
   // Fetch all machines in the company
   const { data: machines = [] } = useQuery({
-    queryKey: ['company-machines', profile?.company_id],
+    queryKey: ['company-machines', companyId],
     queryFn: async () => {
-      if (!profile?.company_id) return [];
+      if (!companyId) return [];
       
       const { data, error } = await supabase
         .from('machines')
@@ -121,7 +123,7 @@ export function PermissionGroupManager() {
           code,
           lines!inner(name, company_id)
         `)
-        .eq('lines.company_id', profile.company_id)
+        .eq('lines.company_id', companyId)
         .eq('is_active', true)
         .order('name');
       
@@ -133,7 +135,7 @@ export function PermissionGroupManager() {
         line_name: (m.lines as { name: string })?.name,
       })) as Machine[];
     },
-    enabled: !!profile?.company_id,
+    enabled: !!companyId,
   });
 
   // Fetch machines in selected group
@@ -156,14 +158,14 @@ export function PermissionGroupManager() {
   // Create group mutation
   const createGroupMutation = useMutation({
     mutationFn: async ({ name, description }: { name: string; description: string }) => {
-      if (!profile?.company_id) throw new Error('ไม่พบข้อมูลบริษัท');
+      if (!companyId || !profile?.user_id) throw new Error('ไม่พบข้อมูลบริษัท');
 
       const { data, error } = await supabase
         .from('machine_permission_groups')
         .insert({
           name,
           description: description || null,
-          company_id: profile.company_id,
+          company_id: companyId,
           created_by: profile.user_id,
         })
         .select()

@@ -67,16 +67,18 @@ export function StaffManager() {
     role: 'STAFF' as 'STAFF' | 'SUPERVISOR',
   });
 
+  const companyId = company?.id;
+
   // Fetch staff + supervisor users in the same company
   const { data: teamUsers = [], isLoading } = useQuery({
-    queryKey: ['team-users', profile?.company_id],
+    queryKey: ['team-users', companyId],
     queryFn: async () => {
-      if (!profile?.company_id) return [];
+      if (!companyId) return [];
       
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('company_id', profile.company_id)
+        .eq('company_id', companyId)
         .in('role', ['STAFF', 'SUPERVISOR'])
         .order('role')
         .order('full_name');
@@ -84,13 +86,13 @@ export function StaffManager() {
       if (error) throw error;
       return data as StaffUser[];
     },
-    enabled: !!profile?.company_id,
+    enabled: !!companyId,
   });
 
   // Create staff user mutation via edge function (doesn't affect current session)
   const createStaffMutation = useMutation({
     mutationFn: async ({ email, password, fullName, role }: { email: string; password: string; fullName: string; role: string }) => {
-      if (!profile?.company_id) throw new Error('ไม่พบข้อมูลบริษัท');
+      if (!companyId) throw new Error('ไม่พบข้อมูลบริษัท');
 
       const response = await supabase.functions.invoke<{ success: boolean; message?: string; error?: string; user?: { id: string; email: string } }>('create-staff-user', {
         body: { email, password, fullName, role },
