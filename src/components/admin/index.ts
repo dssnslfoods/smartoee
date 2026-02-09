@@ -9,3 +9,4 @@ export { UserPermissionManager } from './UserPermissionManager';
 export { UserManager } from './UserManager';
 export { CompanyManager } from './CompanyManager';
 export { PlannedTimeManager } from './PlannedTimeManager';
+export { ShiftManager } from './ShiftManager';
