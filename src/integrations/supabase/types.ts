@@ -450,6 +450,7 @@ export type Database = {
           break_minutes: number
           company_id: string
           created_at: string
+          effective_from: string
           id: string
           is_active: boolean
           maintenance_minutes: number
@@ -465,6 +466,7 @@ export type Database = {
           break_minutes?: number
           company_id: string
           created_at?: string
+          effective_from?: string
           id?: string
           is_active?: boolean
           maintenance_minutes?: number
@@ -480,6 +482,7 @@ export type Database = {
           break_minutes?: number
           company_id?: string
           created_at?: string
+          effective_from?: string
           id?: string
           is_active?: boolean
           maintenance_minutes?: number
@@ -988,6 +991,7 @@ export type Database = {
       shifts: {
         Row: {
           created_at: string
+          effective_from: string
           end_time: string
           id: string
           is_active: boolean
@@ -996,6 +1000,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          effective_from?: string
           end_time: string
           id?: string
           is_active?: boolean
@@ -1004,6 +1009,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          effective_from?: string
           end_time?: string
           id?: string
           is_active?: boolean

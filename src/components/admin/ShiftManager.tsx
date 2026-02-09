@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Loader2, Clock } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Clock, CalendarDays } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { ChangeHistory } from './ChangeHistory';
+import { format } from 'date-fns';
 import {
   Table,
   TableBody,
@@ -40,6 +42,7 @@ interface Shift {
   start_time: string;
   end_time: string;
   is_active: boolean;
+  effective_from: string;
   created_at: string;
 }
 
@@ -69,6 +72,7 @@ export function ShiftManager() {
     start_time: '08:00',
     end_time: '16:00',
     is_active: true,
+    effective_from: new Date().toISOString().slice(0, 10),
   });
 
   const { data: shifts, isLoading } = useQuery({
@@ -92,6 +96,7 @@ export function ShiftManager() {
           start_time: data.start_time,
           end_time: data.end_time,
           is_active: data.is_active,
+          effective_from: data.effective_from,
         });
       if (error) throw error;
     },
@@ -112,6 +117,7 @@ export function ShiftManager() {
           start_time: data.start_time,
           end_time: data.end_time,
           is_active: data.is_active,
+          effective_from: data.effective_from,
         })
         .eq('id', id);
       if (error) throw error;
@@ -140,7 +146,7 @@ export function ShiftManager() {
 
   const handleOpenCreate = () => {
     setEditingShift(null);
-    setFormData({ name: '', start_time: '08:00', end_time: '16:00', is_active: true });
+    setFormData({ name: '', start_time: '08:00', end_time: '16:00', is_active: true, effective_from: new Date().toISOString().slice(0, 10) });
     setIsDialogOpen(true);
   };
 
@@ -148,9 +154,10 @@ export function ShiftManager() {
     setEditingShift(shift);
     setFormData({
       name: shift.name,
-      start_time: shift.start_time.slice(0, 5), // HH:MM
+      start_time: shift.start_time.slice(0, 5),
       end_time: shift.end_time.slice(0, 5),
       is_active: shift.is_active,
+      effective_from: shift.effective_from || new Date().toISOString().slice(0, 10),
     });
     setIsDialogOpen(true);
   };
@@ -158,7 +165,7 @@ export function ShiftManager() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingShift(null);
-    setFormData({ name: '', start_time: '08:00', end_time: '16:00', is_active: true });
+    setFormData({ name: '', start_time: '08:00', end_time: '16:00', is_active: true, effective_from: new Date().toISOString().slice(0, 10) });
   };
 
   const handleSubmit = () => {
@@ -233,6 +240,7 @@ export function ShiftManager() {
               <TableHead>Start Time</TableHead>
               <TableHead>End Time</TableHead>
               <TableHead>Duration</TableHead>
+              <TableHead>เริ่มใช้ตั้งแต่</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
@@ -249,6 +257,14 @@ export function ShiftManager() {
                     {dur != null ? (
                       <span className="text-muted-foreground">{formatDuration(dur)} ({dur} min)</span>
                     ) : '-'}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-sm tabular-nums">
+                        {shift.effective_from ? format(new Date(shift.effective_from + 'T00:00:00'), 'dd/MM/yyyy') : '-'}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <span className={shift.is_active ? 'text-status-running' : 'text-muted-foreground'}>
@@ -270,7 +286,7 @@ export function ShiftManager() {
             })}
             {shifts?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   No shifts defined yet. Add your first shift to get started.
                 </TableCell>
               </TableRow>
@@ -336,6 +352,25 @@ export function ShiftManager() {
               </div>
             )}
 
+            {/* Effective From */}
+            <div className="space-y-2">
+              <Label htmlFor="effective-from">
+                <div className="flex items-center gap-1.5">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  เริ่มใช้ตั้งแต่วันที่ *
+                </div>
+              </Label>
+              <Input
+                id="effective-from"
+                type="date"
+                value={formData.effective_from}
+                onChange={(e) => setFormData({ ...formData, effective_from: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                การเปลี่ยนแปลงจะมีผลตั้งแต่วันที่นี้เป็นต้นไป — ไม่กระทบข้อมูลที่บันทึกไปแล้ว
+              </p>
+            </div>
+
             <div className="flex items-center gap-2">
               <Switch
                 id="shift-active"
@@ -375,6 +410,19 @@ export function ShiftManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Change History */}
+      <ChangeHistory
+        entityType="shifts"
+        title="ประวัติการเปลี่ยนแปลงกะ"
+        displayFields={{
+          name: 'ชื่อกะ',
+          start_time: 'เวลาเริ่ม',
+          end_time: 'เวลาสิ้นสุด',
+          is_active: 'สถานะ',
+          effective_from: 'เริ่มใช้ตั้งแต่',
+        }}
+      />
     </div>
   );
 }
