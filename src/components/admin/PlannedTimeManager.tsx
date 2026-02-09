@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Loader2, Clock, Factory, CalendarDays } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Clock, Factory, CalendarDays } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,6 +15,10 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { ChangeHistory } from './ChangeHistory';
@@ -57,6 +61,8 @@ export function PlannedTimeManager() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState(emptyForm);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deletingTemplate, setDeletingTemplate] = useState<PlannedTimeTemplate | null>(null);
 
   // Fetch plants for the selected company
   const { data: plants } = useQuery({
@@ -148,6 +154,50 @@ export function PlannedTimeManager() {
       } else {
         toast.error(error.message);
       }
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (template: PlannedTimeTemplate) => {
+      // Check for running events in shift_calendar entries linked to this plant + shift
+      const { data: scIds } = await supabase
+        .from('shift_calendar')
+        .select('id')
+        .eq('plant_id', template.plant_id)
+        .eq('shift_id', template.shift_id);
+
+      const calendarIds = scIds?.map(sc => sc.id) || [];
+
+      if (calendarIds.length > 0) {
+        const { data: runningEvents, error: checkError } = await supabase
+          .from('production_events')
+          .select('id')
+          .is('end_ts', null)
+          .in('shift_calendar_id', calendarIds)
+          .limit(1);
+
+        if (checkError) throw checkError;
+
+        if (runningEvents && runningEvents.length > 0) {
+          throw new Error('ไม่สามารถปิด Template ได้ เนื่องจากยังมี Event ที่กำลัง Run อยู่ใน Plant + Shift นี้');
+        }
+      }
+
+      // Soft-delete: set is_active = false
+      const { error } = await supabase
+        .from('planned_time_templates')
+        .update({ is_active: false })
+        .eq('id', template.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['planned-time-templates'] });
+      toast.success('ปิด Template เรียบร้อยแล้ว — ข้อมูลที่บันทึกไปแล้วไม่ได้รับผลกระทบ');
+      setIsDeleteOpen(false);
+      setDeletingTemplate(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
     },
   });
 
@@ -300,9 +350,20 @@ export function PlannedTimeManager() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(t)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(t)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      {t.is_active && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => { setDeletingTemplate(t); setIsDeleteOpen(true); }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -484,6 +545,32 @@ export function PlannedTimeManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ปิดการใช้งาน Template</AlertDialogTitle>
+            <AlertDialogDescription>
+              ต้องการปิด Template สำหรับ "{deletingTemplate?.plants?.name}" / "{deletingTemplate?.shifts?.name}" หรือไม่?
+              Template จะถูกเปลี่ยนสถานะเป็น Inactive — ข้อมูลที่บันทึกไปแล้วจะไม่ได้รับผลกระทบ
+              {'\n\n'}หากมี Event ที่กำลัง Run อยู่ใน Plant + Shift นี้ ระบบจะไม่อนุญาตให้ปิด
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingTemplate && deleteMutation.mutate(deletingTemplate)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              ปิดการใช้งาน
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Change History */}
       <ChangeHistory
