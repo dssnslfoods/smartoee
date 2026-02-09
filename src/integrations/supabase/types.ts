@@ -1327,26 +1327,16 @@ export type Database = {
         Args: { p_shift_calendar_id: string }
         Returns: Json
       }
-      rpc_start_event:
-        | {
-            Args: {
-              p_event_type: Database["public"]["Enums"]["event_type"]
-              p_machine_id: string
-              p_notes?: string
-              p_reason_id?: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_event_type: Database["public"]["Enums"]["event_type"]
-              p_machine_id: string
-              p_notes?: string
-              p_product_id?: string
-              p_reason_id?: string
-            }
-            Returns: Json
-          }
+      rpc_start_event: {
+        Args: {
+          p_event_type: Database["public"]["Enums"]["event_type"]
+          p_machine_id: string
+          p_notes?: string
+          p_product_id?: string
+          p_reason_id?: string
+        }
+        Returns: Json
+      }
       rpc_stop_event: {
         Args: { p_machine_id: string; p_notes?: string }
         Returns: Json
