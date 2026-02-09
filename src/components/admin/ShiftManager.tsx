@@ -132,12 +132,33 @@ export function ShiftManager() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('shifts').delete().eq('id', id);
+      // Check for running events (end_ts IS NULL) on shift_calendar entries linked to this shift
+      const { data: runningEvents, error: checkError } = await supabase
+        .from('production_events')
+        .select('id, shift_calendar_id')
+        .is('end_ts', null)
+        .in(
+          'shift_calendar_id',
+          (await supabase.from('shift_calendar').select('id').eq('shift_id', id)).data?.map(sc => sc.id) || []
+        )
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      if (runningEvents && runningEvents.length > 0) {
+        throw new Error('ไม่สามารถปิดกะได้ เนื่องจากยังมี Event ที่กำลัง Run อยู่ในกะนี้');
+      }
+
+      // Soft-delete: set is_active = false
+      const { error } = await supabase
+        .from('shifts')
+        .update({ is_active: false })
+        .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-shifts'] });
-      toast.success('Shift deleted successfully');
+      toast.success('ปิดกะเรียบร้อยแล้ว — ข้อมูลที่บันทึกไปแล้วไม่ได้รับผลกระทบ');
       setIsDeleteOpen(false);
       setDeletingShift(null);
     },
@@ -392,20 +413,24 @@ export function ShiftManager() {
 
       {/* Delete Confirmation */}
       <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <AlertDialogContent>
+      <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Shift</AlertDialogTitle>
+            <AlertDialogTitle>ปิดการใช้งานกะ</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deletingShift?.name}"? This may affect Planned Time templates and Shift Calendar entries that reference this shift.
+              ต้องการปิดกะ "{deletingShift?.name}" หรือไม่? กะจะถูกเปลี่ยนสถานะเป็น Inactive — ข้อมูลที่บันทึกไปแล้วจะไม่ได้รับผลกระทบ
+              {'\n\n'}หากมี Event ที่กำลัง Run อยู่ในกะนี้ ระบบจะไม่อนุญาตให้ปิด
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deletingShift && deleteMutation.mutate(deletingShift.id)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              ปิดการใช้งาน
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
