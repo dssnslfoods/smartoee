@@ -71,7 +71,7 @@ const navItems: NavItem[] = [
     title: "Admin Setup",
     href: "/admin",
     icon: Settings,
-    roles: ["ADMIN"],
+    roles: ["SUPERVISOR", "ADMIN"],
   },
   {
     title: "Help Center",

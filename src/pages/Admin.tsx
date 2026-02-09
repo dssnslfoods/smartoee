@@ -42,10 +42,15 @@ export default function Admin() {
   }
 
   const isAdmin = hasRole('ADMIN');
+  const isSupervisor = hasRole('SUPERVISOR');
 
-  if (!isAdmin) {
+  if (!isAdmin && !isSupervisor) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  // Admin-only tabs that Supervisors cannot see
+  const adminOnlyTabs = ['users', 'companies'];
+  const defaultTab = isAdmin ? 'users' : 'shifts';
 
   return (
     <AppLayout>
@@ -58,23 +63,27 @@ export default function Admin() {
         />
 
         {/* Main Content */}
-        <Tabs defaultValue="users" className="space-y-6">
+        <Tabs defaultValue={defaultTab} className="space-y-6">
           <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
             <TabsList className="inline-flex h-auto p-1 bg-muted/50 gap-1 min-w-max">
-              <TabsTrigger 
-                value="users" 
-                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
-              >
-                <UserCog className="h-4 w-4" />
-                <span className="hidden sm:inline">Users</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="companies" 
-                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
-              >
-                <Building2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Companies</span>
-              </TabsTrigger>
+              {isAdmin && (
+                <TabsTrigger 
+                  value="users" 
+                  className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  <UserCog className="h-4 w-4" />
+                  <span className="hidden sm:inline">Users</span>
+                </TabsTrigger>
+              )}
+              {isAdmin && (
+                <TabsTrigger 
+                  value="companies" 
+                  className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  <Building2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Companies</span>
+                </TabsTrigger>
+              )}
               <TabsTrigger 
                 value="shifts" 
                 className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
@@ -150,13 +159,17 @@ export default function Admin() {
 
           <Card className="overflow-hidden">
             <CardContent className="p-4 sm:p-6">
-              <TabsContent value="users" className="mt-0">
-                <UserManager />
-              </TabsContent>
+              {isAdmin && (
+                <TabsContent value="users" className="mt-0">
+                  <UserManager />
+                </TabsContent>
+              )}
 
-              <TabsContent value="companies" className="mt-0">
-                <CompanyManager />
-              </TabsContent>
+              {isAdmin && (
+                <TabsContent value="companies" className="mt-0">
+                  <CompanyManager />
+                </TabsContent>
+              )}
 
               <TabsContent value="shifts" className="mt-0">
                 <ShiftManager />
