@@ -1,10 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Loader2, Factory, Layers, Cpu, Shield, ChevronRight, AlertCircle } from 'lucide-react';
+import { Loader2, Shield, Cpu, CheckSquare, Square, Filter, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,51 +16,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-
-type PermLevel = 'plant' | 'line' | 'machine';
 
 interface StaffPermissionDialogProps {
   staffUserId: string;
   staffName: string;
   isOpen: boolean;
   onClose: () => void;
-}
-
-interface PlantPermission {
-  id: string;
-  user_id: string;
-  plant_id: string;
-  plants?: { name: string };
-}
-
-interface LinePermission {
-  id: string;
-  user_id: string;
-  line_id: string;
-  lines?: { name: string; plants?: { name: string } };
-}
-
-interface MachinePermission {
-  id: string;
-  user_id: string;
-  machine_id: string;
-  machines?: { name: string; code: string; lines?: { name: string; plants?: { name: string } } };
 }
 
 interface PermissionGroup {
@@ -79,25 +43,21 @@ interface UserPermissionGroup {
 
 export function StaffPermissionDialog({ staffUserId, staffName, isOpen, onClose }: StaffPermissionDialogProps) {
   const queryClient = useQueryClient();
-  const { company, profile } = useAuth();
+  const { company } = useAuth();
   const scopeCompanyId = company?.id;
 
   const [activeTab, setActiveTab] = useState('permissions');
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ type: PermLevel; id: string; name: string } | null>(null);
 
-  // Add dialog state
-  const [dialogLevel, setDialogLevel] = useState<PermLevel>('plant');
-  const [dialogPlantId, setDialogPlantId] = useState('');
-  const [dialogLineId, setDialogLineId] = useState('');
-  const [dialogMachineId, setDialogMachineId] = useState('');
+  // Filter state
+  const [filterPlantId, setFilterPlantId] = useState<string>('all');
+  const [filterLineId, setFilterLineId] = useState<string>('all');
 
   // Group selection state
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
   const [groupsDirty, setGroupsDirty] = useState(false);
 
   // ─── Data queries ───
-  const { data: plants } = useQuery({
+  const { data: plants = [] } = useQuery({
     queryKey: ['perm-plants', scopeCompanyId],
     queryFn: async () => {
       const { data, error } = await supabase.from('plants').select('id, name').eq('is_active', true).eq('company_id', scopeCompanyId!).order('name');
@@ -107,7 +67,7 @@ export function StaffPermissionDialog({ staffUserId, staffName, isOpen, onClose 
     enabled: !!scopeCompanyId && isOpen,
   });
 
-  const { data: allLines } = useQuery({
+  const { data: allLines = [] } = useQuery({
     queryKey: ['perm-lines', scopeCompanyId],
     queryFn: async () => {
       const { data, error } = await supabase.from('lines').select('id, name, plant_id').eq('is_active', true).eq('company_id', scopeCompanyId!).order('name');
@@ -117,7 +77,7 @@ export function StaffPermissionDialog({ staffUserId, staffName, isOpen, onClose 
     enabled: !!scopeCompanyId && isOpen,
   });
 
-  const { data: allMachines } = useQuery({
+  const { data: allMachines = [] } = useQuery({
     queryKey: ['perm-machines', scopeCompanyId],
     queryFn: async () => {
       const { data, error } = await supabase.from('machines').select('id, name, code, line_id').eq('is_active', true).eq('company_id', scopeCompanyId!).order('name');
@@ -127,33 +87,33 @@ export function StaffPermissionDialog({ staffUserId, staffName, isOpen, onClose 
     enabled: !!scopeCompanyId && isOpen,
   });
 
-  // ─── Current permissions ───
-  const { data: plantPerms, isLoading: loadingPlant } = useQuery({
-    queryKey: ['user-plant-perms', staffUserId],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('user_plant_permissions').select('*, plants(name)').eq('user_id', staffUserId);
-      if (error) throw error;
-      return data as PlantPermission[];
-    },
-    enabled: !!staffUserId && isOpen,
-  });
-
-  const { data: linePerms, isLoading: loadingLine } = useQuery({
-    queryKey: ['user-line-perms', staffUserId],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('user_line_permissions').select('*, lines(name, plants(name))').eq('user_id', staffUserId);
-      if (error) throw error;
-      return data as LinePermission[];
-    },
-    enabled: !!staffUserId && isOpen,
-  });
-
-  const { data: machinePerms, isLoading: loadingMachine } = useQuery({
+  // ─── Current permissions (machine-level only for the new UI) ───
+  const { data: machinePerms = [], isLoading: loadingPerms } = useQuery({
     queryKey: ['user-machine-perms', staffUserId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('user_machine_permissions').select('*, machines(name, code, lines(name, plants(name)))').eq('user_id', staffUserId);
+      const { data, error } = await supabase.from('user_machine_permissions').select('id, machine_id').eq('user_id', staffUserId);
       if (error) throw error;
-      return data as MachinePermission[];
+      return data;
+    },
+    enabled: !!staffUserId && isOpen,
+  });
+
+  const { data: plantPerms = [] } = useQuery({
+    queryKey: ['user-plant-perms', staffUserId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('user_plant_permissions').select('id, plant_id').eq('user_id', staffUserId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!staffUserId && isOpen,
+  });
+
+  const { data: linePerms = [] } = useQuery({
+    queryKey: ['user-line-perms', staffUserId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('user_line_permissions').select('id, line_id').eq('user_id', staffUserId);
+      if (error) throw error;
+      return data;
     },
     enabled: !!staffUserId && isOpen,
   });
@@ -193,60 +153,122 @@ export function StaffPermissionDialog({ staffUserId, staffName, isOpen, onClose 
     }
   }, [currentGroupAssignments, loadingGroupAssignments]);
 
-  // ─── Cascading filters ───
-  const dialogLines = useMemo(() => {
-    if (!dialogPlantId || !allLines) return [];
-    return allLines.filter(l => l.plant_id === dialogPlantId);
-  }, [dialogPlantId, allLines]);
+  // ─── Build permission sets for quick lookup ───
+  const permittedMachineIds = useMemo(() => new Set(machinePerms.map(p => p.machine_id)), [machinePerms]);
+  const permittedPlantIds = useMemo(() => new Set(plantPerms.map(p => p.plant_id)), [plantPerms]);
+  const permittedLineIds = useMemo(() => new Set(linePerms.map(p => p.line_id)), [linePerms]);
 
-  const dialogMachines = useMemo(() => {
-    if (!dialogLineId || !allMachines) return [];
-    return allMachines.filter(m => m.line_id === dialogLineId);
-  }, [dialogLineId, allMachines]);
+  // Build a lookup: lineId -> plantId
+  const lineToPlant = useMemo(() => {
+    const map: Record<string, string> = {};
+    allLines.forEach(l => { map[l.id] = l.plant_id; });
+    return map;
+  }, [allLines]);
+
+  // Build a lookup: machineId -> lineId
+  const machineToLine = useMemo(() => {
+    const map: Record<string, string> = {};
+    allMachines.forEach(m => { map[m.id] = m.line_id; });
+    return map;
+  }, [allMachines]);
+
+  // Check if a machine is permitted (through any level)
+  const isMachinePermitted = useCallback((machineId: string) => {
+    if (permittedMachineIds.has(machineId)) return true;
+    const lineId = machineToLine[machineId];
+    if (lineId && permittedLineIds.has(lineId)) return true;
+    const plantId = lineId ? lineToPlant[lineId] : undefined;
+    if (plantId && permittedPlantIds.has(plantId)) return true;
+    return false;
+  }, [permittedMachineIds, permittedLineIds, permittedPlantIds, machineToLine, lineToPlant]);
+
+  // Get the permission source for display
+  const getPermSource = useCallback((machineId: string): 'machine' | 'line' | 'plant' | null => {
+    if (permittedMachineIds.has(machineId)) return 'machine';
+    const lineId = machineToLine[machineId];
+    if (lineId && permittedLineIds.has(lineId)) return 'line';
+    const plantId = lineId ? lineToPlant[lineId] : undefined;
+    if (plantId && permittedPlantIds.has(plantId)) return 'plant';
+    return null;
+  }, [permittedMachineIds, permittedLineIds, permittedPlantIds, machineToLine, lineToPlant]);
+
+  // ─── Filtered lines and machines ───
+  const filteredLines = useMemo(() => {
+    if (filterPlantId === 'all') return allLines;
+    return allLines.filter(l => l.plant_id === filterPlantId);
+  }, [filterPlantId, allLines]);
+
+  const filteredMachines = useMemo(() => {
+    let machines = allMachines;
+    if (filterPlantId !== 'all') {
+      const lineIdsInPlant = new Set(allLines.filter(l => l.plant_id === filterPlantId).map(l => l.id));
+      machines = machines.filter(m => lineIdsInPlant.has(m.line_id));
+    }
+    if (filterLineId !== 'all') {
+      machines = machines.filter(m => m.line_id === filterLineId);
+    }
+    return machines;
+  }, [filterPlantId, filterLineId, allMachines, allLines]);
+
+  // Group machines by line for display
+  const machinesByLine = useMemo(() => {
+    const map: Record<string, typeof filteredMachines> = {};
+    filteredMachines.forEach(m => {
+      if (!map[m.line_id]) map[m.line_id] = [];
+      map[m.line_id].push(m);
+    });
+    return map;
+  }, [filteredMachines]);
+
+  const linesForDisplay = useMemo(() => {
+    const lineIds = Object.keys(machinesByLine);
+    return allLines.filter(l => lineIds.includes(l.id));
+  }, [machinesByLine, allLines]);
 
   // ─── Mutations ───
-  const addPlantPerm = useMutation({
-    mutationFn: async (plantId: string) => {
-      const { error } = await supabase.from('user_plant_permissions').insert({ user_id: staffUserId, plant_id: plantId });
-      if (error) throw error;
-    },
-    onSuccess: () => { invalidatePerms(); toast.success('เพิ่มสิทธิ์ Plant สำเร็จ'); closeAddDialog(); },
-    onError: (error: Error) => toast.error(error.message),
-  });
-
-  const addLinePerm = useMutation({
-    mutationFn: async (lineId: string) => {
-      const { error } = await supabase.from('user_line_permissions').insert({ user_id: staffUserId, line_id: lineId });
-      if (error) throw error;
-    },
-    onSuccess: () => { invalidatePerms(); toast.success('เพิ่มสิทธิ์ Line สำเร็จ'); closeAddDialog(); },
-    onError: (error: Error) => toast.error(error.message),
-  });
-
-  const addMachinePerm = useMutation({
+  const addMachinePermMutation = useMutation({
     mutationFn: async (machineId: string) => {
       const { error } = await supabase.from('user_machine_permissions').insert({ user_id: staffUserId, machine_id: machineId });
       if (error) throw error;
     },
-    onSuccess: () => { invalidatePerms(); toast.success('เพิ่มสิทธิ์ Machine สำเร็จ'); closeAddDialog(); },
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const deletePlantPerm = useMutation({
-    mutationFn: async (id: string) => { const { error } = await supabase.from('user_plant_permissions').delete().eq('id', id); if (error) throw error; },
-    onSuccess: () => { invalidatePerms(); toast.success('ลบสิทธิ์แล้ว'); setDeleteConfirm(null); },
+  const deleteMachinePermMutation = useMutation({
+    mutationFn: async (machineId: string) => {
+      const perm = machinePerms.find(p => p.machine_id === machineId);
+      if (!perm) return;
+      const { error } = await supabase.from('user_machine_permissions').delete().eq('id', perm.id);
+      if (error) throw error;
+    },
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const deleteLinePerm = useMutation({
-    mutationFn: async (id: string) => { const { error } = await supabase.from('user_line_permissions').delete().eq('id', id); if (error) throw error; },
-    onSuccess: () => { invalidatePerms(); toast.success('ลบสิทธิ์แล้ว'); setDeleteConfirm(null); },
+  // Bulk mutations
+  const bulkAddMutation = useMutation({
+    mutationFn: async (machineIds: string[]) => {
+      const inserts = machineIds.map(machine_id => ({ user_id: staffUserId, machine_id }));
+      const { error } = await supabase.from('user_machine_permissions').insert(inserts);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidatePerms();
+      toast.success('เพิ่มสิทธิ์สำเร็จ');
+    },
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const deleteMachinePerm = useMutation({
-    mutationFn: async (id: string) => { const { error } = await supabase.from('user_machine_permissions').delete().eq('id', id); if (error) throw error; },
-    onSuccess: () => { invalidatePerms(); toast.success('ลบสิทธิ์แล้ว'); setDeleteConfirm(null); },
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (machineIds: string[]) => {
+      const permIds = machinePerms.filter(p => machineIds.includes(p.machine_id)).map(p => p.id);
+      if (permIds.length === 0) return;
+      const { error } = await supabase.from('user_machine_permissions').delete().in('id', permIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidatePerms();
+      toast.success('ลบสิทธิ์สำเร็จ');
+    },
     onError: (error: Error) => toast.error(error.message),
   });
 
@@ -279,33 +301,43 @@ export function StaffPermissionDialog({ staffUserId, staffName, isOpen, onClose 
     queryClient.invalidateQueries({ queryKey: ['user-machine-perms', staffUserId] });
   };
 
-  // ─── Handlers ───
-  const openAddDialog = () => {
-    setDialogLevel('plant');
-    setDialogPlantId('');
-    setDialogLineId('');
-    setDialogMachineId('');
-    setIsAddDialogOpen(true);
+  // ─── Toggle handlers ───
+  const handleToggleMachine = async (machineId: string) => {
+    const source = getPermSource(machineId);
+    if (source === 'plant' || source === 'line') {
+      // Can't toggle inherited permissions from here
+      toast.info('สิทธิ์นี้ได้รับจากระดับ ' + (source === 'plant' ? 'Plant' : 'Line'));
+      return;
+    }
+    if (permittedMachineIds.has(machineId)) {
+      await deleteMachinePermMutation.mutateAsync(machineId);
+    } else {
+      await addMachinePermMutation.mutateAsync(machineId);
+    }
+    invalidatePerms();
   };
 
-  const closeAddDialog = () => {
-    setIsAddDialogOpen(false);
-    setDialogPlantId('');
-    setDialogLineId('');
-    setDialogMachineId('');
+  const handleSelectAllVisible = () => {
+    const toAdd = filteredMachines
+      .filter(m => !isMachinePermitted(m.id))
+      .map(m => m.id);
+    if (toAdd.length === 0) {
+      toast.info('เครื่องจักรทั้งหมดมีสิทธิ์แล้ว');
+      return;
+    }
+    bulkAddMutation.mutate(toAdd);
   };
 
-  const handleAddPermission = () => {
-    if (dialogLevel === 'plant' && dialogPlantId) addPlantPerm.mutate(dialogPlantId);
-    else if (dialogLevel === 'line' && dialogLineId) addLinePerm.mutate(dialogLineId);
-    else if (dialogLevel === 'machine' && dialogMachineId) addMachinePerm.mutate(dialogMachineId);
-  };
-
-  const handleDeletePermission = () => {
-    if (!deleteConfirm) return;
-    if (deleteConfirm.type === 'plant') deletePlantPerm.mutate(deleteConfirm.id);
-    else if (deleteConfirm.type === 'line') deleteLinePerm.mutate(deleteConfirm.id);
-    else deleteMachinePerm.mutate(deleteConfirm.id);
+  const handleDeselectAllVisible = () => {
+    // Only remove direct machine-level permissions
+    const toRemove = filteredMachines
+      .filter(m => permittedMachineIds.has(m.id))
+      .map(m => m.id);
+    if (toRemove.length === 0) {
+      toast.info('ไม่มีสิทธิ์ระดับ Machine ที่จะลบ');
+      return;
+    }
+    bulkDeleteMutation.mutate(toRemove);
   };
 
   const toggleGroup = (groupId: string) => {
@@ -315,345 +347,228 @@ export function StaffPermissionDialog({ staffUserId, staffName, isOpen, onClose 
     setGroupsDirty(true);
   };
 
-  const canSubmit = () => {
-    if (dialogLevel === 'plant') return !!dialogPlantId;
-    if (dialogLevel === 'line') return !!dialogPlantId && !!dialogLineId;
-    return !!dialogPlantId && !!dialogLineId && !!dialogMachineId;
-  };
+  // Stats
+  const totalPermitted = allMachines.filter(m => isMachinePermitted(m.id)).length;
+  const visiblePermitted = filteredMachines.filter(m => isMachinePermitted(m.id)).length;
+  const isBusy = bulkAddMutation.isPending || bulkDeleteMutation.isPending || addMachinePermMutation.isPending || deleteMachinePermMutation.isPending;
 
-  const getLevelDescription = () => {
-    if (dialogLevel === 'plant') return 'เข้าถึง ทุก Line และ Machine ใน Plant ที่เลือก';
-    if (dialogLevel === 'line') return 'เข้าถึง ทุก Machine ใน Line ที่เลือก';
-    return 'เข้าถึง Machine ที่เลือกเพียงเครื่องเดียว';
-  };
-
-  const isLoading = loadingPlant || loadingLine || loadingMachine;
-  const totalPerms = (plantPerms?.length || 0) + (linePerms?.length || 0) + (machinePerms?.length || 0);
-  const isMutating = addPlantPerm.isPending || addLinePerm.isPending || addMachinePerm.isPending;
+  // Reset filters when plant changes
+  useEffect(() => {
+    setFilterLineId('all');
+  }, [filterPlantId]);
 
   return (
-    <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              กำหนดสิทธิ์ — {staffName}
-            </DialogTitle>
-            <DialogDescription>
-              กำหนดสิทธิ์การเข้าถึง Plant / Line / Machine และกลุ่มสิทธิ์
-            </DialogDescription>
-          </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            กำหนดสิทธิ์ — {staffName}
+          </DialogTitle>
+          <DialogDescription>
+            เลือกเครื่องจักรที่ต้องการให้สิทธิ์ หรือจัดการกลุ่มสิทธิ์
+          </DialogDescription>
+        </DialogHeader>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="permissions">
-                สิทธิ์ ({totalPerms})
-              </TabsTrigger>
-              <TabsTrigger value="groups">
-                กลุ่มสิทธิ์ ({selectedGroups.size})
-              </TabsTrigger>
-            </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="permissions">
+              เครื่องจักร ({totalPermitted}/{allMachines.length})
+            </TabsTrigger>
+            <TabsTrigger value="groups">
+              กลุ่มสิทธิ์ ({selectedGroups.size})
+            </TabsTrigger>
+          </TabsList>
 
-            {/* ─── Permissions Tab ─── */}
-            <TabsContent value="permissions" className="flex-1 overflow-auto space-y-3 mt-3">
-              <div className="flex justify-end">
-                <Button size="sm" onClick={openAddDialog}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  เพิ่มสิทธิ์
+          {/* ─── Permissions Tab ─── */}
+          <TabsContent value="permissions" className="flex-1 overflow-hidden flex flex-col gap-3 mt-3">
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={filterPlantId} onValueChange={setFilterPlantId}>
+                <SelectTrigger className="w-[180px] h-8 text-sm">
+                  <SelectValue placeholder="ทุก Plant" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทุก Plant</SelectItem>
+                  {plants.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+
+              <Select value={filterLineId} onValueChange={setFilterLineId} disabled={filterPlantId === 'all'}>
+                <SelectTrigger className="w-[180px] h-8 text-sm">
+                  <SelectValue placeholder="ทุก Line" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทุก Line</SelectItem>
+                  {filteredLines.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+
+              {(filterPlantId !== 'all' || filterLineId !== 'all') && (
+                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => { setFilterPlantId('all'); setFilterLineId('all'); }}>
+                  <X className="h-3.5 w-3.5 mr-1" />
+                  ล้างตัวกรอง
+                </Button>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                {visiblePermitted}/{filteredMachines.length} เครื่องมีสิทธิ์
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleSelectAllVisible} disabled={isBusy}>
+                  <CheckSquare className="h-3.5 w-3.5 mr-1" />
+                  เลือกทั้งหมด
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleDeselectAllVisible} disabled={isBusy}>
+                  <Square className="h-3.5 w-3.5 mr-1" />
+                  ยกเลิกทั้งหมด
                 </Button>
               </div>
-
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : totalPerms === 0 ? (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    ยังไม่มีสิทธิ์ กดปุ่ม "เพิ่มสิทธิ์" เพื่อกำหนดสิทธิ์การเข้าถึง
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <div className="space-y-3">
-                  {/* Plant permissions */}
-                  {plantPerms && plantPerms.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2 pt-3 px-4">
-                        <CardTitle className="text-xs font-medium flex items-center gap-2 text-muted-foreground">
-                          <Factory className="h-3.5 w-3.5" />
-                          Plant Level — ดูได้ทุก Line & Machine
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="px-4 pb-3">
-                        <div className="flex flex-wrap gap-2">
-                          {plantPerms.map((perm) => (
-                            <Badge key={perm.id} variant="secondary" className="gap-1.5 pl-3 pr-1 py-1.5 text-sm">
-                              <Factory className="h-3.5 w-3.5 text-primary" />
-                              {perm.plants?.name}
-                              <button onClick={() => setDeleteConfirm({ type: 'plant', id: perm.id, name: perm.plants?.name || '' })} className="ml-1 rounded-full p-0.5 hover:bg-destructive/20 transition-colors">
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Line permissions */}
-                  {linePerms && linePerms.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2 pt-3 px-4">
-                        <CardTitle className="text-xs font-medium flex items-center gap-2 text-muted-foreground">
-                          <Layers className="h-3.5 w-3.5" />
-                          Line Level — ดูได้ทุก Machine ใน Line
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="px-4 pb-3">
-                        <div className="flex flex-wrap gap-2">
-                          {linePerms.map((perm) => (
-                            <Badge key={perm.id} variant="secondary" className="gap-1.5 pl-3 pr-1 py-1.5 text-sm">
-                              <Layers className="h-3.5 w-3.5 text-blue-500" />
-                              {perm.lines?.name}
-                              <span className="text-muted-foreground text-xs">({perm.lines?.plants?.name})</span>
-                              <button onClick={() => setDeleteConfirm({ type: 'line', id: perm.id, name: perm.lines?.name || '' })} className="ml-1 rounded-full p-0.5 hover:bg-destructive/20 transition-colors">
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Machine permissions */}
-                  {machinePerms && machinePerms.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2 pt-3 px-4">
-                        <CardTitle className="text-xs font-medium flex items-center gap-2 text-muted-foreground">
-                          <Cpu className="h-3.5 w-3.5" />
-                          Machine Level — เข้าถึงเฉพาะเครื่อง
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="px-4 pb-3">
-                        <div className="flex flex-wrap gap-2">
-                          {machinePerms.map((perm) => (
-                            <Badge key={perm.id} variant="secondary" className="gap-1.5 pl-3 pr-1 py-1.5 text-sm">
-                              <Cpu className="h-3.5 w-3.5 text-emerald-500" />
-                              {perm.machines?.name}
-                              <span className="text-muted-foreground text-xs">({perm.machines?.lines?.name})</span>
-                              <button onClick={() => setDeleteConfirm({ type: 'machine', id: perm.id, name: perm.machines?.name || '' })} className="ml-1 rounded-full p-0.5 hover:bg-destructive/20 transition-colors">
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              )}
-            </TabsContent>
-
-            {/* ─── Groups Tab ─── */}
-            <TabsContent value="groups" className="flex-1 overflow-hidden flex flex-col space-y-3 mt-3">
-              {groups.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  ยังไม่มีกลุ่มสิทธิ์ในระบบ<br />
-                  <span className="text-sm">สร้างกลุ่มได้ที่แท็บ "กลุ่มสิทธิ์"</span>
-                </div>
-              ) : (
-                <>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">
-                      เลือก {selectedGroups.size} / {groups.length} กลุ่ม
-                    </span>
-                  </div>
-                  <ScrollArea className="flex-1 border rounded-md p-3">
-                    <div className="space-y-2">
-                      {groups.map((group) => (
-                        <label key={group.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
-                          <Checkbox checked={selectedGroups.has(group.id)} onCheckedChange={() => toggleGroup(group.id)} />
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">{group.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {group.machine_count} เครื่องจักร
-                              {group.description && ` • ${group.description}`}
-                            </div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                  {groupsDirty && (
-                    <Button size="sm" onClick={() => saveGroupsMutation.mutate()} disabled={saveGroupsMutation.isPending} className="self-end">
-                      {saveGroupsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      บันทึกกลุ่มสิทธิ์
-                    </Button>
-                  )}
-                </>
-              )}
-            </TabsContent>
-          </Tabs>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={onClose}>ปิด</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ─── Add Permission Dialog ─── */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>เพิ่มสิทธิ์การเข้าถึง</DialogTitle>
-            <DialogDescription>
-              กำหนดสิทธิ์ให้ <span className="font-medium text-foreground">{staffName}</span>
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {/* Permission level selector */}
-            <div className="space-y-2">
-              <Label>ระดับสิทธิ์</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['plant', 'line', 'machine'] as PermLevel[]).map((level) => {
-                  const Icon = level === 'plant' ? Factory : level === 'line' ? Layers : Cpu;
-                  const label = level === 'plant' ? 'ทั้ง Plant' : level === 'line' ? 'ระบุ Line' : 'ราย Machine';
-                  return (
-                    <button
-                      key={level}
-                      type="button"
-                      onClick={() => {
-                        setDialogLevel(level);
-                        if (level === 'plant') { setDialogLineId(''); setDialogMachineId(''); }
-                        if (level === 'line') { setDialogMachineId(''); }
-                      }}
-                      className={cn(
-                        'flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-xs font-medium transition-all',
-                        dialogLevel === level
-                          ? 'border-primary bg-primary/5 text-primary'
-                          : 'border-border text-muted-foreground hover:border-primary/40'
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="text-xs text-muted-foreground">{getLevelDescription()}</p>
             </div>
 
             <Separator />
 
-            {/* Plant */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Factory className="h-4 w-4 text-primary" />
-                เลือก Plant
-              </Label>
-              <Select value={dialogPlantId} onValueChange={(v) => { setDialogPlantId(v); setDialogLineId(''); setDialogMachineId(''); }}>
-                <SelectTrigger><SelectValue placeholder="เลือก Plant..." /></SelectTrigger>
-                <SelectContent>
-                  {plants?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Line */}
-            {dialogLevel !== 'plant' && dialogPlantId && (
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-blue-500" />
-                  เลือก Line
-                </Label>
-                <Select value={dialogLineId} onValueChange={(v) => { setDialogLineId(v); setDialogMachineId(''); }}>
-                  <SelectTrigger><SelectValue placeholder="เลือก Line..." /></SelectTrigger>
-                  <SelectContent>
-                    {dialogLines.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {dialogLines.length === 0 && <p className="text-xs text-muted-foreground">ไม่มี Line ใน Plant นี้</p>}
+            {/* Machine list */}
+            {loadingPerms ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            )}
+            ) : (
+              <ScrollArea className="flex-1">
+                <div className="space-y-4 pr-3">
+                  {linesForDisplay.map((line) => {
+                    const linePlant = plants.find(p => p.id === line.plant_id);
+                    const machines = machinesByLine[line.id] || [];
+                    const lineAllPermitted = machines.every(m => isMachinePermitted(m.id));
+                    const lineSomePermitted = machines.some(m => isMachinePermitted(m.id));
+                    const isLineInherited = permittedPlantIds.has(line.plant_id) || permittedLineIds.has(line.id);
 
-            {/* Machine */}
-            {dialogLevel === 'machine' && dialogLineId && (
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Cpu className="h-4 w-4 text-emerald-500" />
-                  เลือก Machine
-                </Label>
-                <Select value={dialogMachineId} onValueChange={setDialogMachineId}>
-                  <SelectTrigger><SelectValue placeholder="เลือก Machine..." /></SelectTrigger>
-                  <SelectContent>
-                    {dialogMachines.map((m) => <SelectItem key={m.id} value={m.id}>{m.name} ({m.code})</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {dialogMachines.length === 0 && <p className="text-xs text-muted-foreground">ไม่มี Machine ใน Line นี้</p>}
-              </div>
-            )}
+                    return (
+                      <div key={line.id} className="space-y-1">
+                        {/* Line header */}
+                        <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-muted/50">
+                          <Checkbox
+                            checked={lineAllPermitted}
+                            // Show indeterminate when partially selected
+                            {...(!lineAllPermitted && lineSomePermitted ? { 'data-state': 'indeterminate' } : {})}
+                            onCheckedChange={(checked) => {
+                              if (isLineInherited) {
+                                toast.info('สิทธิ์ Line นี้สืบทอดจากระดับ Plant/Line');
+                                return;
+                              }
+                              if (checked) {
+                                const toAdd = machines.filter(m => !isMachinePermitted(m.id)).map(m => m.id);
+                                if (toAdd.length > 0) bulkAddMutation.mutate(toAdd);
+                              } else {
+                                const toRemove = machines.filter(m => permittedMachineIds.has(m.id)).map(m => m.id);
+                                if (toRemove.length > 0) bulkDeleteMutation.mutate(toRemove);
+                              }
+                            }}
+                            disabled={isBusy}
+                          />
+                          <span className="font-medium text-sm">{line.name}</span>
+                          {linePlant && <span className="text-xs text-muted-foreground">({linePlant.name})</span>}
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            {machines.filter(m => isMachinePermitted(m.id)).length}/{machines.length}
+                          </span>
+                        </div>
 
-            {/* Preview */}
-            {canSubmit() && (
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="text-xs font-medium text-muted-foreground mb-1">สรุปสิทธิ์ที่จะเพิ่ม:</p>
-                <div className="flex items-center gap-1 text-sm">
-                  <span className="font-medium">{staffName}</span>
-                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                  {dialogLevel === 'plant' && (
-                    <Badge variant="secondary" className="gap-1">
-                      <Factory className="h-3 w-3" />
-                      {plants?.find(p => p.id === dialogPlantId)?.name} (ทั้ง Plant)
-                    </Badge>
-                  )}
-                  {dialogLevel === 'line' && (
-                    <Badge variant="secondary" className="gap-1">
-                      <Layers className="h-3 w-3" />
-                      {dialogLines.find(l => l.id === dialogLineId)?.name} (ทุก Machine)
-                    </Badge>
-                  )}
-                  {dialogLevel === 'machine' && (
-                    <Badge variant="secondary" className="gap-1">
-                      <Cpu className="h-3 w-3" />
-                      {dialogMachines.find(m => m.id === dialogMachineId)?.name}
-                    </Badge>
+                        {/* Machines */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pl-6">
+                          {machines.map((machine) => {
+                            const permitted = isMachinePermitted(machine.id);
+                            const source = getPermSource(machine.id);
+                            const isInherited = source === 'plant' || source === 'line';
+
+                            return (
+                              <label
+                                key={machine.id}
+                                className={cn(
+                                  'flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors text-sm',
+                                  permitted ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-muted',
+                                  isInherited && 'opacity-70 cursor-default'
+                                )}
+                              >
+                                <Checkbox
+                                  checked={permitted}
+                                  onCheckedChange={() => handleToggleMachine(machine.id)}
+                                  disabled={isBusy || isInherited}
+                                />
+                                <Cpu className={cn('h-4 w-4 shrink-0', permitted ? 'text-primary' : 'text-muted-foreground')} />
+                                <span className="flex-1 truncate">{machine.name}</span>
+                                <span className="text-xs text-muted-foreground">{machine.code}</span>
+                                {isInherited && (
+                                  <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+                                    {source === 'plant' ? 'Plant' : 'Line'}
+                                  </Badge>
+                                )}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {filteredMachines.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      ไม่พบเครื่องจักรตามเงื่อนไขที่กรอง
+                    </div>
                   )}
                 </div>
-              </div>
+              </ScrollArea>
             )}
-          </div>
+          </TabsContent>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={closeAddDialog}>ยกเลิก</Button>
-            <Button onClick={handleAddPermission} disabled={!canSubmit() || isMutating}>
-              {isMutating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              เพิ่มสิทธิ์
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          {/* ─── Groups Tab ─── */}
+          <TabsContent value="groups" className="flex-1 overflow-hidden flex flex-col space-y-3 mt-3">
+            {groups.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                ยังไม่มีกลุ่มสิทธิ์ในระบบ<br />
+                <span className="text-sm">สร้างกลุ่มได้ที่แท็บ "กลุ่มสิทธิ์"</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">
+                    เลือก {selectedGroups.size} / {groups.length} กลุ่ม
+                  </span>
+                </div>
+                <ScrollArea className="flex-1 border rounded-md p-3">
+                  <div className="space-y-2">
+                    {groups.map((group) => (
+                      <label key={group.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
+                        <Checkbox checked={selectedGroups.has(group.id)} onCheckedChange={() => toggleGroup(group.id)} />
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">{group.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {group.machine_count} เครื่องจักร
+                            {group.description && ` • ${group.description}`}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </ScrollArea>
+                {groupsDirty && (
+                  <Button size="sm" onClick={() => saveGroupsMutation.mutate()} disabled={saveGroupsMutation.isPending} className="self-end">
+                    {saveGroupsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    บันทึกกลุ่มสิทธิ์
+                  </Button>
+                )}
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ลบสิทธิ์</AlertDialogTitle>
-            <AlertDialogDescription>
-              ต้องการลบสิทธิ์ "{deleteConfirm?.name}" ของ {staffName} หรือไม่?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeletePermission} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              ลบสิทธิ์
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>ปิด</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
