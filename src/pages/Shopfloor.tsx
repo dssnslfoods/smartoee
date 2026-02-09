@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PlantLineSelector } from '@/components/shopfloor/PlantLineSelector';
@@ -130,9 +131,11 @@ export default function Shopfloor() {
     refetchInterval: 60000,
   });
 
-  // Find the shift that matches current time (same logic as rpc_start_event)
+  // Find the shift that matches current time — only consider ACTIVE shifts
   const currentShift = useMemo(() => {
-    if (shiftCalendar.length === 0) return undefined;
+    // Filter to only active shift definitions
+    const activeShifts = shiftCalendar.filter(sc => sc.shift?.is_active !== false);
+    if (activeShifts.length === 0) return shiftCalendar[0] as ShiftCalendar | undefined; // fallback to any
     
     const now = new Date();
     const currentHours = now.getHours();
@@ -145,7 +148,7 @@ export default function Shopfloor() {
       return parts[0] * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
     };
     
-    const activeShift = shiftCalendar.find(sc => {
+    const matchedShift = activeShifts.find(sc => {
       const start = sc.shift?.start_time;
       const end = sc.shift?.end_time;
       if (!start || !end) return false;
@@ -162,10 +165,25 @@ export default function Shopfloor() {
       }
     });
     
-    return (activeShift || shiftCalendar[0]) as ShiftCalendar | undefined;
+    return (matchedShift || activeShifts[0]) as ShiftCalendar | undefined;
   }, [shiftCalendar]);
+
+  // Check actual lock status from shift_approvals (not shift.is_active which is soft-delete)
+  const { data: shiftApproval } = useQuery({
+    queryKey: ['shiftApproval', currentShift?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('shift_approvals')
+        .select('status')
+        .eq('shift_calendar_id', currentShift!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentShift?.id,
+  });
   
-  const isLocked = currentShift?.shift?.is_active === false;
+  const isLocked = shiftApproval?.status === 'LOCKED';
 
   const { data: currentEvent } = useQuery({
     queryKey: ['currentEvent', selectedMachineId],
