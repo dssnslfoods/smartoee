@@ -1,6 +1,6 @@
 # PNF OEE System - User Manual & Admin Manual
 
-**Version:** 1.0  
+**Version:** 2.0  
 **Date:** February 2026  
 **System Name:** PNF OEE System  
 **Developer:** Arnon Arpaket  
@@ -157,8 +157,9 @@ The system implements four distinct roles. Each role has specific capabilities a
 - Dashboard - OEE overview with time period filter (today, yesterday, 7/14/30/60 days)
 - Shopfloor - Full event capture capabilities
 - Monitor - Real-time machine status view
-- Supervisor Dashboard - Shift summaries, OEE metrics, staff management, permission groups, audit logs
+- Supervisor Dashboard - Shift management, OEE metrics, staff management, master data management (Shifts, Planned Time, Machines, Products, Standards), permission groups, audit logs
 - Recent Activity - All activities within their company
+- Help Center - System manual and FAQ
 
 **What they can do:**
 - Everything a Staff member can do
@@ -172,9 +173,11 @@ The system implements four distinct roles. Each role has specific capabilities a
 - Edit Staff and Supervisor account information (name, email, password)
 - Switch user roles between Staff and Supervisor within their company
 - Create and manage machine permission groups
-- Assign Staff members to permission groups
+- Assign Staff members to permission groups via a filterable tree-view dialog with bulk Select All / Deselect All
+- Manage production-related master data: Shifts (กะทำงาน), Planned Production Time (เวลาวางแผน), Machines (เครื่องจักร), Products/SKUs (สินค้า), and Production Standards (มาตรฐาน)
 - Create production standards (machine-SKU benchmarks) inline from the Shopfloor page
-- View audit logs for their plant
+- Duplicate shifts and bulk-copy Planned Time templates across plants
+- View audit logs and change history for their plant
 - Edit or delete any production event or count within their company
 
 **What they cannot do:**
@@ -182,7 +185,7 @@ The system implements four distinct roles. Each role has specific capabilities a
 - Access the Activity Log (raw audit trail)
 - Create Executive or Admin accounts
 - Manage users outside their company
-- Modify master data (plants, lines, machines, products, reasons)
+- Manage infrastructure master data (Plants, Lines, Companies, Downtime/Defect Reasons) — these are managed by Admin
 - Manage company-level settings
 
 **Responsibility:**
@@ -239,16 +242,15 @@ The system implements four distinct roles. Each role has specific capabilities a
 - Everything all other roles can do
 - Select which company to work with (multi-company management)
 - Switch between companies at any time via the sidebar
-- Manage Companies (create, edit, activate/deactivate)
-- Manage Plants (create, edit, activate/deactivate per company)
-- Manage Production Lines (create, edit, activate/deactivate per company)
-- Manage Machines (create, edit with OEE targets, cycle times, time units, activate/deactivate)
-- Manage Products / SKUs (create, edit, activate/deactivate per company)
-- Manage Production Standards (ideal cycle times and setup times per machine-SKU combination)
-- Manage Downtime Reasons (create, edit with category: Planned/Unplanned/Breakdown/Changeover)
-- Manage Defect Reasons (create, edit per company)
-- Manage all User accounts (create with any role, edit email/password/name/role/company)
-- Manage User Permissions (assign users to plants, lines, machines)
+- **Admin Setup page** — Manage core infrastructure:
+  - Users (create with any role, edit email/password/name/role/company)
+  - Companies (create, edit, activate/deactivate)
+  - Plants (create, edit, activate/deactivate per company)
+  - Production Lines (create, edit, activate/deactivate per company)
+  - Downtime Reasons (create, edit with category: Planned/Unplanned/Breakdown/Changeover)
+  - Defect Reasons (create, edit per company)
+- **Supervisor Dashboard** — Also has access to production master data tabs:
+  - Machines, Products/SKUs, Production Standards, Shifts, Planned Production Time
 - Bulk import and export master data (Excel/CSV)
 - View the raw Activity Log (audit trail) with full before/after data
 - Edit or delete any production event or count in any company
@@ -334,11 +336,12 @@ The left sidebar contains the following menu items (visibility depends on your r
 | Dashboard | All roles | OEE overview with gauges and machine status |
 | Shopfloor | All roles | Record production events and counts |
 | Monitor | All roles | Real-time machine status board |
-| Supervisor | Supervisor, Admin | Shift management, staff management, audit logs |
+| Supervisor | Supervisor, Admin | Shift management, staff management, production master data, audit logs |
 | Executive | Executive, Admin | High-level OEE performance dashboard |
 | Recent Activity | All roles | View recent production activities |
 | Activity Log | Admin only | Raw audit trail with full data history |
-| Admin Setup | Admin only | Master data and system configuration |
+| Admin Setup | Admin only | Core infrastructure configuration (Users, Companies, Plants, Lines, Reasons) |
+| Help Center | Admin, Executive, Supervisor | System manual, FAQ, and PDF export |
 
 **Sidebar features:**
 - **Collapse/Expand:** Click the collapse button at the bottom to minimize the sidebar (desktop only).
@@ -570,22 +573,34 @@ This tab displays cards for all machines you have permission to operate, showing
 
 # PART 4: ADMIN MANUAL
 
-## 4.1 Admin Dashboard Overview
+## 4.1 Admin Setup Overview
 
-The Admin Setup page is organized into tabs, each managing a different aspect of the system:
+The Admin Setup page focuses on **core infrastructure configuration**. It is organized into the following tabs:
 
 | Tab | Purpose |
 |-----|---------|
-| Users | Create and manage user accounts |
-| Companies | Manage company records |
+| Users | Create and manage user accounts (Admin only) |
+| Companies | Manage company records (Admin only) |
 | Plants | Manage manufacturing plants |
 | Lines | Manage production lines within plants |
-| Machines | Manage individual machines within lines |
-| Products | Manage product catalog (SKUs) |
-| Standards | Manage production standards (machine-SKU benchmarks) |
 | Downtime | Manage downtime reason codes |
 | Defects | Manage defect reason codes |
-| Permissions | Assign users to plants, lines, and machines |
+
+**Note:** Production-related master data (Machines, Products/SKUs, Production Standards, Shifts, and Planned Production Time) are now managed on the **Supervisor Dashboard** to better align with operational workflows. Both Supervisors and Admins can access these tabs.
+
+### 4.1.1 Supervisor Dashboard — Master Data Tabs
+
+The Supervisor Dashboard includes the following additional master data management tabs:
+
+| Tab | Icon | Purpose |
+|-----|------|---------|
+| กะทำงาน (Shifts) | Timer | Configure shift schedules (name, start/end time, effective date). Supports duplicating shifts. |
+| เวลาวางแผน (Planned Time) | Clock | Configure Planned Production Time templates per plant/shift (breaks, meals, maintenance, meetings). Supports bulk-copy across plants. |
+| เครื่องจักร (Machines) | Cpu | Manage machines with OEE targets, cycle times, and time units. |
+| สินค้า (Products) | Package | Manage product catalog (SKUs). |
+| มาตรฐาน (Standards) | BarChart3 | Manage production standards (ideal cycle time, setup time per machine-SKU combination). |
+
+All master data management uses **soft-delete** (is_active: false) to preserve historical data. The system prevents deactivation if there are active RUN events on that entity.
 
 ## 4.2 User and Role Management
 
@@ -748,18 +763,31 @@ Changing a user's role immediately affects their access:
 
 ## 4.4 System Configuration: Permissions
 
-### 4.4.1 Direct Permission Assignment
+### 4.4.1 Staff Machine Permission Assignment (Supervisor Feature)
 
-On the **Permissions** tab, administrators can assign users access to specific:
-- **Plants** - User can see data for machines in the plant.
-- **Lines** - User can see data for machines in the line.
-- **Machines** - User can operate and record events for the machine.
+Supervisors can assign machine permissions to staff members via a redesigned **Staff Permission Dialog** accessible from the Staff Manager tab:
 
-**Note:** Supervisors and Admins automatically have access to all machines in their company. Direct permissions are primarily for Staff members.
+1. Navigate to **Supervisor Dashboard** > **Staff** tab.
+2. Click the **gear icon** (⚙️) next to a staff member's name.
+3. The **Staff Permission Dialog** opens with two tabs: **Machines** and **Permission Groups**.
+
+**Machines Tab — Filterable Tree-View:**
+- **Filter by Plant:** Select a plant to narrow down the machine list.
+- **Filter by Line:** Further filter by production line (cascaded from plant selection).
+- **Clear Filters:** Reset all filters to show all machines.
+- Machines are **grouped by Line** in a tree-view layout for easy browsing.
+- Each machine shows a checkbox to grant or revoke direct access.
+- **Select All (visible):** Grant access to all machines currently shown in the filtered view.
+- **Deselect All (visible):** Remove direct access for all visible machines.
+- **Inherited Permissions:** If a machine's access is inherited from a Plant-level or Line-level permission, it is shown with a badge (e.g., "สืบทอดจาก Plant" or "สืบทอดจาก Line") and the checkbox is disabled to prevent accidental removal.
+
+**Permission Groups Tab:**
+- Assign the staff member to existing permission groups.
+- All machines in the group become accessible to the assigned staff.
 
 ### 4.4.2 Permission Groups (Supervisor Feature)
 
-Supervisors can create permission groups on the Supervisor Dashboard:
+Supervisors can create and manage permission groups on the Supervisor Dashboard:
 
 1. Navigate to **Supervisor Dashboard** and select the **Permission Groups** tab.
 2. Click **Create Group**.
@@ -768,6 +796,18 @@ Supervisors can create permission groups on the Supervisor Dashboard:
 5. Assign staff members to the group.
 
 **Benefit:** Instead of assigning machines one by one, create a group (e.g., "Assembly Line A Operators") and assign staff to it. All machines in the group become accessible to all assigned staff.
+
+### 4.4.3 Permission Hierarchy
+
+Permissions are checked in this order (broadest to narrowest):
+1. **Plant-level** — Grants access to all machines in the plant.
+2. **Line-level** — Grants access to all machines in the line.
+3. **Machine-level** — Grants access to a specific machine.
+4. **Permission Group** — Grants access to all machines in the group.
+
+If a user has access at a higher level (Plant or Line), individual machine permissions are shown as "inherited" and cannot be removed individually — the higher-level permission must be removed first.
+
+**Note:** Supervisors and Admins automatically have access to all machines in their company. Permission assignment is primarily for Staff members.
 
 ## 4.5 Bulk Import and Export
 
@@ -888,17 +928,21 @@ Company
 
 ## 5.3 How the System Ensures Data Accuracy
 
-1. **Database-level validation:** All business rules (overlap prevention, lock enforcement) are enforced by database triggers and functions, not by the frontend. This means rules cannot be bypassed.
+1. **Database-level validation:** All business rules (overlap prevention, lock enforcement, shift-time enforcement) are enforced by database triggers and functions, not by the frontend. This means rules cannot be bypassed.
 
 2. **Overlap prevention:** The system prevents two events from being active on the same machine simultaneously. Starting a new event automatically ends any active event.
 
 3. **Lock enforcement:** Once a shift is locked, the database rejects any INSERT, UPDATE, or DELETE on production_events and production_counts for that shift.
 
-4. **Audit trail:** Every change is automatically logged by database triggers, capturing the actor, timestamp, and before/after states.
+4. **Strict shift-time enforcement:** The system blocks all data entry operations (Start Run, Add Counts, Create/Edit Manual Events) outside of active shift windows. Error messages are displayed in Thai to clearly inform operators. This ensures OEE data integrity by preventing recording of data outside planned production time.
 
-5. **Role-based access (RLS):** Row Level Security policies on all tables ensure users can only access data they are authorized to see. This is enforced at the database level, not in the application code.
+5. **Audit trail:** Every change is automatically logged by database triggers, capturing the actor, timestamp, and before/after states.
 
-6. **Recalculation preview:** Before recalculating OEE, supervisors can review the full event timeline and count history to identify data issues.
+6. **Role-based access (RLS):** Row Level Security policies on all tables ensure users can only access data they are authorized to see. This is enforced at the database level, not in the application code.
+
+7. **Recalculation preview:** Before recalculating OEE, supervisors can review the full event timeline and count history to identify data issues.
+
+8. **Change History (Audit Log Diff):** Master data management screens display detailed change history showing before/after values for every modification, allowing Admins and Supervisors to trace all configuration changes.
 
 ## 5.4 How Permissions Affect Data Visibility
 
@@ -951,6 +995,10 @@ Permission checks are performed by database functions (`has_machine_permission`,
 | Error | Cause | Solution |
 |-------|-------|----------|
 | "กรุณาเลือก SKU ก่อนเริ่มงาน" | Tried to start RUN without selecting a product | Select a product from the SKU selector before clicking Start Run. |
+| "นอกเวลาทำการ ไม่สามารถรันเครื่องจักรได้" | Tried to start a RUN event outside any active shift window | Wait until the shift starts, or contact Admin to configure shift schedules. |
+| "นอกเวลาทำการ ไม่สามารถบันทึกจำนวนผลิตได้" | Tried to add production counts outside any active shift window | Counts can only be recorded during an active shift. |
+| "นอกเวลาทำการ ไม่สามารถกำหนดเวลาเริ่มต้นนอกช่วงกะได้" | Tried to create a manual event with start time outside shift | Ensure the event start time falls within an active shift window. |
+| "นอกเวลาทำการ ไม่สามารถกำหนดเวลาสิ้นสุดนอกช่วงกะได้" | Tried to edit an event with end time outside shift | Ensure the event end time falls within the shift window. |
 | "Failed to start event" | Various: shift locked, no active shift, permission denied | Check that the shift is not locked. Verify you have permission for the machine. |
 | "No benchmark defined for [SKU] on [Machine]" | No production standard exists for this machine-SKU combination | This is a warning, not a blocker. Contact your Supervisor or Admin to create a production standard. |
 
@@ -1057,5 +1105,5 @@ Permission checks are performed by database functions (`has_machine_permission`,
 *End of Document*
 
 **PNF OEE System - User Manual and Admin Manual**  
-**Version 1.0 - February 2026**  
+**Version 2.0 - February 2026**  
 **Designed and Developed by Arnon Arpaket**
