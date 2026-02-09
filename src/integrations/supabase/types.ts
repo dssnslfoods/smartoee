@@ -445,6 +445,97 @@ export type Database = {
           },
         ]
       }
+      planned_time_templates: {
+        Row: {
+          break_minutes: number
+          company_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          maintenance_minutes: number
+          meal_minutes: number
+          meeting_minutes: number
+          other_label: string | null
+          other_minutes: number
+          plant_id: string
+          shift_id: string
+          updated_at: string
+        }
+        Insert: {
+          break_minutes?: number
+          company_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          maintenance_minutes?: number
+          meal_minutes?: number
+          meeting_minutes?: number
+          other_label?: string | null
+          other_minutes?: number
+          plant_id: string
+          shift_id: string
+          updated_at?: string
+        }
+        Update: {
+          break_minutes?: number
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          maintenance_minutes?: number
+          meal_minutes?: number
+          meeting_minutes?: number
+          other_label?: string | null
+          other_minutes?: number
+          plant_id?: string
+          shift_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planned_time_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planned_time_templates_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planned_time_templates_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["plant_id"]
+          },
+          {
+            foreignKeyName: "planned_time_templates_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "v_shift_summary"
+            referencedColumns: ["plant_id"]
+          },
+          {
+            foreignKeyName: "planned_time_templates_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planned_time_templates_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["shift_id"]
+          },
+        ]
+      }
       plants: {
         Row: {
           code: string | null

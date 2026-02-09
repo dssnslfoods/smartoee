@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom';
-import { Settings, Factory, Layers, Cpu, AlertTriangle, Ban, Users, UserCog, Building2, Loader2, Package, BarChart3 } from 'lucide-react';
+import { Settings, Factory, Layers, Cpu, AlertTriangle, Ban, Users, UserCog, Building2, Loader2, Package, BarChart3, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -16,6 +16,7 @@ import {
   UserPermissionManager,
   UserManager,
   CompanyManager,
+  PlannedTimeManager,
 } from '@/components/admin';
 
 export default function Admin() {
@@ -123,6 +124,13 @@ export default function Admin() {
                 <span className="hidden sm:inline">Defects</span>
               </TabsTrigger>
               <TabsTrigger 
+                value="planned-time" 
+                className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Clock className="h-4 w-4" />
+                <span className="hidden sm:inline">Planned Time</span>
+              </TabsTrigger>
+              <TabsTrigger 
                 value="permissions" 
                 className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
               >
@@ -172,6 +180,10 @@ export default function Admin() {
 
               <TabsContent value="permissions" className="mt-0">
                 <UserPermissionManager />
+              </TabsContent>
+
+              <TabsContent value="planned-time" className="mt-0">
+                <PlannedTimeManager />
               </TabsContent>
             </CardContent>
           </Card>
