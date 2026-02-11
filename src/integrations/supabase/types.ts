@@ -997,6 +997,7 @@ export type Database = {
           is_active: boolean
           name: string
           start_time: string
+          working_days: number[]
         }
         Insert: {
           created_at?: string
@@ -1006,6 +1007,7 @@ export type Database = {
           is_active?: boolean
           name: string
           start_time: string
+          working_days?: number[]
         }
         Update: {
           created_at?: string
@@ -1015,6 +1017,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           start_time?: string
+          working_days?: number[]
         }
         Relationships: []
       }
