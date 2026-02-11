@@ -12,6 +12,8 @@ import { OEEMetricsPanel } from './OEEMetricsPanel';
 import { ApprovalControls } from './ApprovalControls';
 import { ShiftActivityDetail } from './ShiftActivityDetail';
 import oeeApi from '@/services/oeeApi';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ShiftApprovalCalendarProps {
   plantId: string;
@@ -21,6 +23,7 @@ interface ShiftApprovalCalendarProps {
 export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCalendarProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { company } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
@@ -40,9 +43,41 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
     enabled: !!plantId,
   });
 
+  // Fetch pre-defined holidays for this month
+  const { data: preDefinedHolidays = [] } = useQuery({
+    queryKey: ['holidays-calendar', company?.id, plantId, monthRange.startDate, monthRange.endDate],
+    queryFn: async () => {
+      if (!company?.id) return [];
+      const { data, error } = await supabase
+        .from('holidays')
+        .select('holiday_date, name, is_recurring, plant_id')
+        .eq('company_id', company.id)
+        .or(`plant_id.is.null,plant_id.eq.${plantId}`);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!company?.id && !!plantId,
+  });
+
+  // Build a set of holiday dates (including recurring matched by month/day)
+  const holidayDateMap = useMemo(() => {
+    const map = new Map<string, string>(); // date -> name
+    for (const h of preDefinedHolidays) {
+      if (h.is_recurring) {
+        // Match same month/day across the current month's year
+        const mm = h.holiday_date.slice(5); // MM-DD
+        const yearStr = format(currentMonth, 'yyyy');
+        map.set(`${yearStr}-${mm}`, h.name);
+      } else {
+        map.set(h.holiday_date, h.name);
+      }
+    }
+    return map;
+  }, [preDefinedHolidays, currentMonth]);
+
   // Group summaries by date and compute status per date
   const dateStatusMap = useMemo(() => {
-    const map = new Map<string, { summaries: typeof allSummaries; hasUnapproved: boolean; allLocked: boolean; isHoliday: boolean }>();
+    const map = new Map<string, { summaries: typeof allSummaries; hasUnapproved: boolean; allLocked: boolean; isHoliday: boolean; holidayName?: string }>();
     for (const s of allSummaries) {
       if (!s.shift_date) continue;
       const existing = map.get(s.shift_date) || { summaries: [], hasUnapproved: false, allLocked: true, isHoliday: true };
@@ -53,7 +88,7 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
       if (s.approval_status !== 'LOCKED') {
         existing.allLocked = false;
       }
-      // If any shift has actual activity (non-zero run_time, good_qty, reject_qty, or downtime), it's not a holiday
+      // If any shift has actual activity, it's not a holiday
       const hasActivity = (s.total_run_time != null && Number(s.total_run_time) > 0)
         || (s.total_good_qty != null && Number(s.total_good_qty) > 0)
         || (s.total_reject_qty != null && Number(s.total_reject_qty) > 0)
@@ -61,10 +96,16 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
       if (hasActivity) {
         existing.isHoliday = false;
       }
+      // Check pre-defined holidays
+      const predefined = holidayDateMap.get(s.shift_date);
+      if (predefined) {
+        existing.isHoliday = true;
+        existing.holidayName = predefined;
+      }
       map.set(s.shift_date, existing);
     }
     return map;
-  }, [allSummaries]);
+  }, [allSummaries, holidayDateMap]);
 
   // Summaries for the selected date
   const selectedSummaries = useMemo(() => {
@@ -296,8 +337,10 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                 <div className="flex items-center gap-3 rounded-lg border border-sky-500/30 bg-sky-500/5 p-4">
                   <Palmtree className="h-5 w-5 text-sky-500 shrink-0" />
                   <div>
-                    <p className="text-sm font-medium">วันหยุดพิเศษ — ไม่มีการบันทึกเหตุการณ์</p>
-                    <p className="text-xs text-muted-foreground">วันนี้ไม่มีข้อมูลการผลิต จึงไม่ถูกนำมาคำนวณ OEE</p>
+                    <p className="text-sm font-medium">
+                      วันหยุดพิเศษ{dateStatusMap.get(selectedDate)?.holidayName ? `: ${dateStatusMap.get(selectedDate)?.holidayName}` : ' — ไม่มีการบันทึกเหตุการณ์'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">วันนี้ไม่ถูกนำมาคำนวณ OEE</p>
                   </div>
                 </div>
               )}
