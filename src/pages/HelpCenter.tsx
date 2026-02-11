@@ -25,6 +25,9 @@ import {
   Monitor,
   ScrollText,
   FileDown,
+  ClipboardList,
+  CalendarDays,
+  X,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -73,11 +76,11 @@ const helpSections: HelpSection[] = [
     items: [
       {
         q: "บทบาท STAFF ทำอะไรได้บ้าง?",
-        a: "Staff สามารถ: เริ่ม/หยุดเหตุการณ์การผลิต (RUN, DOWNTIME, SETUP) บนเครื่องจักรที่มีสิทธิ์ บันทึกจำนวนผลิต (Good/Reject) ดู Timeline เหตุการณ์ ดู Dashboard แบบพื้นฐาน (ไม่มีตัวกรองช่วงเวลา) และดู Recent Activity เฉพาะของตนเอง ไม่สามารถเข้าหน้า Supervisor, Executive หรือ Admin ได้",
+        a: "Staff สามารถ: เริ่ม/หยุดเหตุการณ์การผลิต (RUN, DOWNTIME, SETUP) บนเครื่องจักรที่มีสิทธิ์ บันทึกจำนวนผลิต (Good/Reject) ดู Timeline เหตุการณ์ ดู Dashboard แบบพื้นฐาน (ไม่มีตัวกรองช่วงเวลา) ดู Recent Activity เฉพาะของตนเอง และดูหน้ารอบันทึกจำนวนผลิต (Pending Counts) ไม่สามารถเข้าหน้า Supervisor, Executive หรือ Admin ได้",
       },
       {
         q: "บทบาท SUPERVISOR ทำอะไรได้บ้าง?",
-        a: "Supervisor มีสิทธิ์ทุกอย่างเหมือน Staff เพิ่มเติม: เข้าถึงเครื่องจักรทั้งหมดในบริษัทโดยอัตโนมัติ ตรวจสอบ/คำนวณ OEE/อนุมัติ/ล็อคกะ สร้างบัญชี Staff และ Supervisor ใหม่ เปลี่ยนบทบาทระหว่าง Staff กับ Supervisor ได้ จัดการกลุ่มสิทธิ์เครื่องจักร สร้างมาตรฐานการผลิต และดู Audit Log ของโรงงาน",
+        a: "Supervisor มีสิทธิ์ทุกอย่างเหมือน Staff เพิ่มเติม: เข้าถึงเครื่องจักรทั้งหมดในบริษัทโดยอัตโนมัติ ตรวจสอบ/คำนวณ OEE/อนุมัติ/ล็อคกะ สร้างบัญชี Staff และ Supervisor ใหม่ เปลี่ยนบทบาทระหว่าง Staff กับ Supervisor ได้ จัดการกลุ่มสิทธิ์เครื่องจักร สร้างมาตรฐานการผลิต ดู Audit Log จัดการวันหยุด (Holidays) และคลิกชื่อเครื่องจักรใน Warning เพื่อไปยังหน้ารอบันทึกจำนวนผลิตได้โดยตรง",
       },
       {
         q: "บทบาท EXECUTIVE ทำอะไรได้บ้าง?",
@@ -85,7 +88,7 @@ const helpSections: HelpSection[] = [
       },
       {
         q: "บทบาท ADMIN ทำอะไรได้บ้าง?",
-        a: "Admin มีสิทธิ์เต็มในระบบ: จัดการบริษัท โรงงาน ไลน์ เครื่องจักร สินค้า มาตรฐานการผลิต สาเหตุหยุดเครื่อง/ของเสีย จัดการบัญชีผู้ใช้ทุกบทบาท กำหนดสิทธิ์ Import/Export ข้อมูล ดู Activity Log และเลือกบริษัทที่ต้องการจัดการได้",
+        a: "Admin มีสิทธิ์เต็มในระบบ: จัดการบริษัท โรงงาน ไลน์ เครื่องจักร สินค้า มาตรฐานการผลิต สาเหตุหยุดเครื่อง/ของเสีย วันหยุด จัดการบัญชีผู้ใช้ทุกบทบาท กำหนดสิทธิ์ Import/Export ข้อมูล ดู Activity Log และเลือกบริษัทที่ต้องการจัดการได้",
       },
       {
         q: "สิทธิ์การเข้าถึงเครื่องจักรทำงานอย่างไร?",
@@ -198,6 +201,27 @@ const helpSections: HelpSection[] = [
     ],
   },
 
+  /* -------- Pending Counts -------- */
+  {
+    id: "pendingcounts",
+    title: "รอบันทึกจำนวนผลิต (Pending Counts)",
+    icon: ClipboardList,
+    items: [
+      {
+        q: "หน้ารอบันทึกจำนวนผลิตคืออะไร?",
+        a: "หน้านี้แสดงรายการเหตุการณ์ RUN ที่จบแล้วแต่ยังไม่ได้บันทึกจำนวนผลิต (Good/Reject Qty) ช่วยให้มั่นใจว่าข้อมูลการผลิตครบถ้วนก่อนที่ Supervisor จะคำนวณ OEE และอนุมัติกะ",
+      },
+      {
+        q: "วิธีบันทึกจำนวนผลิตจากหน้านี้",
+        a: "คลิกที่เหตุการณ์ที่ต้องการ → ระบบจะเปิดฟอร์มบันทึกจำนวนผลิต → กรอก Good Qty และ Reject Qty → เลือกสาเหตุของเสีย (ถ้ามี) → กด Submit เหตุการณ์จะหายจากรายการเมื่อบันทึกเสร็จ",
+      },
+      {
+        q: "Supervisor สามารถเข้าหน้านี้จากหน้า Supervisor ได้อย่างไร?",
+        a: "เมื่อ Supervisor พยายามอนุมัติกะ หากมีเหตุการณ์ RUN ที่ยังไม่ได้บันทึกจำนวนผลิต ระบบจะแสดง Warning พร้อมชื่อเครื่องจักรที่คลิกได้ คลิกที่ชื่อเครื่องจักรจะนำทางมายังหน้ารอบันทึกจำนวนผลิตโดยกรองเฉพาะเครื่องจักรนั้น พร้อมปุ่ม 'กลับหน้า Supervisor' เพื่อกลับไปดำเนินการต่อ",
+      },
+    ],
+  },
+
   /* -------- Supervisor -------- */
   {
     id: "supervisor",
@@ -206,11 +230,11 @@ const helpSections: HelpSection[] = [
     items: [
       {
         q: "Supervisor Dashboard ประกอบด้วยอะไรบ้าง?",
-        a: "ประกอบด้วย 4 แท็บ: (1) สรุปกะ - ดู OEE, อนุมัติ/ล็อคกะ (2) กลุ่มสิทธิ์ - จัดการ Permission Group (3) จัดการพนักงาน - สร้าง/แก้ไขบัญชี Staff และ Supervisor รวมถึงเปลี่ยนบทบาทได้ (4) Audit Log - ดูประวัติการเปลี่ยนแปลงข้อมูล",
+        a: "ประกอบด้วยหลายแท็บ: (1) สรุปกะ - ดู OEE, อนุมัติ/ล็อคกะ พร้อมปฏิทินแสดงสถานะรายวัน (2) กลุ่มสิทธิ์ - จัดการ Permission Group (3) จัดการพนักงาน - สร้าง/แก้ไขบัญชี Staff และ Supervisor รวมถึงเปลี่ยนบทบาทได้ (4) Audit Log - ดูประวัติการเปลี่ยนแปลงข้อมูล (5) ข้อมูลหลัก - กะทำงาน, เวลาวางแผน, เครื่องจักร, สินค้า, มาตรฐาน, วันหยุด",
       },
       {
         q: "ขั้นตอนการปิดกะ (Shift Workflow) เป็นอย่างไร?",
-        a: 'ขั้นตอน: (1) เลือกโรงงาน (2) ตรวจสอบข้อมูลกะ (3) กดปุ่ม "คำนวณ OEE" → ตรวจสอบ Timeline Preview → ยืนยัน (4) กด "อนุมัติกะ" (5) กด "ล็อคกะ" เพื่อป้องกันการแก้ไขย้อนหลัง',
+        a: 'ขั้นตอน: (1) เลือกโรงงาน (2) ตรวจสอบข้อมูลกะ (3) ตรวจสอบว่าไม่มีเหตุการณ์ที่รอบันทึกจำนวนผลิต (ถ้ามี คลิกชื่อเครื่องจักรเพื่อไปกรอกข้อมูล) (4) กดปุ่ม "คำนวณ OEE" → ตรวจสอบ Timeline Preview → ยืนยัน (5) กด "อนุมัติกะ" (6) กด "ล็อคกะ" เพื่อป้องกันการแก้ไขย้อนหลัง',
       },
       {
         q: "ทำไมต้อง Preview ก่อนคำนวณ OEE?",
@@ -223,6 +247,14 @@ const helpSections: HelpSection[] = [
       {
         q: "Supervisor จัดการบัญชีพนักงานอย่างไร?",
         a: 'ไปที่แท็บ "จัดการพนักงาน" → กดปุ่มเพิ่มพนักงาน → กรอกชื่อ, Email, รหัสผ่าน → บัญชีจะถูกสร้างในบริษัทเดียวกับ Supervisor โดยอัตโนมัติ Supervisor สามารถแก้ไข Email, ชื่อ, รหัสผ่าน และเปลี่ยนบทบาทระหว่าง Staff กับ Supervisor ได้',
+      },
+      {
+        q: "ปฏิทินกะแสดงสถานะอย่างไร?",
+        a: "ปฏิทินในแท็บสรุปกะแสดงสถานะรายวันด้วยสี: เขียว = อนุมัติแล้ว, เหลือง = ร่าง (DRAFT), แดง = ล็อคแล้ว, เทา = วันหยุด/ไม่มีการผลิต ระบบตรวจสอบทั้งข้อมูล OEE และเหตุการณ์การผลิตเพื่อแยกวันหยุดจริงออกจากวันที่มีการผลิตแต่ยังไม่ได้คำนวณ OEE",
+      },
+      {
+        q: "วิธีจัดการวันหยุด (Holidays)",
+        a: 'ไปที่แท็บ "วันหยุด" บน Supervisor Dashboard → กดเพิ่มวันหยุด → กรอกชื่อ, วันที่, คำอธิบาย → เลือกโรงงาน (ถ้าต้องการกำหนดเฉพาะโรงงาน) → เลือกว่าเป็นวันหยุดประจำปีหรือไม่ วันหยุดจะแสดงบนปฏิทินกะเพื่อช่วยในการวางแผน',
       },
     ],
   },
@@ -257,7 +289,7 @@ const helpSections: HelpSection[] = [
     items: [
       {
         q: "Admin Setup มีแท็บอะไรบ้าง?",
-        a: "มี 10 แท็บ: Users (ผู้ใช้), Companies (บริษัท), Plants (โรงงาน), Lines (ไลน์), Machines (เครื่องจักร), Products (สินค้า/SKU), Standards (มาตรฐานการผลิต), Downtime (สาเหตุหยุดเครื่อง), Defects (สาเหตุของเสีย), Permissions (สิทธิ์)",
+        a: "มี 6 แท็บหลัก: Users (ผู้ใช้), Companies (บริษัท), Plants (โรงงาน), Lines (ไลน์), Downtime (สาเหตุหยุดเครื่อง), Defects (สาเหตุของเสีย) ส่วนข้อมูลเกี่ยวกับการผลิต (Machines, Products, Standards, Shifts, Planned Time, Holidays) จัดการบน Supervisor Dashboard",
       },
       {
         q: "วิธีสร้างบัญชีผู้ใช้ใหม่",
@@ -330,6 +362,10 @@ const helpSections: HelpSection[] = [
         a: "ตรวจสอบว่า: (1) มี OEE Snapshot ในช่วงเวลาที่เลือก (7/14/30 วัน) (2) Supervisor ได้คำนวณ OEE และอนุมัติกะเรียบร้อยแล้ว (3) มีข้อมูลการผลิตจริงในช่วงเวลานั้น",
       },
       {
+        q: "ปฏิทินแสดงเป็นวันหยุดทั้งที่มีการผลิต",
+        a: "สาเหตุที่เป็นไปได้: Supervisor ยังไม่ได้คำนวณ OEE สำหรับกะนั้น ระบบตรวจสอบทั้งข้อมูล OEE และเหตุการณ์การผลิต แต่หากยังไม่มีทั้งสองอย่าง จะแสดงเป็นวันหยุด กรุณาคำนวณ OEE เพื่อให้ปฏิทินแสดงสถานะที่ถูกต้อง",
+      },
+      {
         q: "ลองทำอะไรก่อนแจ้ง IT?",
         a: "1. รีเฟรชหน้า 2. ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต 3. ลองเบราว์เซอร์อื่น (Chrome/Firefox/Edge) 4. ล้าง Cache เบราว์เซอร์ 5. ตรวจสอบว่าคนอื่นมีปัญหาเหมือนกันไหม 6. จด Error Message หรือถ่ายภาพหน้าจอไว้แจ้ง IT",
       },
@@ -344,11 +380,11 @@ const helpSections: HelpSection[] = [
     items: [
       {
         q: "Staff ควรใช้ระบบอย่างไรให้ถูกต้อง?",
-        a: "บันทึกเหตุการณ์แบบ Real-time (อย่ารอจบกะ), เลือก SKU ให้ถูกต้องก่อน Start Run, บันทึกจำนวนผลิตเป็นระยะ ไม่ต้องรอจบกะ, เลือกสาเหตุ Downtime ทุกครั้ง, ใช้ Notes เพิ่มรายละเอียดเมื่อจำเป็น",
+        a: "บันทึกเหตุการณ์แบบ Real-time (อย่ารอจบกะ), เลือก SKU ให้ถูกต้องก่อน Start Run, บันทึกจำนวนผลิตเป็นระยะ ไม่ต้องรอจบกะ, เลือกสาเหตุ Downtime ทุกครั้ง, ใช้ Notes เพิ่มรายละเอียดเมื่อจำเป็น, ตรวจสอบหน้ารอบันทึกจำนวนผลิตเป็นประจำ",
       },
       {
         q: "Supervisor ควรทำอะไรบ้าง?",
-        a: "ตรวจสอบ Timeline Preview ก่อนคำนวณ OEE, ทำตาม Workflow ตามลำดับ (ตรวจสอบ → คำนวณ → อนุมัติ → ล็อค), ล็อคกะทันทีหลังอนุมัติ, จัดการสิทธิ์ Staff เมื่อมีคนใหม่เข้ามา, ใช้ Permission Group แทนกำหนดสิทธิ์ทีละเครื่อง",
+        a: "ตรวจสอบ Timeline Preview ก่อนคำนวณ OEE, ทำตาม Workflow ตามลำดับ (ตรวจสอบ → คำนวณ → อนุมัติ → ล็อค), ล็อคกะทันทีหลังอนุมัติ, จัดการสิทธิ์ Staff เมื่อมีคนใหม่เข้ามา, ใช้ Permission Group แทนกำหนดสิทธิ์ทีละเครื่อง, ใช้ลิงก์คลิกได้ใน Warning เพื่อไปกรอกข้อมูลที่ขาด, ตั้งค่าวันหยุดเพื่อให้ปฏิทินแม่นยำ",
       },
       {
         q: "สิ่งที่ไม่ควรทำ (Don'ts)",
@@ -356,7 +392,7 @@ const helpSections: HelpSection[] = [
       },
       {
         q: "ตารางปฏิบัติงานรายวันแนะนำ",
-        a: "เริ่มกะ: Staff เลือกเครื่องจักร+SKU กด Start Run → ระหว่างกะ: บันทึกเหตุการณ์ตามจริง กรอกจำนวนผลิตเป็นระยะ → จบกะ: หยุดเหตุการณ์ทั้งหมด กรอกจำนวนผลิตสุดท้าย → หลังจบกะ: Supervisor ตรวจสอบ คำนวณ OEE อนุมัติ ล็อค",
+        a: "เริ่มกะ: Staff เลือกเครื่องจักร+SKU กด Start Run → ระหว่างกะ: บันทึกเหตุการณ์ตามจริง กรอกจำนวนผลิตเป็นระยะ → จบกะ: หยุดเหตุการณ์ทั้งหมด กรอกจำนวนผลิตสุดท้าย ตรวจสอบ Pending Counts → หลังจบกะ: Supervisor ตรวจสอบ คำนวณ OEE อนุมัติ ล็อค",
       },
     ],
   },
@@ -369,10 +405,13 @@ const helpSections: HelpSection[] = [
 export default function HelpCenter() {
   const { hasRole } = useAuth();
   const [search, setSearch] = useState("");
+  const [activeSection, setActiveSection] = useState<string | null>(null);
 
   // Filter sections and items by search
   const filteredSections = helpSections
     .map((section) => {
+      // If active section filter, only show that section
+      if (activeSection && section.id !== activeSection) return null;
       if (!search.trim()) return section;
       const q = search.toLowerCase();
       const matchedItems = section.items.filter(
@@ -530,6 +569,7 @@ export default function HelpCenter() {
     <div class="line"></div>
     <div class="subtitle">คู่มือการใช้งานระบบ</div>
     <div class="meta">
+      เวอร์ชัน 2.1<br/>
       วันที่พิมพ์: ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}<br/><p>
    © 2026 PNF OEE System. Designed and Developed by Arnon Arpaket. All rights reserved.
     </div>
@@ -548,7 +588,7 @@ export default function HelpCenter() {
   ${sectionsHTML}
 
   <div class="footer-note">
-    PNF OEE System — Manual and Document v1.0 -
+    PNF OEE System — คู่มือการใช้งาน v2.1 — ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}
   </div>
 </body>
 </html>`);
@@ -568,10 +608,10 @@ export default function HelpCenter() {
 
   return (
     <AppLayout>
-      <div className="page-container space-y-6 max-w-4xl mx-auto">
+      <div className="page-container space-y-5 max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
-          <PageHeader title="Help Center" description="คู่มือการใช้งานระบบ PNF OEE" icon={HelpCircle} />
+          <PageHeader title="Help Center" description="คู่มือการใช้งานระบบ PNF OEE v2.1" icon={HelpCircle} />
           <Button variant="outline" size="sm" onClick={handleExportPDF} className="shrink-0 gap-2 mt-1">
             <FileDown className="h-4 w-4" />
             Export PDF
@@ -584,7 +624,7 @@ export default function HelpCenter() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="ค้นหาคำถาม เช่น วิธีเริ่มบันทึก, OEE คืออะไร, ลืมรหัสผ่าน..."
+                placeholder="ค้นหาคำถาม เช่น วิธีเริ่มบันทึก, OEE คืออะไร, ลืมรหัสผ่าน, Pending Counts..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-10"
@@ -598,15 +638,36 @@ export default function HelpCenter() {
           </CardContent>
         </Card>
 
+        {/* Quick Navigation Chips */}
+        <div className="flex flex-wrap gap-2">
+          {helpSections.map((section) => {
+            const Icon = section.icon;
+            const isActive = activeSection === section.id;
+            return (
+              <Button
+                key={section.id}
+                variant={isActive ? "default" : "outline"}
+                size="sm"
+                className="gap-1.5 text-xs h-8"
+                onClick={() => setActiveSection(isActive ? null : section.id)}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {section.title}
+                {isActive && <X className="h-3 w-3 ml-0.5" />}
+              </Button>
+            );
+          })}
+        </div>
+
         {/* Sections */}
-        <ScrollArea className="h-[calc(100vh-260px)] min-h-[400px]">
+        <ScrollArea className="h-[calc(100vh-320px)] min-h-[400px]">
           <div className="space-y-4 pr-3">
             {filteredSections.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center text-muted-foreground">
                   <HelpCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>ไม่พบคำถามที่ตรงกับ "{search}"</p>
-                  <p className="text-xs mt-1">ลองค้นหาด้วยคำอื่น</p>
+                  <p className="text-xs mt-1">ลองค้นหาด้วยคำอื่น หรือลองเลือกหมวดอื่น</p>
                 </CardContent>
               </Card>
             ) : (
@@ -650,6 +711,11 @@ export default function HelpCenter() {
             )}
           </div>
         </ScrollArea>
+
+        {/* Footer stats */}
+        <div className="text-center text-xs text-muted-foreground pb-2">
+          ทั้งหมด {helpSections.length} หมวด · {helpSections.reduce((s, sec) => s + sec.items.length, 0)} คำถาม · เวอร์ชัน 2.1
+        </div>
       </div>
     </AppLayout>
   );

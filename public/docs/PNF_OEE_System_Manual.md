@@ -1,6 +1,6 @@
 # PNF OEE System - User Manual & Admin Manual
 
-**Version:** 2.0  
+**Version:** 2.1  
 **Date:** February 2026  
 **System Name:** PNF OEE System  
 **Developer:** Arnon Arpaket  
@@ -157,8 +157,9 @@ The system implements four distinct roles. Each role has specific capabilities a
 - Dashboard - OEE overview with time period filter (today, yesterday, 7/14/30/60 days)
 - Shopfloor - Full event capture capabilities
 - Monitor - Real-time machine status view
-- Supervisor Dashboard - Shift management, OEE metrics, staff management, master data management (Shifts, Planned Time, Machines, Products, Standards), permission groups, audit logs
+- Supervisor Dashboard - Shift management, OEE metrics, staff management, master data management (Shifts, Planned Time, Machines, Products, Standards), permission groups, audit logs, holiday management
 - Recent Activity - All activities within their company
+- Pending Counts - Events awaiting production count entry
 - Help Center - System manual and FAQ
 
 **What they can do:**
@@ -179,6 +180,8 @@ The system implements four distinct roles. Each role has specific capabilities a
 - Duplicate shifts and bulk-copy Planned Time templates across plants
 - View audit logs and change history for their plant
 - Edit or delete any production event or count within their company
+- Manage holidays (วันหยุด) per plant
+- Click machine names in approval warnings to navigate directly to pending counts for quick data completion
 
 **What they cannot do:**
 - Access the Admin Setup page
@@ -250,7 +253,7 @@ The system implements four distinct roles. Each role has specific capabilities a
   - Downtime Reasons (create, edit with category: Planned/Unplanned/Breakdown/Changeover)
   - Defect Reasons (create, edit per company)
 - **Supervisor Dashboard** — Also has access to production master data tabs:
-  - Machines, Products/SKUs, Production Standards, Shifts, Planned Production Time
+  - Machines, Products/SKUs, Production Standards, Shifts, Planned Production Time, Holidays
 - Bulk import and export master data (Excel/CSV)
 - View the raw Activity Log (audit trail) with full before/after data
 - Edit or delete any production event or count in any company
@@ -336,6 +339,7 @@ The left sidebar contains the following menu items (visibility depends on your r
 | Dashboard | All roles | OEE overview with gauges and machine status |
 | Shopfloor | All roles | Record production events and counts |
 | Monitor | All roles | Real-time machine status board |
+| Pending Counts | All roles | RUN events awaiting production count entry |
 | Supervisor | Supervisor, Admin | Shift management, staff management, production master data, audit logs |
 | Executive | Executive, Admin | High-level OEE performance dashboard |
 | Recent Activity | All roles | View recent production activities |
@@ -526,7 +530,23 @@ This tab displays cards for all machines you have permission to operate, showing
 
 **Interaction:** Click any machine card to open a control sheet showing event details and production information.
 
-## 3.6 Recent Activity
+## 3.6 Pending Counts (รอบันทึกจำนวนผลิต)
+
+**Screen purpose:** View and complete RUN events that have ended but still need production count entry.
+
+**When to use:** To ensure all completed RUN events have their production counts recorded, preventing data gaps.
+
+**Features:**
+- Lists all completed RUN events that lack production count records.
+- Shows machine name, SKU, start/end time, and duration for each pending event.
+- Click an event to open the count entry form directly.
+- Supports filtering by machine when navigated from the Supervisor Dashboard.
+
+**Navigation from Supervisor:**
+- When a Supervisor sees a warning about incomplete counts during shift approval, they can click the machine name to navigate directly to this page with the relevant machine pre-filtered.
+- A "กลับหน้า Supervisor" (Back to Supervisor) button appears for easy return navigation.
+
+## 3.7 Recent Activity
 
 **Screen purpose:** View a timeline of recent production activities in a human-readable format.
 
@@ -554,7 +574,7 @@ This tab displays cards for all machines you have permission to operate, showing
 - Supervisors and Admins can edit or delete any production event or count within their company.
 - Click the edit or delete icon on any editable record to modify or remove it.
 
-## 3.7 Activity Log (Admin Only)
+## 3.8 Activity Log (Admin Only)
 
 **Screen purpose:** Raw audit trail showing all system changes with full before/after data.
 
@@ -599,6 +619,7 @@ The Supervisor Dashboard includes the following additional master data managemen
 | เครื่องจักร (Machines) | Cpu | Manage machines with OEE targets, cycle times, and time units. |
 | สินค้า (Products) | Package | Manage product catalog (SKUs). |
 | มาตรฐาน (Standards) | BarChart3 | Manage production standards (ideal cycle time, setup time per machine-SKU combination). |
+| วันหยุด (Holidays) | Calendar | Manage holidays per plant. Holidays are used in calendar display and shift planning. |
 
 All master data management uses **soft-delete** (is_active: false) to preserve historical data. The system prevents deactivation if there are active RUN events on that entity.
 
@@ -761,6 +782,19 @@ Changing a user's role immediately affects their access:
 - **Company** (required) - The company this reason belongs to.
 - **Is Active** - Toggle to enable/disable.
 
+### 4.3.9 Holiday Management
+
+**Purpose:** Define holidays per plant to help with shift planning and calendar display.
+
+**Fields:**
+- **Name** (required) - Holiday name.
+- **Date** (required) - The holiday date.
+- **Plant** (optional) - If set, applies to a specific plant only; if empty, applies company-wide.
+- **Description** (optional) - Additional details.
+- **Is Recurring** - Whether the holiday repeats annually.
+
+**Impact:** Holidays are displayed on the Supervisor's shift approval calendar. Days configured as holidays show with a special indicator to help distinguish non-production days from days with missing data.
+
 ## 4.4 System Configuration: Permissions
 
 ### 4.4.1 Staff Machine Permission Assignment (Supervisor Feature)
@@ -889,7 +923,14 @@ Master data can be bulk imported using Excel (.xlsx) or CSV files:
 4. Pareto data is derived from `production_events` joined with `downtime_reasons`.
 5. Line ranking is calculated by aggregating machine-level snapshots up to line level.
 
-### 5.1.3 All Changes to Audit Trail
+### 5.1.3 Supervisor to Pending Counts
+
+1. When a Supervisor attempts to approve a shift, the system checks for RUN events without production counts.
+2. If incomplete events are found, a warning is displayed with clickable machine names.
+3. Clicking a machine name navigates to the Pending Counts page with the machine pre-filtered.
+4. After completing the missing counts, the user can click "กลับหน้า Supervisor" to return.
+
+### 5.1.4 All Changes to Audit Trail
 
 Every INSERT, UPDATE, or DELETE on production tables triggers an audit log entry:
 - The `before_json` captures the record state before the change.
@@ -915,6 +956,7 @@ Company
   |
   |-- Downtime Reasons
   |-- Defect Reasons
+  |-- Holidays
   |-- User Profiles
         |-- User Permissions (Plant/Line/Machine)
         |-- Permission Groups
@@ -925,6 +967,7 @@ Company
 - Production Standards link a Machine to a Product with specific benchmark values.
 - Production Events belong to a Machine and a Shift Calendar entry.
 - A Shift Calendar entry links a Shift definition to a specific Plant and date.
+- Holidays can be company-wide or plant-specific.
 
 ## 5.3 How the System Ensures Data Accuracy
 
@@ -943,6 +986,8 @@ Company
 7. **Recalculation preview:** Before recalculating OEE, supervisors can review the full event timeline and count history to identify data issues.
 
 8. **Change History (Audit Log Diff):** Master data management screens display detailed change history showing before/after values for every modification, allowing Admins and Supervisors to trace all configuration changes.
+
+9. **Pending counts detection:** During shift approval, the system warns if RUN events lack production counts, with direct navigation to resolve incomplete data.
 
 ## 5.4 How Permissions Affect Data Visibility
 
@@ -989,6 +1034,7 @@ Permission checks are performed by database functions (`has_machine_permission`,
 | OEE shows 0% on Dashboard | OEE has not been calculated yet | Supervisor must recalculate OEE for the shift on the Supervisor Dashboard. |
 | Executive Dashboard shows no data | No OEE snapshots exist for the selected time period | Ensure shifts have been recalculated and approved. |
 | Recent Activity is empty | No production records exist or filter is too restrictive | Try changing the filter chips or clearing the search field. |
+| Calendar shows holiday incorrectly | Day has production events but no OEE calculated | The calendar checks both OEE data and production events. Ensure OEE is recalculated for that shift. |
 
 ## 6.4 Validation Errors
 
@@ -1025,6 +1071,7 @@ Permission checks are performed by database functions (`has_machine_permission`,
 3. **Record counts regularly** - Do not wait until the end of the shift to enter all counts. Record them periodically for better data granularity.
 4. **Always select a downtime reason** - When recording downtime, always specify the reason. This data is critical for loss analysis.
 5. **Use notes for context** - Add notes to events when the reason code alone does not fully explain the situation.
+6. **Check Pending Counts** - Regularly visit the Pending Counts page to ensure all completed RUN events have production counts recorded.
 
 ### For Supervisors
 
@@ -1033,6 +1080,7 @@ Permission checks are performed by database functions (`has_machine_permission`,
 3. **Lock shifts promptly** - Lock approved shifts to prevent retroactive data changes.
 4. **Manage staff permissions proactively** - When new staff join, assign machine permissions immediately.
 5. **Use permission groups** - For teams that share the same set of machines, create a permission group rather than assigning machines individually.
+6. **Use clickable warnings** - When approval warnings show machines with missing counts, click the machine name to navigate directly to Pending Counts for quick resolution.
 
 ### For Executives
 
@@ -1046,6 +1094,7 @@ Permission checks are performed by database functions (`has_machine_permission`,
 2. **Create production standards** - Define ideal cycle times for all machine-product combinations to ensure accurate OEE calculations.
 3. **Set realistic OEE targets** - Configure machine-level OEE targets that are achievable but challenging.
 4. **Regularly audit user accounts** - Review active accounts and deactivate those of departed employees.
+5. **Configure holidays** - Set up holidays per plant to improve calendar accuracy and shift planning.
 
 ## 7.2 Do's and Don'ts
 
@@ -1058,6 +1107,8 @@ Permission checks are performed by database functions (`has_machine_permission`,
 - Do use permission groups for team-based machine access.
 - Do export data regularly for backup and offline analysis.
 - Do set up production standards for accurate performance calculations.
+- Do check Pending Counts regularly to ensure data completeness.
+- Do configure holidays to improve calendar accuracy.
 
 ### Don'ts
 
@@ -1099,11 +1150,12 @@ Permission checks are performed by database functions (`has_machine_permission`,
 | Export OEE data for management reporting | Supervisor / Executive |
 | Review loss Pareto for improvement priorities | Executive / Supervisor |
 | Update machine OEE targets based on recent performance | Admin |
+| Configure upcoming holidays | Admin / Supervisor |
 
 ---
 
 *End of Document*
 
 **PNF OEE System - User Manual and Admin Manual**  
-**Version 2.0 - February 2026**  
+**Version 2.1 - February 2026**  
 **Designed and Developed by Arnon Arpaket**
