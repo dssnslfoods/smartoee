@@ -587,7 +587,7 @@ export type Database = {
           machine_id: string
           notes: string | null
           reject_qty: number
-          shift_calendar_id: string
+          shift_calendar_id: string | null
           ts: string
         }
         Insert: {
@@ -599,7 +599,7 @@ export type Database = {
           machine_id: string
           notes?: string | null
           reject_qty?: number
-          shift_calendar_id: string
+          shift_calendar_id?: string | null
           ts?: string
         }
         Update: {
@@ -611,7 +611,7 @@ export type Database = {
           machine_id?: string
           notes?: string | null
           reject_qty?: number
-          shift_calendar_id?: string
+          shift_calendar_id?: string | null
           ts?: string
         }
         Relationships: [
@@ -672,7 +672,7 @@ export type Database = {
           plant_id: string
           product_id: string | null
           reason_id: string | null
-          shift_calendar_id: string
+          shift_calendar_id: string | null
           start_ts: string
           updated_at: string
         }
@@ -688,7 +688,7 @@ export type Database = {
           plant_id: string
           product_id?: string | null
           reason_id?: string | null
-          shift_calendar_id: string
+          shift_calendar_id?: string | null
           start_ts?: string
           updated_at?: string
         }
@@ -704,7 +704,7 @@ export type Database = {
           plant_id?: string
           product_id?: string | null
           reason_id?: string | null
-          shift_calendar_id?: string
+          shift_calendar_id?: string | null
           start_ts?: string
           updated_at?: string
         }
