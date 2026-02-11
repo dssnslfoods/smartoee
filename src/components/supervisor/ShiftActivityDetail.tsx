@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
@@ -34,6 +34,11 @@ function formatDuration(startTs: string, endTs?: string): string {
 export function ShiftActivityDetail({ shiftCalendarId }: ShiftActivityDetailProps) {
   const [eventsOpen, setEventsOpen] = useState(false);
   const [countsOpen, setCountsOpen] = useState(false);
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+
+  const toggleEvent = useCallback((id: string) => {
+    setExpandedEventId(prev => prev === id ? null : id);
+  }, []);
 
   const { data: events = [], isLoading: eventsLoading } = useQuery({
     queryKey: ['shiftEvents', shiftCalendarId],
@@ -73,44 +78,73 @@ export function ShiftActivityDetail({ shiftCalendarId }: ShiftActivityDetailProp
               {events.map((event) => {
                 const config = eventTypeConfig[event.event_type] || eventTypeConfig.RUN;
                 const Icon = config.icon;
+                const isExpanded = expandedEventId === event.id;
+                const hasDetails = event.reason || event.product || event.notes;
+
                 return (
-                  <div
+                  <button
                     key={event.id}
-                    className="flex items-start gap-3 rounded-md border px-3 py-2 text-sm"
+                    type="button"
+                    onClick={() => toggleEvent(event.id)}
+                    className={cn(
+                      'w-full text-left flex flex-col rounded-md border px-3 py-2 text-sm transition-colors',
+                      hasDetails ? 'hover:bg-accent/50 cursor-pointer' : 'cursor-default',
+                      isExpanded && 'bg-accent/30 border-primary/30',
+                    )}
                   >
-                    <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md mt-0.5', config.color)}>
-                      <Icon className="h-3.5 w-3.5" />
+                    <div className="flex items-start gap-3">
+                      <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md mt-0.5', config.color)}>
+                        <Icon className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium">{config.label}</span>
+                          {event.machine?.name && (
+                            <Badge variant="outline" className="text-xs h-5">{event.machine.name}</Badge>
+                          )}
+                          {hasDetails && !isExpanded && (
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-auto shrink-0" />
+                          )}
+                          {isExpanded && (
+                            <ChevronUp className="h-3.5 w-3.5 text-muted-foreground ml-auto shrink-0" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                          <span>{format(new Date(event.start_ts), 'HH:mm')}</span>
+                          <span>→</span>
+                          <span>{event.end_ts ? format(new Date(event.end_ts), 'HH:mm') : 'กำลังดำเนินการ'}</span>
+                          <span className="text-foreground/70">({formatDuration(event.start_ts, event.end_ts || undefined)})</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium">{config.label}</span>
-                        {event.machine?.name && (
-                          <Badge variant="outline" className="text-xs h-5">{event.machine.name}</Badge>
+
+                    {/* Expanded details */}
+                    {isExpanded && hasDetails && (
+                      <div className="ml-10 mt-2 space-y-1.5 border-t pt-2">
+                        {event.reason && (
+                          <div className="flex items-start gap-2 text-xs">
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-medium text-foreground">สาเหตุ: {event.reason.name}</p>
+                              <p className="text-muted-foreground">รหัส: {event.reason.code} · หมวด: {event.reason.category}</p>
+                            </div>
+                          </div>
+                        )}
+                        {event.product && (
+                          <div className="flex items-start gap-2 text-xs">
+                            <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-medium text-foreground">สินค้า: {event.product.name}</p>
+                              <p className="text-muted-foreground">รหัส: {event.product.code}</p>
+                            </div>
+                          </div>
+                        )}
+                        {event.notes && (
+                          <p className="text-xs text-muted-foreground italic pl-5">📝 {event.notes}</p>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        <span>{format(new Date(event.start_ts), 'HH:mm')}</span>
-                        <span>→</span>
-                        <span>{event.end_ts ? format(new Date(event.end_ts), 'HH:mm') : 'กำลังดำเนินการ'}</span>
-                        <span className="text-foreground/70">({formatDuration(event.start_ts, event.end_ts || undefined)})</span>
-                      </div>
-                      {event.reason && (
-                        <div className="flex items-center gap-1 text-xs text-amber-600 mt-1">
-                          <AlertTriangle className="h-3 w-3" />
-                          {event.reason.name}
-                        </div>
-                      )}
-                      {event.product && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                          <Package className="h-3 w-3" />
-                          {event.product.name}
-                        </div>
-                      )}
-                      {event.notes && (
-                        <p className="text-xs text-muted-foreground mt-0.5 italic">{event.notes}</p>
-                      )}
-                    </div>
-                  </div>
+                    )}
+                  </button>
                 );
               })}
             </div>
