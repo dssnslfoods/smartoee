@@ -53,12 +53,11 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
       if (s.approval_status !== 'LOCKED') {
         existing.allLocked = false;
       }
-      // If any shift has activity (run_time, good_qty, reject_qty, downtime, or oee), it's not a holiday
-      const hasActivity = (s.total_run_time && s.total_run_time > 0)
-        || (s.total_good_qty && s.total_good_qty > 0)
-        || (s.total_reject_qty && s.total_reject_qty > 0)
-        || (s.total_downtime && s.total_downtime > 0)
-        || (s.avg_oee !== null && s.avg_oee !== undefined);
+      // If any shift has actual activity (non-zero run_time, good_qty, reject_qty, or downtime), it's not a holiday
+      const hasActivity = (s.total_run_time != null && Number(s.total_run_time) > 0)
+        || (s.total_good_qty != null && Number(s.total_good_qty) > 0)
+        || (s.total_reject_qty != null && Number(s.total_reject_qty) > 0)
+        || (s.total_downtime != null && Number(s.total_downtime) > 0);
       if (hasActivity) {
         existing.isHoliday = false;
       }
