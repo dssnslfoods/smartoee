@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AddCountsForm } from '@/components/shopfloor/AddCountsForm';
 import { useAuth } from '@/hooks/useAuth';
-import { getDefectReasons, addCounts } from '@/services';
+import { getDefectReasons, addCountsBackdate } from '@/services';
 import { cn } from '@/lib/utils';
 import { ClipboardList, Play, Package, Clock, ChevronLeft, CheckCircle2, Calendar, Factory, User } from 'lucide-react';
 import { format } from 'date-fns';
@@ -30,6 +30,7 @@ interface PendingRun {
   shift_date: string;
   plant_name: string | null;
   staff_name: string | null;
+  shift_calendar_id: string | null;
 }
 
 export default function PendingCounts() {
@@ -118,6 +119,7 @@ export default function PendingCounts() {
           shift_date: sc?.shift_date || format(new Date(ev.start_ts), 'yyyy-MM-dd'),
           plant_name: plantName,
           staff_name: profileMap.get(ev.created_by) || null,
+          shift_calendar_id: ev.shift_calendar_id,
         });
       }
 
@@ -134,7 +136,16 @@ export default function PendingCounts() {
   const addCountsMutation = useMutation({
     mutationFn: async (data: { goodQty: number; rejectQty: number; defectReasonId?: string; notes?: string }) => {
       if (!selectedEvent) throw new Error('No event selected');
-      return addCounts(selectedEvent.machine_id, data.goodQty, data.rejectQty, data.defectReasonId, data.notes);
+      // Use the event's end_ts as timestamp and its shift_calendar_id for backdated recording
+      return addCountsBackdate(
+        selectedEvent.machine_id,
+        data.goodQty,
+        data.rejectQty,
+        data.defectReasonId,
+        data.notes,
+        selectedEvent.shift_calendar_id || undefined,
+        selectedEvent.end_ts
+      );
     },
     onSuccess: (data) => {
       if (data.success) {

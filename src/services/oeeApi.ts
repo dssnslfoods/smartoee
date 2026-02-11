@@ -151,6 +151,29 @@ export async function addCounts(
   return handleRpcError(data as unknown as AddCountsResponse) as AddCountsResponse;
 }
 
+export async function addCountsBackdate(
+  machineId: string,
+  goodQty: number,
+  rejectQty: number = 0,
+  defectReasonId?: string,
+  notes?: string,
+  shiftCalendarId?: string,
+  ts?: string
+): Promise<AddCountsResponse> {
+  const { data, error } = await supabase.rpc('rpc_add_counts_backdate' as any, {
+    p_machine_id: machineId,
+    p_good_qty: goodQty,
+    p_reject_qty: rejectQty,
+    p_defect_reason_id: defectReasonId || null,
+    p_notes: notes || null,
+    p_shift_calendar_id: shiftCalendarId || null,
+    p_ts: ts || null,
+  });
+
+  if (error) throw error;
+  return handleRpcError(data as unknown as AddCountsResponse) as AddCountsResponse;
+}
+
 // =============================================
 // RPC FUNCTIONS - Shift Management
 // =============================================
