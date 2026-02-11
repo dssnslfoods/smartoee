@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Copy, Loader2, Clock, CalendarDays } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,6 +45,20 @@ interface Shift {
   is_active: boolean;
   effective_from: string;
   created_at: string;
+  working_days: number[];
+}
+
+const DAY_LABELS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+const DAY_FULL_LABELS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+
+function formatWorkingDays(days: number[]): string {
+  if (!days || days.length === 0) return 'ไม่ระบุ';
+  if (days.length === 7) return 'ทุกวัน';
+  // Check if Mon-Fri
+  const sorted = [...days].sort();
+  if (sorted.length === 5 && sorted.join(',') === '1,2,3,4,5') return 'จ-ศ';
+  if (sorted.length === 6 && sorted.join(',') === '1,2,3,4,5,6') return 'จ-ส';
+  return sorted.map(d => DAY_LABELS[d]).join(', ');
 }
 
 function calcDurationMinutes(start: string, end: string): number | null {
@@ -73,6 +88,7 @@ export function ShiftManager() {
     end_time: '16:00',
     is_active: true,
     effective_from: new Date().toISOString().slice(0, 10),
+    working_days: [1, 2, 3, 4, 5, 6] as number[],
   });
 
   const { data: shifts, isLoading } = useQuery({
@@ -97,6 +113,7 @@ export function ShiftManager() {
           end_time: data.end_time,
           is_active: data.is_active,
           effective_from: data.effective_from,
+          working_days: data.working_days,
         });
       if (error) throw error;
     },
@@ -118,6 +135,7 @@ export function ShiftManager() {
           end_time: data.end_time,
           is_active: data.is_active,
           effective_from: data.effective_from,
+          working_days: data.working_days,
         })
         .eq('id', id);
       if (error) throw error;
@@ -183,7 +201,7 @@ export function ShiftManager() {
 
   const handleOpenCreate = () => {
     setEditingShift(null);
-    setFormData({ name: '', start_time: '08:00', end_time: '16:00', is_active: true, effective_from: new Date().toISOString().slice(0, 10) });
+    setFormData({ name: '', start_time: '08:00', end_time: '16:00', is_active: true, effective_from: new Date().toISOString().slice(0, 10), working_days: [1, 2, 3, 4, 5, 6] });
     setIsDialogOpen(true);
   };
 
@@ -195,6 +213,7 @@ export function ShiftManager() {
       end_time: shift.end_time.slice(0, 5),
       is_active: shift.is_active,
       effective_from: shift.effective_from || new Date().toISOString().slice(0, 10),
+      working_days: shift.working_days || [1, 2, 3, 4, 5, 6],
     });
     setIsDialogOpen(true);
   };
@@ -202,7 +221,7 @@ export function ShiftManager() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingShift(null);
-    setFormData({ name: '', start_time: '08:00', end_time: '16:00', is_active: true, effective_from: new Date().toISOString().slice(0, 10) });
+    setFormData({ name: '', start_time: '08:00', end_time: '16:00', is_active: true, effective_from: new Date().toISOString().slice(0, 10), working_days: [1, 2, 3, 4, 5, 6] });
   };
 
   const handleDuplicate = (shift: Shift) => {
@@ -213,6 +232,7 @@ export function ShiftManager() {
       end_time: shift.end_time.slice(0, 5),
       is_active: true,
       effective_from: new Date().toISOString().slice(0, 10),
+      working_days: shift.working_days || [1, 2, 3, 4, 5, 6],
     });
     setIsDialogOpen(true);
   };
@@ -317,6 +337,7 @@ export function ShiftManager() {
               <TableHead>Start Time</TableHead>
               <TableHead>End Time</TableHead>
               <TableHead>Duration</TableHead>
+              <TableHead>วันทำงาน</TableHead>
               <TableHead>เริ่มใช้ตั้งแต่</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
@@ -334,6 +355,9 @@ export function ShiftManager() {
                     {dur != null ? (
                       <span className="text-muted-foreground">{formatDuration(dur)} ({dur} min)</span>
                     ) : '-'}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm">{formatWorkingDays(shift.working_days)}</span>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
@@ -368,7 +392,7 @@ export function ShiftManager() {
             })}
             {shifts?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   No shifts defined yet. Add your first shift to get started.
                 </TableCell>
               </TableRow>
@@ -453,6 +477,50 @@ export function ShiftManager() {
               </p>
             </div>
 
+            {/* Working Days */}
+            <div className="space-y-2">
+              <Label>วันทำงาน *</Label>
+              <div className="flex flex-wrap gap-2">
+                {DAY_LABELS.map((label, idx) => {
+                  const isSelected = formData.working_days.includes(idx);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        const next = isSelected
+                          ? formData.working_days.filter(d => d !== idx)
+                          : [...formData.working_days, idx].sort();
+                        setFormData({ ...formData, working_days: next });
+                      }}
+                      className={cn(
+                        'h-9 w-9 rounded-full text-xs font-medium border transition-colors',
+                        isSelected
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background text-muted-foreground border-border hover:bg-accent',
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" className="text-xs h-7"
+                  onClick={() => setFormData({ ...formData, working_days: [1, 2, 3, 4, 5] })}>
+                  จ-ศ
+                </Button>
+                <Button type="button" variant="outline" size="sm" className="text-xs h-7"
+                  onClick={() => setFormData({ ...formData, working_days: [1, 2, 3, 4, 5, 6] })}>
+                  จ-ส
+                </Button>
+                <Button type="button" variant="outline" size="sm" className="text-xs h-7"
+                  onClick={() => setFormData({ ...formData, working_days: [0, 1, 2, 3, 4, 5, 6] })}>
+                  ทุกวัน
+                </Button>
+              </div>
+            </div>
+
             <div className="flex items-center gap-2">
               <Switch
                 id="shift-active"
@@ -518,6 +586,7 @@ export function ShiftManager() {
           end_time: 'เวลาสิ้นสุด',
           is_active: 'สถานะ',
           effective_from: 'เริ่มใช้ตั้งแต่',
+          working_days: 'วันทำงาน',
         }}
       />
     </div>
