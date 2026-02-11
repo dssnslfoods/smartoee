@@ -152,6 +152,7 @@ export default function PendingCounts() {
         toast.success('บันทึกจำนวนผลิตสำเร็จ');
         setSelectedEvent(null);
         queryClient.invalidateQueries({ queryKey: ['pending-counts-all'] });
+        queryClient.invalidateQueries({ queryKey: ['pending-counts-badge'] });
         queryClient.invalidateQueries({ queryKey: ['productionCounts'] });
         queryClient.invalidateQueries({ queryKey: ['monitor-machines'] });
       } else {
