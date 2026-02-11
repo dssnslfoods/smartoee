@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { Lock, ClipboardCheck, Timer, Clock, Cpu, Package, BarChart3 } from 'lucide-react';
+import { Lock, ClipboardCheck, Timer, Clock, Cpu, Package, BarChart3, Palmtree } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +12,7 @@ import { AuditLogViewer } from '@/components/supervisor/AuditLogViewer';
 import { StaffManager } from '@/components/supervisor/StaffManager';
 import { PermissionGroupManager } from '@/components/supervisor/PermissionGroupManager';
 import { ShiftApprovalCalendar } from '@/components/supervisor/ShiftApprovalCalendar';
+import { HolidayManager } from '@/components/supervisor/HolidayManager';
 import {
   ShiftManager,
   PlannedTimeManager,
@@ -126,6 +127,10 @@ export default function Supervisor() {
                   <BarChart3 className="h-4 w-4" />
                   <span className="hidden sm:inline">มาตรฐาน</span>
                 </TabsTrigger>
+                <TabsTrigger value="holidays" className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <Palmtree className="h-4 w-4" />
+                  <span className="hidden sm:inline">วันหยุด</span>
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -183,6 +188,10 @@ export default function Supervisor() {
                   <ProductionStandardsManager />
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="holidays" className="mt-0">
+              <HolidayManager />
             </TabsContent>
           </Tabs>
         )}
