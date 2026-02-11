@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
@@ -48,6 +49,7 @@ export function ApprovalControls({
   isLocking,
   isRecalculating,
 }: ApprovalControlsProps) {
+  const navigate = useNavigate();
   const isLocked = status === 'LOCKED';
   const isApproved = status === 'APPROVED';
   const isDraft = !status || status === 'DRAFT';
@@ -129,12 +131,17 @@ export function ApprovalControls({
           </div>
           <div className="ml-8 space-y-1">
             {pendingItems.map((item) => (
-              <div key={item.machineId} className="flex items-center gap-2 text-xs text-muted-foreground">
+              <button
+                key={item.machineId}
+                onClick={() => navigate(`/pending-counts?machine_id=${item.machineId}`)}
+                className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group w-full text-left"
+              >
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                <span className="font-medium text-foreground">{item.name}</span>
+                <span className="font-medium text-foreground group-hover:underline">{item.name}</span>
                 <span className="text-muted-foreground">({item.code})</span>
                 <span>— {item.eventCount} เหตุการณ์</span>
-              </div>
+                <span className="ml-auto text-[10px] text-muted-foreground/60 group-hover:text-primary">คลิกเพื่อบันทึก →</span>
+              </button>
             ))}
           </div>
         </div>
