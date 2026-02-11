@@ -12,7 +12,7 @@ import { AddCountsForm } from '@/components/shopfloor/AddCountsForm';
 import { useAuth } from '@/hooks/useAuth';
 import { getDefectReasons, addCounts } from '@/services';
 import { cn } from '@/lib/utils';
-import { ClipboardList, Play, Package, Clock, ChevronLeft, CheckCircle2, Calendar } from 'lucide-react';
+import { ClipboardList, Play, Package, Clock, ChevronLeft, CheckCircle2, Calendar, Factory, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -28,6 +28,8 @@ interface PendingRun {
   product_name: string | null;
   product_code: string | null;
   shift_date: string;
+  plant_name: string | null;
+  staff_name: string | null;
 }
 
 export default function PendingCounts() {
@@ -40,10 +42,10 @@ export default function PendingCounts() {
   const { data: pendingRuns = [], isLoading } = useQuery({
     queryKey: ['pending-counts-all', companyId],
     queryFn: async () => {
-      // Get machines the user can see
+      // Get machines with line→plant info
       let machineQuery = supabase
         .from('machines')
-        .select('id, name, code, line_id, is_active')
+        .select('id, name, code, line_id, is_active, lines!inner(name, plant_id, plants!inner(name))')
         .eq('is_active', true)
         .order('name');
 
@@ -58,10 +60,10 @@ export default function PendingCounts() {
       const machineIds = machines.map(m => m.id);
       const machineMap = new Map(machines.map(m => [m.id, m]));
 
-      // Get completed RUN events with shift_calendar info
+      // Get completed RUN events with shift_calendar info and created_by
       const { data: runEvents, error: eErr } = await supabase
         .from('production_events')
-        .select('id, machine_id, event_type, start_ts, end_ts, product_id, shift_calendar_id, products(name, code), shift_calendar!inner(shift_date)')
+        .select('id, machine_id, event_type, start_ts, end_ts, product_id, shift_calendar_id, created_by, products(name, code), shift_calendar!inner(shift_date)')
         .in('machine_id', machineIds)
         .eq('event_type', 'RUN')
         .not('end_ts', 'is', null)
@@ -69,6 +71,13 @@ export default function PendingCounts() {
 
       if (eErr) throw eErr;
       if (!runEvents?.length) return [];
+
+      // Fetch staff profiles for created_by
+      const creatorIds = [...new Set(runEvents.map(e => e.created_by).filter(Boolean))];
+      const { data: profiles } = creatorIds.length > 0
+        ? await supabase.from('user_profiles').select('user_id, full_name').in('user_id', creatorIds)
+        : { data: [] };
+      const profileMap = new Map((profiles || []).map(p => [p.user_id, p.full_name]));
 
       // Get shift_calendar_ids with counts
       const scIds = [...new Set(runEvents.map(e => e.shift_calendar_id).filter(Boolean))];
@@ -93,6 +102,8 @@ export default function PendingCounts() {
         const machine = machineMap.get(ev.machine_id);
         const product = ev.products as { name: string; code: string } | null;
         const sc = ev.shift_calendar as { shift_date: string } | null;
+        const lineData = machine?.lines as any;
+        const plantName = lineData?.plants?.name || null;
 
         results.push({
           id: ev.id,
@@ -105,6 +116,8 @@ export default function PendingCounts() {
           product_name: product?.name || null,
           product_code: product?.code || null,
           shift_date: sc?.shift_date || format(new Date(ev.start_ts), 'yyyy-MM-dd'),
+          plant_name: plantName,
+          staff_name: profileMap.get(ev.created_by) || null,
         });
       }
 
@@ -255,8 +268,22 @@ export default function PendingCounts() {
                                 <span className="font-semibold text-sm">{run.machine_name}</span>
                                 <span className="font-mono text-[10px] text-muted-foreground">({run.machine_code})</span>
                               </div>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                                {run.plant_name && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Factory className="h-3 w-3 shrink-0" />
+                                    <span>{run.plant_name}</span>
+                                  </div>
+                                )}
+                                {run.staff_name && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <User className="h-3 w-3 shrink-0" />
+                                    <span>{run.staff_name}</span>
+                                  </div>
+                                )}
+                              </div>
                               {run.product_name ? (
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                                   <Package className="h-3 w-3 shrink-0" />
                                   <span className="truncate">{run.product_name}</span>
                                   {run.product_code && <span className="font-mono text-[10px]">({run.product_code})</span>}
