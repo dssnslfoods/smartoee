@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -41,6 +41,7 @@ export function AddCountsForm({
   const [notes, setNotes] = useState('');
   const [activeField, setActiveField] = useState<ActiveField>('good');
   const [inputBuffer, setInputBuffer] = useState('0');
+  const [isEditing, setIsEditing] = useState(false);
 
   const currentValue = activeField === 'good' ? goodQty : rejectQty;
   const setCurrentValue = activeField === 'good' ? setGoodQty : setRejectQty;
@@ -50,10 +51,31 @@ export function AddCountsForm({
     setCurrentValue(Math.max(0, num));
   }, [setCurrentValue]);
 
+  const goodInputRef = useRef<HTMLInputElement>(null);
+  const rejectInputRef = useRef<HTMLInputElement>(null);
+
   const handleFieldSelect = (field: ActiveField) => {
     setActiveField(field);
     const val = field === 'good' ? goodQty : rejectQty;
     setInputBuffer(val.toString());
+    // Focus the input after selecting
+    setTimeout(() => {
+      const ref = field === 'good' ? goodInputRef : rejectInputRef;
+      ref.current?.focus();
+      ref.current?.select();
+    }, 0);
+  };
+
+  const handleDirectInput = (field: ActiveField, raw: string) => {
+    if (isLocked) return;
+    // Allow empty string while typing
+    const cleaned = raw.replace(/[^0-9]/g, '');
+    if (cleaned.length > 6) return;
+    const setter = field === 'good' ? setGoodQty : setRejectQty;
+    if (field === activeField) {
+      setInputBuffer(cleaned || '0');
+    }
+    setter(parseInt(cleaned) || 0);
   };
 
   const handleNumpadPress = (digit: string) => {
@@ -110,17 +132,15 @@ export function AddCountsForm({
       {/* Quantity Display Cards */}
       <div className="grid grid-cols-2 gap-3">
         {/* Good Quantity Card */}
-        <button
-          type="button"
+        <div
           onClick={() => handleFieldSelect('good')}
           className={cn(
-            'relative rounded-xl border-2 p-4 text-left transition-all',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            'relative rounded-xl border-2 p-4 text-left transition-all cursor-pointer',
             activeField === 'good'
               ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/10'
-              : 'border-border bg-card hover:border-green-500/50'
+              : 'border-border bg-card hover:border-green-500/50',
+            isLocked && 'opacity-50 cursor-not-allowed'
           )}
-          disabled={isLocked}
         >
           <div className="flex items-center gap-2 mb-2">
             <div className={cn(
@@ -131,31 +151,37 @@ export function AddCountsForm({
             </div>
             <Label className="text-sm font-medium text-muted-foreground">ชิ้นงานดี</Label>
           </div>
-          <div className={cn(
-            'text-3xl font-bold tabular-nums tracking-tight',
-            goodQty > 0 ? 'text-green-500' : 'text-muted-foreground'
-          )}>
-            {goodQty.toLocaleString()}
-          </div>
+          <input
+            ref={goodInputRef}
+            type="text"
+            inputMode="numeric"
+            value={activeField === 'good' ? inputBuffer : goodQty.toString()}
+            onChange={(e) => handleDirectInput('good', e.target.value)}
+            onFocus={() => { setActiveField('good'); setInputBuffer(goodQty.toString()); }}
+            className={cn(
+              'w-full text-3xl font-bold tabular-nums tracking-tight bg-transparent border-none outline-none p-0',
+              goodQty > 0 ? 'text-green-500' : 'text-muted-foreground'
+            )}
+            disabled={isLocked}
+            maxLength={6}
+          />
           {activeField === 'good' && (
             <div className="absolute top-2 right-2">
               <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
             </div>
           )}
-        </button>
+        </div>
 
         {/* Reject Quantity Card */}
-        <button
-          type="button"
+        <div
           onClick={() => handleFieldSelect('reject')}
           className={cn(
-            'relative rounded-xl border-2 p-4 text-left transition-all',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            'relative rounded-xl border-2 p-4 text-left transition-all cursor-pointer',
             activeField === 'reject'
               ? 'border-red-500 bg-red-500/10 shadow-lg shadow-red-500/10'
-              : 'border-border bg-card hover:border-red-500/50'
+              : 'border-border bg-card hover:border-red-500/50',
+            isLocked && 'opacity-50 cursor-not-allowed'
           )}
-          disabled={isLocked}
         >
           <div className="flex items-center gap-2 mb-2">
             <div className={cn(
@@ -166,18 +192,26 @@ export function AddCountsForm({
             </div>
             <Label className="text-sm font-medium text-muted-foreground">ของเสีย</Label>
           </div>
-          <div className={cn(
-            'text-3xl font-bold tabular-nums tracking-tight',
-            rejectQty > 0 ? 'text-red-500' : 'text-muted-foreground'
-          )}>
-            {rejectQty.toLocaleString()}
-          </div>
+          <input
+            ref={rejectInputRef}
+            type="text"
+            inputMode="numeric"
+            value={activeField === 'reject' ? inputBuffer : rejectQty.toString()}
+            onChange={(e) => handleDirectInput('reject', e.target.value)}
+            onFocus={() => { setActiveField('reject'); setInputBuffer(rejectQty.toString()); }}
+            className={cn(
+              'w-full text-3xl font-bold tabular-nums tracking-tight bg-transparent border-none outline-none p-0',
+              rejectQty > 0 ? 'text-red-500' : 'text-muted-foreground'
+            )}
+            disabled={isLocked}
+            maxLength={6}
+          />
           {activeField === 'reject' && (
             <div className="absolute top-2 right-2">
               <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
             </div>
           )}
-        </button>
+        </div>
       </div>
 
       {/* Quick Add Buttons */}
