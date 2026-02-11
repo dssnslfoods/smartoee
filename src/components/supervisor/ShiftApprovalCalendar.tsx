@@ -75,6 +75,27 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
     return map;
   }, [preDefinedHolidays, currentMonth]);
 
+  // Fetch event counts per shift_calendar_id for holiday detection
+  const shiftCalendarIds = useMemo(() => allSummaries.map(s => s.shift_calendar_id).filter(Boolean) as string[], [allSummaries]);
+
+  const { data: eventCountMap = new Map<string, number>() } = useQuery({
+    queryKey: ['shift-event-counts', shiftCalendarIds],
+    queryFn: async () => {
+      if (!shiftCalendarIds.length) return new Map<string, number>();
+      const { data } = await supabase
+        .from('production_events')
+        .select('shift_calendar_id')
+        .in('shift_calendar_id', shiftCalendarIds);
+      const map = new Map<string, number>();
+      for (const row of (data || [])) {
+        map.set(row.shift_calendar_id!, (map.get(row.shift_calendar_id!) || 0) + 1);
+      }
+      return map;
+    },
+    enabled: shiftCalendarIds.length > 0,
+    staleTime: 30_000,
+  });
+
   // Group summaries by date and compute status per date
   const dateStatusMap = useMemo(() => {
     const map = new Map<string, { summaries: typeof allSummaries; hasUnapproved: boolean; allLocked: boolean; isHoliday: boolean; holidayName?: string }>();
@@ -88,15 +109,16 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
       if (s.approval_status !== 'LOCKED') {
         existing.allLocked = false;
       }
-      // If any shift has actual activity, it's not a holiday
-      const hasActivity = (s.total_run_time != null && Number(s.total_run_time) > 0)
+      // Check if this shift has any activity: OEE data OR raw events
+      const hasOeeActivity = (s.total_run_time != null && Number(s.total_run_time) > 0)
         || (s.total_good_qty != null && Number(s.total_good_qty) > 0)
         || (s.total_reject_qty != null && Number(s.total_reject_qty) > 0)
         || (s.total_downtime != null && Number(s.total_downtime) > 0);
-      if (hasActivity) {
+      const hasRawEvents = (eventCountMap.get(s.shift_calendar_id!) || 0) > 0;
+      if (hasOeeActivity || hasRawEvents) {
         existing.isHoliday = false;
       }
-      // Check pre-defined holidays
+      // Check pre-defined holidays (overrides activity check)
       const predefined = holidayDateMap.get(s.shift_date);
       if (predefined) {
         existing.isHoliday = true;
@@ -105,7 +127,7 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
       map.set(s.shift_date, existing);
     }
     return map;
-  }, [allSummaries, holidayDateMap]);
+  }, [allSummaries, holidayDateMap, eventCountMap]);
 
   // Summaries for the selected date
   const selectedSummaries = useMemo(() => {
