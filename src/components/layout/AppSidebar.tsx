@@ -126,14 +126,14 @@ export function AppSidebar() {
               {item.title}
             </span>
             {item.href === "/pending-counts" && pendingCount > 0 && (
-              <Badge variant="destructive" className="ml-1 h-5 min-w-[20px] px-1.5 text-[10px] font-bold">
+              <Badge variant="destructive" className={cn("ml-1 h-5 min-w-[20px] px-1.5 text-[10px] font-bold", pendingCount > 5 && "animate-pulse")}>
                 {pendingCount > 99 ? "99+" : pendingCount}
               </Badge>
             )}
           </div>
         )}
         {isCollapsed && item.href === "/pending-counts" && pendingCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+          <span className={cn("absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground", pendingCount > 5 && "animate-pulse")}>
             {pendingCount > 99 ? "99+" : pendingCount}
           </span>
         )}
