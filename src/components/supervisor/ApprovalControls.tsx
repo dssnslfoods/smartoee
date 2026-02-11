@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { CheckCircle2, Lock, AlertTriangle, Loader2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { CheckCircle2, Lock, AlertTriangle, Loader2, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -16,6 +17,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { RecalcPreviewDialog } from './RecalcPreviewDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ApprovalControlsProps {
   shiftCalendarId: string;
@@ -50,8 +52,57 @@ export function ApprovalControls({
   const isApproved = status === 'APPROVED';
   const isDraft = !status || status === 'DRAFT';
 
+  // Check for pending counts: RUN events with end_ts that have no matching production_counts
+  const { data: pendingCount = 0 } = useQuery({
+    queryKey: ['shift-pending-counts', shiftCalendarId],
+    queryFn: async () => {
+      // Get all completed RUN events for this shift
+      const { data: runEvents } = await supabase
+        .from('production_events')
+        .select('id, machine_id')
+        .eq('shift_calendar_id', shiftCalendarId)
+        .eq('event_type', 'RUN')
+        .not('end_ts', 'is', null);
+
+      if (!runEvents?.length) return 0;
+
+      const machineIds = [...new Set(runEvents.map(e => e.machine_id))];
+
+      // Get production counts for this shift
+      const { data: counts } = await supabase
+        .from('production_counts')
+        .select('machine_id')
+        .eq('shift_calendar_id', shiftCalendarId)
+        .in('machine_id', machineIds);
+
+      const machinesWithCounts = new Set((counts || []).map(c => c.machine_id));
+      
+      // Count events for machines that have no counts
+      return runEvents.filter(e => !machinesWithCounts.has(e.machine_id)).length;
+    },
+    enabled: !isLocked, // No need to check if already locked
+    staleTime: 15_000,
+  });
+
+  const hasPendingCounts = pendingCount > 0;
+
   return (
     <div className="flex flex-col gap-4 pt-5 border-t border-border/60">
+      {/* Pending counts warning */}
+      {hasPendingCounts && !isLocked && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+          <ClipboardList className="h-5 w-5 text-amber-500 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-amber-600">
+              มี {pendingCount} เหตุการณ์ RUN ที่ยังไม่ได้บันทึกจำนวนผลิต
+            </p>
+            <p className="text-xs text-muted-foreground">
+              ต้องบันทึกจำนวนผลิตให้ครบก่อนจึงจะอนุมัติหรือล็อคกะได้
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Status Info */}
       <div className="flex flex-wrap gap-4 text-sm">
         {isApproved && approvedAt && (
@@ -85,7 +136,7 @@ export function ApprovalControls({
             <AlertDialogTrigger asChild>
               <Button 
                 className="bg-status-running hover:bg-status-running/90 min-w-[120px]"
-                disabled={isApproving}
+                disabled={isApproving || hasPendingCounts}
               >
                 {isApproving ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -122,7 +173,7 @@ export function ApprovalControls({
             <AlertDialogTrigger asChild>
               <Button 
                 className="bg-status-idle hover:bg-status-idle/90 min-w-[120px]"
-                disabled={isLocking}
+                disabled={isLocking || hasPendingCounts}
               >
                 {isLocking ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
