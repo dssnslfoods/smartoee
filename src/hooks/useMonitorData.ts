@@ -20,7 +20,7 @@ export interface MonitorMachine {
   reasonName?: string;
   notes?: string;
   operatorName?: string;
-  pendingCounts: number; // Completed RUN events without production counts
+  
 }
 
 export interface MonitorStats {
@@ -79,50 +79,7 @@ async function fetchMonitorData(companyId?: string): Promise<{ machines: Monitor
     }
   }
 
-  // Detect pending counts: completed RUN events without any production_counts in the same shift
-  // Get today's shift_calendar IDs
-  const today = new Date().toISOString().split('T')[0];
-  const { data: todayShifts } = await supabase
-    .from('shift_calendar')
-    .select('id')
-    .eq('shift_date', today);
-  
-  const shiftCalendarIds = (todayShifts || []).map(s => s.id);
-  
-  const pendingCountMap = new Map<string, number>();
-  if (shiftCalendarIds.length > 0) {
-    // Get completed RUN events for today
-    const { data: completedRuns } = await supabase
-      .from('production_events')
-      .select('machine_id, shift_calendar_id')
-      .in('machine_id', machineIds)
-      .in('shift_calendar_id', shiftCalendarIds)
-      .eq('event_type', 'RUN')
-      .not('end_ts', 'is', null);
 
-    if (completedRuns && completedRuns.length > 0) {
-      // Get production_counts for today's shifts per machine
-      const { data: counts } = await supabase
-        .from('production_counts')
-        .select('machine_id, shift_calendar_id')
-        .in('machine_id', machineIds)
-        .in('shift_calendar_id', shiftCalendarIds);
-
-      // Build set of machines that have counts per shift
-      const hasCountsSet = new Set<string>();
-      for (const c of counts || []) {
-        hasCountsSet.add(`${c.machine_id}::${c.shift_calendar_id}`);
-      }
-
-      // Count completed RUN events without counts per machine
-      for (const run of completedRuns) {
-        const key = `${run.machine_id}::${run.shift_calendar_id}`;
-        if (!hasCountsSet.has(key)) {
-          pendingCountMap.set(run.machine_id, (pendingCountMap.get(run.machine_id) || 0) + 1);
-        }
-      }
-    }
-  }
 
   const stats: MonitorStats = { running: 0, idle: 0, stopped: 0, maintenance: 0, total: machines.length };
 
@@ -159,7 +116,6 @@ async function fetchMonitorData(companyId?: string): Promise<{ machines: Monitor
       reasonName: reason?.name,
       notes: ev?.notes ?? undefined,
       operatorName: ev?.created_by ? operatorMap.get(ev.created_by) : undefined,
-      pendingCounts: pendingCountMap.get(machine.id) || 0,
     };
   });
 

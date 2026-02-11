@@ -15,6 +15,7 @@ import ActivityLog from "./pages/ActivityLog";
 import RecentActivity from "./pages/RecentActivity";
 import Monitor from "./pages/Monitor";
 import HelpCenter from "./pages/HelpCenter";
+import PendingCounts from "./pages/PendingCounts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
             <Route path="/activity-log" element={<ActivityLog />} />
             <Route path="/recent-activity" element={<RecentActivity />} />
             <Route path="/monitor" element={<Monitor />} />
+            <Route path="/pending-counts" element={<PendingCounts />} />
             <Route path="/help" element={<HelpCenter />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

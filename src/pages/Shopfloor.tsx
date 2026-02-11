@@ -16,13 +16,11 @@ import { LockedBanner } from '@/components/shopfloor/LockedBanner';
 import { MyMachinesViewer } from '@/components/shopfloor/MyMachinesViewer';
 import { ProductionBenchmarkCard } from '@/components/shopfloor/ProductionBenchmarkCard';
 import { InlineStandardDialog } from '@/components/shopfloor/InlineStandardDialog';
-import { PendingCountsSheet } from '@/components/shopfloor/PendingCountsSheet';
-import type { PendingEvent } from '@/components/shopfloor/PendingCountsSheet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Factory, Activity, Package, Monitor, Clock, AlertTriangle, BarChart3, ClipboardList } from 'lucide-react';
+import { Loader2, Factory, Activity, Package, Monitor, Clock, AlertTriangle, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -61,7 +59,6 @@ export default function Shopfloor() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState('capture');
   const [standardDialogProduct, setStandardDialogProduct] = useState<Product | null>(null);
-  const [pendingSheetOpen, setPendingSheetOpen] = useState(false);
 
   // Admin or Supervisor can create production standards inline
   const canCreateStandard = isAdmin() || hasRole('SUPERVISOR');
@@ -202,38 +199,6 @@ export default function Shopfloor() {
     refetchInterval: 10000,
   });
 
-  // Check for pending counts: completed RUN events without production_counts
-  const { data: productionCountsForShift = [] } = useQuery({
-    queryKey: ['productionCounts', selectedMachineId, currentShift?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('production_counts')
-        .select('id')
-        .eq('machine_id', selectedMachineId!)
-        .eq('shift_calendar_id', currentShift!.id);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!selectedMachineId && !!currentShift?.id,
-    refetchInterval: 10000,
-  });
-
-  const pendingEvents = useMemo((): PendingEvent[] => {
-    if (!events.length || productionCountsForShift.length > 0) return [];
-    return events
-      .filter(e => e.event_type === 'RUN' && e.end_ts)
-      .map(e => ({
-        id: e.id,
-        event_type: e.event_type,
-        start_ts: e.start_ts,
-        end_ts: e.end_ts,
-        product_id: e.product_id ?? null,
-        products: e.product ? { name: e.product.name, code: e.product.code } : null,
-        notes: e.notes,
-      }));
-  }, [events, productionCountsForShift]);
-
-  const pendingCountEvents = pendingEvents.length;
 
   const { data: downtimeReasons = [] } = useQuery({
     queryKey: ['downtimeReasons', company?.id],
@@ -454,18 +419,6 @@ export default function Shopfloor() {
           <TabsContent value="capture" className="space-y-5 mt-5">
             {isLocked && <LockedBanner />}
 
-            {/* Pending Counts Warning */}
-            {pendingCountEvents > 0 && (
-              <Alert 
-                className="border-status-pending/30 bg-status-pending/5 cursor-pointer hover:bg-status-pending/10 transition-colors active:scale-[0.99]"
-                onClick={() => setPendingSheetOpen(true)}
-              >
-                <ClipboardList className="h-4 w-4 text-status-pending" />
-                <AlertDescription className="text-status-pending font-medium">
-                  มี {pendingCountEvents} เหตุการณ์ RUN ที่จบแล้วแต่ยังไม่ได้บันทึกจำนวนผลิต — <span className="underline">แตะเพื่อบันทึก</span>
-                </AlertDescription>
-              </Alert>
-            )}
 
             {/* Machine Selection */}
             <Card className="overflow-hidden">
@@ -710,17 +663,6 @@ export default function Shopfloor() {
             onCreated={() => setStandardDialogProduct(null)}
           />
         )}
-
-        {/* Pending Counts Sheet */}
-        <PendingCountsSheet
-          open={pendingSheetOpen}
-          onOpenChange={setPendingSheetOpen}
-          pendingEvents={pendingEvents}
-          defectReasons={defectReasons}
-          onSubmitCounts={(data) => addCountsMutation.mutate(data)}
-          isSubmitting={addCountsMutation.isPending}
-          isLocked={isLocked}
-        />
       </div>
     </AppLayout>
   );
