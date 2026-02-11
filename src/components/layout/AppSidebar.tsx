@@ -17,6 +17,8 @@ import {
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { usePendingCountsBadge } from "@/hooks/usePendingCountsBadge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -90,6 +92,7 @@ const navItems: NavItem[] = [
 export function AppSidebar() {
   const { pathname } = useLocation();
   const { profile, company, roles, signOut, isAdmin } = useAuth();
+  const pendingCount = usePendingCountsBadge();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -113,13 +116,25 @@ export function AppSidebar() {
           <Icon className="h-5 w-5" />
         </div>
         {!isCollapsed && (
-          <span
-            className={cn(
-              "font-medium transition-colors",
-              isActive ? "text-sidebar-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-foreground",
+          <div className="flex flex-1 items-center justify-between min-w-0">
+            <span
+              className={cn(
+                "font-medium transition-colors truncate",
+                isActive ? "text-sidebar-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-foreground",
+              )}
+            >
+              {item.title}
+            </span>
+            {item.href === "/pending-counts" && pendingCount > 0 && (
+              <Badge variant="destructive" className="ml-1 h-5 min-w-[20px] px-1.5 text-[10px] font-bold">
+                {pendingCount > 99 ? "99+" : pendingCount}
+              </Badge>
             )}
-          >
-            {item.title}
+          </div>
+        )}
+        {isCollapsed && item.href === "/pending-counts" && pendingCount > 0 && (
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+            {pendingCount > 99 ? "99+" : pendingCount}
           </span>
         )}
       </>
@@ -137,7 +152,7 @@ export function AppSidebar() {
         to={item.href}
         onClick={() => setIsMobileOpen(false)}
         className={cn(
-          "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all",
+          "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all",
           "hover:bg-sidebar-accent/80",
           isActive && "bg-sidebar-accent shadow-sm",
           isCollapsed && "justify-center px-2",
