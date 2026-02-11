@@ -171,7 +171,9 @@ export async function addCountsBackdate(
   });
 
   if (error) throw error;
-  return handleRpcError(data as unknown as AddCountsResponse) as AddCountsResponse;
+  const result = data as any;
+  // Normalize ok→success for consistency with other RPC responses
+  return { success: result?.ok ?? false, message: result?.error || '' } as AddCountsResponse;
 }
 
 // =============================================
