@@ -1329,6 +1329,10 @@ export type Database = {
         Args: { _shift_calendar_id: string }
         Returns: boolean
       }
+      is_shift_working_day: {
+        Args: { _check_date: string; _shift_id: string }
+        Returns: boolean
+      }
       is_supervisor: { Args: { _user_id: string }; Returns: boolean }
       is_supervisor_of_company: {
         Args: { _company_id: string; _user_id: string }
