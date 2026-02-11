@@ -161,22 +161,12 @@ export function ShiftManager() {
   });
 
   // Hard-delete for inactive shifts only
+  // ข้อมูล OEE ในอดีตถูกคำนวณและเก็บไว้ใน oee_snapshots แล้ว จึงลบกะ inactive ได้โดยไม่กระทบ
   const hardDeleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Double-check: only allow deleting inactive shifts
       const target = shifts?.find(s => s.id === id);
       if (target?.is_active) {
         throw new Error('ไม่สามารถลบกะที่ยัง Active ได้ — กรุณาปิดการใช้งานก่อน');
-      }
-
-      // Check if there are any shift_calendar entries referencing this shift
-      const { count, error: countError } = await supabase
-        .from('shift_calendar')
-        .select('id', { count: 'exact', head: true })
-        .eq('shift_id', id);
-      if (countError) throw countError;
-      if (count && count > 0) {
-        throw new Error('ไม่สามารถลบกะนี้ได้ เนื่องจากมีข้อมูล Shift Calendar อ้างอิงอยู่');
       }
 
       const { error } = await supabase.from('shifts').delete().eq('id', id);
@@ -492,7 +482,7 @@ export function ShiftManager() {
             <AlertDialogDescription>
               {deletingShift?.is_active
                 ? `ต้องการปิดกะ "${deletingShift?.name}" หรือไม่? กะจะถูกเปลี่ยนสถานะเป็น Inactive — ข้อมูลที่บันทึกไปแล้วจะไม่ได้รับผลกระทบ\n\nหากมี Event ที่กำลัง Run อยู่ในกะนี้ ระบบจะไม่อนุญาตให้ปิด`
-                : `ต้องการลบกะ "${deletingShift?.name}" ออกจากระบบถาวรหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้\n\nหากมีข้อมูล Shift Calendar อ้างอิงอยู่ ระบบจะไม่อนุญาตให้ลบ`
+                : `ต้องการลบกะ "${deletingShift?.name}" ออกจากระบบถาวรหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้\n\nข้อมูล OEE ที่คำนวณไปแล้วจะไม่ได้รับผลกระทบ เนื่องจากถูกจัดเก็บไว้เรียบร้อยแล้ว`
               }
             </AlertDialogDescription>
           </AlertDialogHeader>
