@@ -14,6 +14,7 @@ export {
   startEvent,
   stopEvent,
   addCounts,
+  addCountsBackdate,
   approveShift,
   lockShift,
   recalcOeeForShift,
