@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { OEEMetricsPanel } from './OEEMetricsPanel';
 import { ApprovalControls } from './ApprovalControls';
+import { ShiftActivityDetail } from './ShiftActivityDetail';
 import oeeApi from '@/services/oeeApi';
 
 interface ShiftApprovalCalendarProps {
@@ -322,6 +323,8 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                         isRecalculating={recalcMutation.isPending}
                       />
                     )}
+
+                    <ShiftActivityDetail shiftCalendarId={summary.shift_calendar_id} />
                   </CardContent>
                 </Card>
               ))}
