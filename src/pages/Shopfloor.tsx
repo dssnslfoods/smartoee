@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Factory, Activity, Package, Monitor, Clock, AlertTriangle, BarChart3 } from 'lucide-react';
+import { Loader2, Factory, Activity, Package, Monitor, Clock, AlertTriangle, BarChart3, ClipboardList } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -198,6 +198,28 @@ export default function Shopfloor() {
     enabled: !!selectedMachineId && !!currentShift?.id,
     refetchInterval: 10000,
   });
+
+  // Check for pending counts: completed RUN events without production_counts
+  const { data: productionCountsForShift = [] } = useQuery({
+    queryKey: ['productionCounts', selectedMachineId, currentShift?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('production_counts')
+        .select('id')
+        .eq('machine_id', selectedMachineId!)
+        .eq('shift_calendar_id', currentShift!.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedMachineId && !!currentShift?.id,
+    refetchInterval: 10000,
+  });
+
+  const pendingCountEvents = useMemo(() => {
+    if (!events.length || productionCountsForShift.length > 0) return 0;
+    // Count completed RUN events (have end_ts)
+    return events.filter(e => e.event_type === 'RUN' && e.end_ts).length;
+  }, [events, productionCountsForShift]);
 
   const { data: downtimeReasons = [] } = useQuery({
     queryKey: ['downtimeReasons', company?.id],
@@ -417,6 +439,16 @@ export default function Shopfloor() {
 
           <TabsContent value="capture" className="space-y-5 mt-5">
             {isLocked && <LockedBanner />}
+
+            {/* Pending Counts Warning */}
+            {pendingCountEvents > 0 && (
+              <Alert className="border-status-pending/30 bg-status-pending/5">
+                <ClipboardList className="h-4 w-4 text-status-pending" />
+                <AlertDescription className="text-status-pending font-medium">
+                  มี {pendingCountEvents} เหตุการณ์ RUN ที่จบแล้วแต่ยังไม่ได้บันทึกจำนวนผลิต — กรุณาบันทึกจำนวนผลิตให้ครบถ้วน
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Machine Selection */}
             <Card className="overflow-hidden">

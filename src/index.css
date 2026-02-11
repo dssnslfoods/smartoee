@@ -54,6 +54,7 @@
     --status-idle: 38 92% 48%;
     --status-stopped: 0 84% 52%;
     --status-maintenance: 270 72% 52%;
+    --status-pending: 32 95% 44%;
 
     /* Sidebar - Dark industrial */
     --sidebar-background: 220 28% 10%;
@@ -129,6 +130,7 @@
     --status-idle: 45 100% 60%;
     --status-stopped: 0 100% 60%;
     --status-maintenance: 280 100% 70%;
+    --status-pending: 32 100% 55%;
 
     /* Sidebar Dark */
     --sidebar-background: 220 45% 5%;

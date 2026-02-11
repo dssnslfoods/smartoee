@@ -70,6 +70,7 @@ export default {
           idle: "hsl(var(--status-idle))",
           stopped: "hsl(var(--status-stopped))",
           maintenance: "hsl(var(--status-maintenance))",
+          pending: "hsl(var(--status-pending))",
         },
         // Chart Colors
         chart: {

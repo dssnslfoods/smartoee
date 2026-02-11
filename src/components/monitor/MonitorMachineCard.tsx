@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Play, Pause, AlertTriangle, Wrench, Clock, User, Package } from 'lucide-react';
+import { Play, Pause, AlertTriangle, Wrench, Clock, User, Package, ClipboardList } from 'lucide-react';
 import type { MonitorMachine } from '@/hooks/useMonitorData';
 
 const statusConfig = {
@@ -164,6 +164,16 @@ export function MonitorMachineCard({ machine, onClick }: MonitorMachineCardProps
             <p className="italic truncate">📝 {machine.notes}</p>
           )}
         </div>
+
+        {/* Pending Counts Badge */}
+        {machine.pendingCounts > 0 && (
+          <div className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 bg-status-pending/10 border border-status-pending/20">
+            <ClipboardList className="h-3.5 w-3.5 text-status-pending shrink-0" />
+            <span className="text-xs font-medium text-status-pending">
+              รอบันทึกจำนวนผลิต ({machine.pendingCounts})
+            </span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
