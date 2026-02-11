@@ -53,18 +53,19 @@ export function ApprovalControls({
   const isDraft = !status || status === 'DRAFT';
 
   // Check for pending counts: RUN events with end_ts that have no matching production_counts
-  const { data: pendingCount = 0 } = useQuery({
+  const { data: pendingDetails } = useQuery({
     queryKey: ['shift-pending-counts', shiftCalendarId],
     queryFn: async () => {
-      // Get all completed RUN events for this shift
+      // Get all completed RUN events for this shift with machine info
       const { data: runEvents } = await supabase
         .from('production_events')
-        .select('id, machine_id')
+        .select('id, machine_id, start_ts, end_ts, machines(name, code)')
         .eq('shift_calendar_id', shiftCalendarId)
         .eq('event_type', 'RUN')
-        .not('end_ts', 'is', null);
+        .not('end_ts', 'is', null)
+        .order('start_ts', { ascending: true });
 
-      if (!runEvents?.length) return 0;
+      if (!runEvents?.length) return { count: 0, items: [] };
 
       const machineIds = [...new Set(runEvents.map(e => e.machine_id))];
 
@@ -77,28 +78,64 @@ export function ApprovalControls({
 
       const machinesWithCounts = new Set((counts || []).map(c => c.machine_id));
       
-      // Count events for machines that have no counts
-      return runEvents.filter(e => !machinesWithCounts.has(e.machine_id)).length;
+      // Get events for machines that have no counts, grouped by machine
+      const pendingEvents = runEvents.filter(e => !machinesWithCounts.has(e.machine_id));
+      
+      // Group by machine
+      const machineMap = new Map<string, { name: string; code: string; eventCount: number }>();
+      for (const e of pendingEvents) {
+        const machine = e.machines as any;
+        if (!machineMap.has(e.machine_id)) {
+          machineMap.set(e.machine_id, {
+            name: machine?.name || 'N/A',
+            code: machine?.code || '',
+            eventCount: 0,
+          });
+        }
+        machineMap.get(e.machine_id)!.eventCount++;
+      }
+
+      return {
+        count: pendingEvents.length,
+        items: Array.from(machineMap.entries()).map(([id, info]) => ({
+          machineId: id,
+          ...info,
+        })),
+      };
     },
-    enabled: !isLocked, // No need to check if already locked
+    enabled: !isLocked,
     staleTime: 15_000,
   });
 
+  const pendingCount = pendingDetails?.count ?? 0;
+  const pendingItems = pendingDetails?.items ?? [];
   const hasPendingCounts = pendingCount > 0;
 
   return (
     <div className="flex flex-col gap-4 pt-5 border-t border-border/60">
       {/* Pending counts warning */}
       {hasPendingCounts && !isLocked && (
-        <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-          <ClipboardList className="h-5 w-5 text-amber-500 shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-amber-600">
-              มี {pendingCount} เหตุการณ์ RUN ที่ยังไม่ได้บันทึกจำนวนผลิต
-            </p>
-            <p className="text-xs text-muted-foreground">
-              ต้องบันทึกจำนวนผลิตให้ครบก่อนจึงจะอนุมัติหรือล็อคกะได้
-            </p>
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+          <div className="flex items-center gap-3">
+            <ClipboardList className="h-5 w-5 text-amber-500 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-600">
+                มี {pendingCount} เหตุการณ์ RUN ใน {pendingItems.length} เครื่องจักร ที่ยังไม่ได้บันทึกจำนวนผลิต
+              </p>
+              <p className="text-xs text-muted-foreground">
+                ต้องบันทึกจำนวนผลิตให้ครบก่อนจึงจะอนุมัติหรือล็อคกะได้
+              </p>
+            </div>
+          </div>
+          <div className="ml-8 space-y-1">
+            {pendingItems.map((item) => (
+              <div key={item.machineId} className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                <span className="font-medium text-foreground">{item.name}</span>
+                <span className="text-muted-foreground">({item.code})</span>
+                <span>— {item.eventCount} เหตุการณ์</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
