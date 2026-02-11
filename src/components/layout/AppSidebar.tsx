@@ -4,6 +4,7 @@ import {
   Settings,
   BarChart3,
   ClipboardCheck,
+  ClipboardList,
   LogOut,
   Menu,
   X,
@@ -43,6 +44,11 @@ const navItems: NavItem[] = [
     title: "Monitor",
     href: "/monitor",
     icon: Monitor,
+  },
+  {
+    title: "รอบันทึกผลิต",
+    href: "/pending-counts",
+    icon: ClipboardList,
   },
   {
     title: "Supervisor",
