@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -39,6 +39,7 @@ export default function PendingCounts() {
   const { company, isAdmin, hasRole } = useAuth();
   const companyId = company?.id;
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const filterMachineId = searchParams.get('machine_id');
   const [selectedEvent, setSelectedEvent] = useState<PendingRun | null>(null);
   const [autoSelected, setAutoSelected] = useState(false);
@@ -196,11 +197,19 @@ export default function PendingCounts() {
   return (
     <AppLayout>
       <div className="page-container space-y-5">
-        <PageHeader
-          title="รอบันทึกจำนวนผลิต"
-          description="เหตุการณ์ RUN ที่จบแล้วแต่ยังไม่ได้บันทึกจำนวนผลิต"
-          icon={ClipboardList}
-        />
+        <div className="flex items-center justify-between">
+          <PageHeader
+            title="รอบันทึกจำนวนผลิต"
+            description="เหตุการณ์ RUN ที่จบแล้วแต่ยังไม่ได้บันทึกจำนวนผลิต"
+            icon={ClipboardList}
+          />
+          {filterMachineId && (
+            <Button variant="outline" size="sm" onClick={() => navigate('/supervisor')} className="gap-2 shrink-0">
+              <ChevronLeft className="h-4 w-4" />
+              กลับหน้า Supervisor
+            </Button>
+          )}
+        </div>
 
         {selectedEvent ? (
           <div className="space-y-4">
