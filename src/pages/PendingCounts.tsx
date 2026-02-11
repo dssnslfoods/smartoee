@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -37,7 +38,10 @@ export default function PendingCounts() {
   const queryClient = useQueryClient();
   const { company, isAdmin, hasRole } = useAuth();
   const companyId = company?.id;
+  const [searchParams] = useSearchParams();
+  const filterMachineId = searchParams.get('machine_id');
   const [selectedEvent, setSelectedEvent] = useState<PendingRun | null>(null);
+  const [autoSelected, setAutoSelected] = useState(false);
 
   // Fetch all pending RUN events (completed, no counts) across all permitted machines
   const { data: pendingRuns = [], isLoading } = useQuery({
@@ -127,6 +131,17 @@ export default function PendingCounts() {
     },
     refetchInterval: 15000,
   });
+
+  // Auto-select first matching event when navigated with machine_id query param
+  useEffect(() => {
+    if (filterMachineId && pendingRuns.length > 0 && !autoSelected) {
+      const match = pendingRuns.find(r => r.machine_id === filterMachineId);
+      if (match) {
+        setSelectedEvent(match);
+        setAutoSelected(true);
+      }
+    }
+  }, [filterMachineId, pendingRuns, autoSelected]);
 
   const { data: defectReasons = [] } = useQuery({
     queryKey: ['defectReasons', companyId],
