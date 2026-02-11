@@ -990,36 +990,71 @@ export type Database = {
       }
       shifts: {
         Row: {
+          company_id: string
           created_at: string
           effective_from: string
           end_time: string
           id: string
           is_active: boolean
           name: string
+          plant_id: string
           start_time: string
           working_days: number[]
         }
         Insert: {
+          company_id: string
           created_at?: string
           effective_from?: string
           end_time: string
           id?: string
           is_active?: boolean
           name: string
+          plant_id: string
           start_time: string
           working_days?: number[]
         }
         Update: {
+          company_id?: string
           created_at?: string
           effective_from?: string
           end_time?: string
           id?: string
           is_active?: boolean
           name?: string
+          plant_id?: string
           start_time?: string
           working_days?: number[]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "shifts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["plant_id"]
+          },
+          {
+            foreignKeyName: "shifts_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "v_shift_summary"
+            referencedColumns: ["plant_id"]
+          },
+        ]
       }
       user_line_permissions: {
         Row: {
