@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { CheckCircle2, Lock, ClipboardCheck, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Lock, ClipboardCheck, ChevronLeft, ChevronRight, AlertCircle, Palmtree } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,16 +42,25 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
 
   // Group summaries by date and compute status per date
   const dateStatusMap = useMemo(() => {
-    const map = new Map<string, { summaries: typeof allSummaries; hasUnapproved: boolean; allLocked: boolean }>();
+    const map = new Map<string, { summaries: typeof allSummaries; hasUnapproved: boolean; allLocked: boolean; isHoliday: boolean }>();
     for (const s of allSummaries) {
       if (!s.shift_date) continue;
-      const existing = map.get(s.shift_date) || { summaries: [], hasUnapproved: false, allLocked: true };
+      const existing = map.get(s.shift_date) || { summaries: [], hasUnapproved: false, allLocked: true, isHoliday: true };
       existing.summaries.push(s);
       if (!s.approval_status || s.approval_status === 'DRAFT') {
         existing.hasUnapproved = true;
       }
       if (s.approval_status !== 'LOCKED') {
         existing.allLocked = false;
+      }
+      // If any shift has activity (run_time, good_qty, reject_qty, downtime, or oee), it's not a holiday
+      const hasActivity = (s.total_run_time && s.total_run_time > 0)
+        || (s.total_good_qty && s.total_good_qty > 0)
+        || (s.total_reject_qty && s.total_reject_qty > 0)
+        || (s.total_downtime && s.total_downtime > 0)
+        || (s.avg_oee !== null && s.avg_oee !== undefined);
+      if (hasActivity) {
+        existing.isHoliday = false;
       }
       map.set(s.shift_date, existing);
     }
@@ -168,12 +177,13 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
             </div>
             {/* Day cells */}
             <div className="grid grid-cols-7 gap-1">
-              {calendarDays.map((day, i) => {
+                {calendarDays.map((day, i) => {
                 if (!day) return <div key={`empty-${i}`} />;
                 const info = dateStatusMap.get(day.date);
                 const hasShifts = !!info;
                 const hasUnapproved = info?.hasUnapproved || false;
                 const allLocked = info?.allLocked || false;
+                const isHoliday = info?.isHoliday || false;
                 const isSelected = selectedDate === day.date;
                 const isToday = day.date === todayStr;
 
@@ -187,13 +197,19 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                       hasShifts ? 'hover:bg-accent cursor-pointer' : 'text-muted-foreground/40 cursor-default',
                       isSelected && 'bg-primary text-primary-foreground hover:bg-primary/90',
                       isToday && !isSelected && 'ring-1 ring-primary/50',
+                      isHoliday && !isSelected && 'bg-muted/60 text-muted-foreground',
                     )}
                   >
                     <span className="font-medium">{day.day}</span>
                     {/* Status dots */}
                     {hasShifts && (
                       <div className="absolute bottom-0.5 flex gap-0.5">
-                        {hasUnapproved ? (
+                        {isHoliday ? (
+                          <span className={cn(
+                            'h-1.5 w-1.5 rounded-full',
+                            isSelected ? 'bg-primary-foreground' : 'bg-sky-400'
+                          )} />
+                        ) : hasUnapproved ? (
                           <span className={cn(
                             'h-1.5 w-1.5 rounded-full',
                             isSelected ? 'bg-primary-foreground' : 'bg-amber-500'
@@ -217,7 +233,7 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
             </div>
 
             {/* Legend */}
-            <div className="flex items-center gap-4 mt-4 pt-3 border-t text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-3 mt-4 pt-3 border-t text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-amber-500" />
                 ยังไม่อนุมัติ
@@ -229,6 +245,10 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-muted-foreground/50" />
                 ล็อคแล้ว
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-sky-400" />
+                วันหยุด
               </div>
             </div>
           </CardContent>
@@ -260,10 +280,28 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                 <h3 className="text-lg font-semibold">
                   {format(new Date(selectedDate + 'T00:00:00'), 'EEEE d MMMM yyyy', { locale: th })}
                 </h3>
-                <Badge variant="outline" className="text-xs">
-                  {selectedSummaries.length} กะ
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {dateStatusMap.get(selectedDate)?.isHoliday && (
+                    <Badge className="bg-sky-500/15 text-sky-600 hover:bg-sky-500/20 border-0 font-medium">
+                      <Palmtree className="h-3.5 w-3.5 mr-1" />
+                      วันหยุดพิเศษ
+                    </Badge>
+                  )}
+                  <Badge variant="outline" className="text-xs">
+                    {selectedSummaries.length} กะ
+                  </Badge>
+                </div>
               </div>
+
+              {dateStatusMap.get(selectedDate)?.isHoliday && (
+                <div className="flex items-center gap-3 rounded-lg border border-sky-500/30 bg-sky-500/5 p-4">
+                  <Palmtree className="h-5 w-5 text-sky-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">วันหยุดพิเศษ — ไม่มีการบันทึกเหตุการณ์</p>
+                    <p className="text-xs text-muted-foreground">วันนี้ไม่มีข้อมูลการผลิต จึงไม่ถูกนำมาคำนวณ OEE</p>
+                  </div>
+                </div>
+              )}
 
               {selectedSummaries.map((summary) => (
                 <Card key={summary.shift_calendar_id} className="overflow-hidden">
