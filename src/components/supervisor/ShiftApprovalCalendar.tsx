@@ -138,12 +138,14 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
       } else if (s.approval_status === 'APPROVED' || s.approval_status === 'LOCKED') {
         // Approved with no real activity: check if OEE=0% (working day) or no OEE (holiday)
         existing.isNoActivity = false; // No longer "unconfirmed no-activity"
-        const hasOeeSnapshot = (s.avg_oee != null);
-        if (hasOeeSnapshot) {
-          // Has 0% OEE snapshot = confirmed as working day
+        existing.isHoliday = false; // Override the default holiday assumption
+        // Distinguish: forced working day has downtime (= planned_time * machines), holiday has 0
+        const hasDowntimeSnapshot = (s.total_downtime != null && Number(s.total_downtime) > 0);
+        if (hasDowntimeSnapshot) {
+          // Has downtime = confirmed as working day (OEE forced to 0%)
           existing.isConfirmedHoliday = false;
         } else {
-          // No OEE snapshot = confirmed as holiday
+          // No downtime = confirmed as holiday (no OEE snapshots)
           existing.isConfirmedWorkingDay = false;
         }
       }
