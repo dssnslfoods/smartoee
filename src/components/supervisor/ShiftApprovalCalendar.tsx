@@ -163,6 +163,8 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
     return map;
   }, [allSummaries, holidayDateMap, eventCountMap]);
 
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+
   // Summaries for the selected date
   const selectedSummaries = useMemo(() => {
     if (!selectedDate) return [];
@@ -172,9 +174,9 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
   // Count of unapproved dates
   const unapprovedCount = useMemo(() => {
     let count = 0;
-    dateStatusMap.forEach(v => { if (v.hasUnapproved) count++; });
+    dateStatusMap.forEach((v, dateStr) => { if (v.hasUnapproved && dateStr <= todayStr) count++; });
     return count;
-  }, [dateStatusMap]);
+  }, [dateStatusMap, todayStr]);
 
   // Mutations
   const approveMutation = useMutation({
@@ -234,7 +236,7 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
     return days;
   }, [currentMonth]);
 
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  // todayStr moved above unapprovedCount
 
   return (
     <div className="space-y-6">
@@ -277,13 +279,14 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                 {calendarDays.map((day, i) => {
                 if (!day) return <div key={`empty-${i}`} />;
                 const info = dateStatusMap.get(day.date);
-                const hasShifts = !!info;
-                const hasUnapproved = info?.hasUnapproved || false;
-                const allLocked = info?.allLocked || false;
-                const isHoliday = info?.isHoliday || false;
-                const isNoActivity = info?.isNoActivity && !info?.isPreDefinedHoliday || false;
-                const isConfirmedHoliday = info?.isConfirmedHoliday && !info?.hasUnapproved && !isNoActivity || false;
-                const isConfirmedWorkingDay = info?.isConfirmedWorkingDay && !info?.hasUnapproved && !isNoActivity || false;
+                const isFutureDate = day.date > todayStr;
+                const hasShifts = !!info && !isFutureDate;
+                const hasUnapproved = hasShifts && (info?.hasUnapproved || false);
+                const allLocked = hasShifts && (info?.allLocked || false);
+                const isHoliday = hasShifts && (info?.isHoliday || false);
+                const isNoActivity = hasShifts && (info?.isNoActivity && !info?.isPreDefinedHoliday || false);
+                const isConfirmedHoliday = hasShifts && (info?.isConfirmedHoliday && !info?.hasUnapproved && !isNoActivity || false);
+                const isConfirmedWorkingDay = hasShifts && (info?.isConfirmedWorkingDay && !info?.hasUnapproved && !isNoActivity || false);
                 const isSelected = selectedDate === day.date;
                 const isToday = day.date === todayStr;
 
