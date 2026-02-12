@@ -1445,10 +1445,12 @@ export type Database = {
         Returns: Json
       }
       rpc_lock_shift: { Args: { p_shift_calendar_id: string }; Returns: Json }
-      rpc_recalc_oee_for_shift: {
-        Args: { p_shift_calendar_id: string }
-        Returns: Json
-      }
+      rpc_recalc_oee_for_shift:
+        | { Args: { p_shift_calendar_id: string }; Returns: Json }
+        | {
+            Args: { p_force_working_day?: boolean; p_shift_calendar_id: string }
+            Returns: Json
+          }
       rpc_start_event: {
         Args: {
           p_event_type: Database["public"]["Enums"]["event_type"]

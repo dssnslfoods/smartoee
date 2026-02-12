@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { CheckCircle2, Lock, ClipboardCheck, ChevronLeft, ChevronRight, AlertCircle, Palmtree } from 'lucide-react';
+import { CheckCircle2, Lock, ClipboardCheck, ChevronLeft, ChevronRight, AlertCircle, Palmtree, Factory, HelpCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -98,10 +98,10 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
 
   // Group summaries by date and compute status per date
   const dateStatusMap = useMemo(() => {
-    const map = new Map<string, { summaries: typeof allSummaries; hasUnapproved: boolean; allLocked: boolean; isHoliday: boolean; holidayName?: string }>();
+    const map = new Map<string, { summaries: typeof allSummaries; hasUnapproved: boolean; allLocked: boolean; isHoliday: boolean; isPreDefinedHoliday: boolean; holidayName?: string; isNoActivity: boolean }>();
     for (const s of allSummaries) {
       if (!s.shift_date) continue;
-      const existing = map.get(s.shift_date) || { summaries: [], hasUnapproved: false, allLocked: true, isHoliday: true };
+      const existing = map.get(s.shift_date) || { summaries: [], hasUnapproved: false, allLocked: true, isHoliday: true, isPreDefinedHoliday: false, isNoActivity: true };
       existing.summaries.push(s);
       if (!s.approval_status || s.approval_status === 'DRAFT') {
         existing.hasUnapproved = true;
@@ -117,11 +117,13 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
       const hasRawEvents = (eventCountMap.get(s.shift_calendar_id!) || 0) > 0;
       if (hasOeeActivity || hasRawEvents) {
         existing.isHoliday = false;
+        existing.isNoActivity = false;
       }
       // Check pre-defined holidays (overrides activity check)
       const predefined = holidayDateMap.get(s.shift_date);
       if (predefined) {
         existing.isHoliday = true;
+        existing.isPreDefinedHoliday = true;
         existing.holidayName = predefined;
       }
       map.set(s.shift_date, existing);
@@ -170,14 +172,15 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
   });
 
   const recalcMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const result = await oeeApi.recalcOeeForShift(id);
+    mutationFn: async ({ id, forceWorkingDay }: { id: string; forceWorkingDay?: boolean }) => {
+      const result = await oeeApi.recalcOeeForShift(id, forceWorkingDay);
       if (!result.success) throw new Error(result.message || 'Failed');
       return result;
     },
     onSuccess: () => {
       toast({ title: 'สำเร็จ', description: 'คำนวณ OEE ใหม่เรียบร้อยแล้ว' });
       queryClient.invalidateQueries({ queryKey: ['shiftSummaries-calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['shift-event-counts'] });
     },
     onError: (e: Error) => toast({ title: 'ผิดพลาด', description: e.message, variant: 'destructive' }),
   });
@@ -355,14 +358,54 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                 </div>
               </div>
 
-              {dateStatusMap.get(selectedDate)?.isHoliday && (
+              {dateStatusMap.get(selectedDate)?.isPreDefinedHoliday && (
                 <div className="flex items-center gap-3 rounded-lg border border-sky-500/30 bg-sky-500/5 p-4">
                   <Palmtree className="h-5 w-5 text-sky-500 shrink-0" />
                   <div>
                     <p className="text-sm font-medium">
-                      วันหยุดพิเศษ{dateStatusMap.get(selectedDate)?.holidayName ? `: ${dateStatusMap.get(selectedDate)?.holidayName}` : ' — ไม่มีการบันทึกเหตุการณ์'}
+                      วันหยุดพิเศษ: {dateStatusMap.get(selectedDate)?.holidayName}
                     </p>
                     <p className="text-xs text-muted-foreground">วันนี้ไม่ถูกนำมาคำนวณ OEE</p>
+                  </div>
+                </div>
+              )}
+
+              {dateStatusMap.get(selectedDate)?.isNoActivity && !dateStatusMap.get(selectedDate)?.isPreDefinedHoliday && isSupervisor && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <HelpCircle className="h-5 w-5 text-amber-500 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">ไม่มีกิจกรรมการผลิตในวันนี้</p>
+                      <p className="text-xs text-muted-foreground">กรุณายืนยันว่าวันนี้เป็นวันหยุดหรือวันทำงาน เพื่อให้ระบบคำนวณ OEE ได้ถูกต้อง</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 ml-8">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => {
+                        // Confirm as holiday — just recalc normally (skip OEE)
+                        selectedSummaries.forEach(s => recalcMutation.mutate({ id: s.shift_calendar_id }));
+                      }}
+                      disabled={recalcMutation.isPending}
+                    >
+                      <Palmtree className="h-3.5 w-3.5" />
+                      วันหยุด (ไม่คิด OEE)
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => {
+                        selectedSummaries.forEach(s => {
+                          recalcMutation.mutate({ id: s.shift_calendar_id, forceWorkingDay: true });
+                        });
+                      }}
+                      disabled={recalcMutation.isPending}
+                    >
+                      <Factory className="h-3.5 w-3.5" />
+                      วันทำงาน (OEE = 0%)
+                    </Button>
                   </div>
                 </div>
               )}
@@ -419,7 +462,7 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                         lockedAt={summary.locked_at}
                         onApprove={() => approveMutation.mutate(summary.shift_calendar_id)}
                         onLock={() => lockMutation.mutate(summary.shift_calendar_id)}
-                        onRecalc={() => recalcMutation.mutate(summary.shift_calendar_id)}
+                        onRecalc={() => recalcMutation.mutate({ id: summary.shift_calendar_id })}
                         isApproving={approveMutation.isPending}
                         isLocking={lockMutation.isPending}
                         isRecalculating={recalcMutation.isPending}

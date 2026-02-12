@@ -203,10 +203,12 @@ export async function lockShift(
 }
 
 export async function recalcOeeForShift(
-  shiftCalendarId: string
+  shiftCalendarId: string,
+  forceWorkingDay?: boolean
 ): Promise<RecalcOeeResponse> {
   const { data, error } = await supabase.rpc('rpc_recalc_oee_for_shift', {
     p_shift_calendar_id: shiftCalendarId,
+    p_force_working_day: forceWorkingDay || false,
   });
 
   if (error) throw error;
