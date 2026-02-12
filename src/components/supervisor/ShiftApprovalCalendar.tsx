@@ -249,6 +249,7 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                 const hasUnapproved = info?.hasUnapproved || false;
                 const allLocked = info?.allLocked || false;
                 const isHoliday = info?.isHoliday || false;
+                const isNoActivity = info?.isNoActivity && !info?.isPreDefinedHoliday || false;
                 const isSelected = selectedDate === day.date;
                 const isToday = day.date === todayStr;
 
@@ -263,6 +264,7 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                       isSelected && 'bg-primary text-primary-foreground hover:bg-primary/90',
                       isToday && !isSelected && 'ring-1 ring-primary/50',
                       isHoliday && !isSelected && 'bg-muted/60 text-muted-foreground',
+                      isNoActivity && !isSelected && 'bg-rose-500/10',
                     )}
                   >
                     <span className="font-medium">{day.day}</span>
@@ -273,6 +275,11 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                           <span className={cn(
                             'h-1.5 w-1.5 rounded-full',
                             isSelected ? 'bg-primary-foreground' : 'bg-sky-400'
+                          )} />
+                        ) : isNoActivity ? (
+                          <span className={cn(
+                            'h-1.5 w-1.5 rounded-full',
+                            isSelected ? 'bg-primary-foreground' : 'bg-rose-400'
                           )} />
                         ) : hasUnapproved ? (
                           <span className={cn(
@@ -310,6 +317,10 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-muted-foreground/50" />
                 ล็อคแล้ว
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-rose-400" />
+                ไม่มีกิจกรรม
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-sky-400" />
