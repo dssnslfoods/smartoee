@@ -98,13 +98,29 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
 
   // Group summaries by date and compute status per date
   const dateStatusMap = useMemo(() => {
-    const map = new Map<string, { summaries: typeof allSummaries; hasUnapproved: boolean; allLocked: boolean; isHoliday: boolean; isPreDefinedHoliday: boolean; holidayName?: string; isNoActivity: boolean }>();
+    const map = new Map<string, { 
+      summaries: typeof allSummaries; 
+      hasUnapproved: boolean; 
+      allLocked: boolean; 
+      isHoliday: boolean; 
+      isPreDefinedHoliday: boolean; 
+      holidayName?: string; 
+      isNoActivity: boolean;
+      isConfirmedHoliday: boolean;
+      isConfirmedWorkingDay: boolean;
+    }>();
     for (const s of allSummaries) {
       if (!s.shift_date) continue;
-      const existing = map.get(s.shift_date) || { summaries: [], hasUnapproved: false, allLocked: true, isHoliday: true, isPreDefinedHoliday: false, isNoActivity: true };
+      const existing = map.get(s.shift_date) || { 
+        summaries: [], hasUnapproved: false, allLocked: true, 
+        isHoliday: true, isPreDefinedHoliday: false, isNoActivity: true,
+        isConfirmedHoliday: true, isConfirmedWorkingDay: true,
+      };
       existing.summaries.push(s);
       if (!s.approval_status || s.approval_status === 'DRAFT') {
         existing.hasUnapproved = true;
+        existing.isConfirmedHoliday = false;
+        existing.isConfirmedWorkingDay = false;
       }
       if (s.approval_status !== 'LOCKED') {
         existing.allLocked = false;
@@ -117,6 +133,18 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
       if (hasRealActivity || hasRawEvents) {
         existing.isHoliday = false;
         existing.isNoActivity = false;
+        existing.isConfirmedHoliday = false;
+        existing.isConfirmedWorkingDay = false;
+      } else if (s.approval_status === 'APPROVED' || s.approval_status === 'LOCKED') {
+        // Approved with no real activity: check if OEE=0% (working day) or no OEE (holiday)
+        const hasOeeSnapshot = (s.avg_oee != null);
+        if (hasOeeSnapshot) {
+          // Has 0% OEE snapshot = confirmed as working day
+          existing.isConfirmedHoliday = false;
+        } else {
+          // No OEE snapshot = confirmed as holiday
+          existing.isConfirmedWorkingDay = false;
+        }
       }
       // Check pre-defined holidays (overrides activity check)
       const predefined = holidayDateMap.get(s.shift_date);
@@ -124,6 +152,8 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
         existing.isHoliday = true;
         existing.isPreDefinedHoliday = true;
         existing.holidayName = predefined;
+        existing.isConfirmedHoliday = true;
+        existing.isConfirmedWorkingDay = false;
       }
       map.set(s.shift_date, existing);
     }
@@ -249,6 +279,8 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                 const allLocked = info?.allLocked || false;
                 const isHoliday = info?.isHoliday || false;
                 const isNoActivity = info?.isNoActivity && !info?.isPreDefinedHoliday || false;
+                const isConfirmedHoliday = info?.isConfirmedHoliday && !info?.hasUnapproved && !isNoActivity || false;
+                const isConfirmedWorkingDay = info?.isConfirmedWorkingDay && !info?.hasUnapproved && !isNoActivity || false;
                 const isSelected = selectedDate === day.date;
                 const isToday = day.date === todayStr;
 
@@ -262,20 +294,20 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                       hasShifts ? 'hover:bg-accent cursor-pointer' : 'text-muted-foreground/40 cursor-default',
                       isSelected && 'bg-primary text-primary-foreground hover:bg-primary/90',
                       isToday && !isSelected && 'ring-1 ring-primary/50',
-                      isHoliday && !isSelected && 'bg-muted/60 text-muted-foreground',
-                      isNoActivity && !isSelected && 'bg-rose-500/10',
+                      (isHoliday || isConfirmedHoliday) && !isSelected && 'bg-sky-500/10 text-muted-foreground',
+                      (isNoActivity || isConfirmedWorkingDay) && !isSelected && 'bg-rose-500/10',
                     )}
                   >
                     <span className="font-medium">{day.day}</span>
                     {/* Status dots */}
                     {hasShifts && (
                       <div className="absolute bottom-0.5 flex gap-0.5">
-                        {isHoliday ? (
+                        {(isHoliday || isConfirmedHoliday) ? (
                           <span className={cn(
                             'h-1.5 w-1.5 rounded-full',
                             isSelected ? 'bg-primary-foreground' : 'bg-sky-400'
                           )} />
-                        ) : isNoActivity ? (
+                        ) : (isNoActivity || isConfirmedWorkingDay) ? (
                           <span className={cn(
                             'h-1.5 w-1.5 rounded-full',
                             isSelected ? 'bg-primary-foreground' : 'bg-rose-400'
@@ -319,7 +351,7 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-rose-400" />
-                ไม่มีกิจกรรม
+                ไม่มีกิจกรรม / วันทำงาน (0%)
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-sky-400" />
@@ -386,7 +418,7 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                     <HelpCircle className="h-5 w-5 text-amber-500 shrink-0" />
                     <div>
                       <p className="text-sm font-medium">ไม่มีกิจกรรมการผลิตในวันนี้</p>
-                      <p className="text-xs text-muted-foreground">กรุณายืนยันว่าวันนี้เป็นวันหยุดหรือวันทำงาน เพื่อให้ระบบคำนวณ OEE ได้ถูกต้อง</p>
+                      <p className="text-xs text-muted-foreground">กรุณายืนยันว่าวันนี้เป็นวันหยุดหรือวันทำงาน ระบบจะคำนวณ OEE และอนุมัติกะให้อัตโนมัติ</p>
                     </div>
                   </div>
                   <div className="flex gap-2 ml-8">
@@ -394,27 +426,48 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                       size="sm"
                       variant="outline"
                       className="gap-1.5"
-                      onClick={() => {
-                        // Confirm as holiday — just recalc normally (skip OEE)
-                        selectedSummaries.forEach(s => recalcMutation.mutate({ id: s.shift_calendar_id }));
+                      onClick={async () => {
+                        // Confirm as holiday — recalc (skip OEE) then auto-approve all shifts
+                        for (const s of selectedSummaries) {
+                          try {
+                            await oeeApi.recalcOeeForShift(s.shift_calendar_id);
+                            await oeeApi.approveShift(s.shift_calendar_id);
+                          } catch (e: any) {
+                            toast({ title: 'ผิดพลาด', description: e.message, variant: 'destructive' });
+                            return;
+                          }
+                        }
+                        toast({ title: 'สำเร็จ', description: 'ยืนยันวันหยุดและอนุมัติกะเรียบร้อยแล้ว' });
+                        queryClient.invalidateQueries({ queryKey: ['shiftSummaries-calendar'] });
+                        queryClient.invalidateQueries({ queryKey: ['shift-event-counts'] });
                       }}
-                      disabled={recalcMutation.isPending}
+                      disabled={recalcMutation.isPending || approveMutation.isPending}
                     >
                       <Palmtree className="h-3.5 w-3.5" />
-                      วันหยุด (ไม่คิด OEE)
+                      ยืนยันวันหยุด
                     </Button>
                     <Button
                       size="sm"
                       className="gap-1.5"
-                      onClick={() => {
-                        selectedSummaries.forEach(s => {
-                          recalcMutation.mutate({ id: s.shift_calendar_id, forceWorkingDay: true });
-                        });
+                      onClick={async () => {
+                        // Confirm as working day — recalc with force + auto-approve all shifts
+                        for (const s of selectedSummaries) {
+                          try {
+                            await oeeApi.recalcOeeForShift(s.shift_calendar_id, true);
+                            await oeeApi.approveShift(s.shift_calendar_id);
+                          } catch (e: any) {
+                            toast({ title: 'ผิดพลาด', description: e.message, variant: 'destructive' });
+                            return;
+                          }
+                        }
+                        toast({ title: 'สำเร็จ', description: 'ยืนยันวันทำงานและอนุมัติกะเรียบร้อยแล้ว (OEE = 0%)' });
+                        queryClient.invalidateQueries({ queryKey: ['shiftSummaries-calendar'] });
+                        queryClient.invalidateQueries({ queryKey: ['shift-event-counts'] });
                       }}
-                      disabled={recalcMutation.isPending}
+                      disabled={recalcMutation.isPending || approveMutation.isPending}
                     >
                       <Factory className="h-3.5 w-3.5" />
-                      วันทำงาน (OEE = 0%)
+                      ยืนยันวันทำงาน (OEE = 0%)
                     </Button>
                   </div>
                 </div>
