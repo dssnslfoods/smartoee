@@ -137,6 +137,7 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
         existing.isConfirmedWorkingDay = false;
       } else if (s.approval_status === 'APPROVED' || s.approval_status === 'LOCKED') {
         // Approved with no real activity: check if OEE=0% (working day) or no OEE (holiday)
+        existing.isNoActivity = false; // No longer "unconfirmed no-activity"
         const hasOeeSnapshot = (s.avg_oee != null);
         if (hasOeeSnapshot) {
           // Has 0% OEE snapshot = confirmed as working day
