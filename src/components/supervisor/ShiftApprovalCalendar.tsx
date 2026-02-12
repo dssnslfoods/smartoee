@@ -109,13 +109,12 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
       if (s.approval_status !== 'LOCKED') {
         existing.allLocked = false;
       }
-      // Check if this shift has any activity: OEE data OR raw events
-      const hasOeeActivity = (s.total_run_time != null && Number(s.total_run_time) > 0)
+      // Check if this shift has real production activity (raw events or actual run/good output)
+      const hasRealActivity = (s.total_run_time != null && Number(s.total_run_time) > 0)
         || (s.total_good_qty != null && Number(s.total_good_qty) > 0)
-        || (s.total_reject_qty != null && Number(s.total_reject_qty) > 0)
-        || (s.total_downtime != null && Number(s.total_downtime) > 0);
+        || (s.total_reject_qty != null && Number(s.total_reject_qty) > 0);
       const hasRawEvents = (eventCountMap.get(s.shift_calendar_id!) || 0) > 0;
-      if (hasOeeActivity || hasRawEvents) {
+      if (hasRealActivity || hasRawEvents) {
         existing.isHoliday = false;
         existing.isNoActivity = false;
       }
