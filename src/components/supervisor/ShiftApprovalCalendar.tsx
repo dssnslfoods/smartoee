@@ -4,6 +4,7 @@ import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns
 import { th } from 'date-fns/locale';
 import { CheckCircle2, Lock, ClipboardCheck, ChevronLeft, ChevronRight, AlertCircle, Palmtree, Factory, HelpCircle, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,7 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
   const { company } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [holidayNameInput, setHolidayNameInput] = useState('');
 
   // Fetch shift summaries for the entire visible month range
   const monthRange = useMemo(() => {
@@ -320,7 +322,7 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                 return (
                   <button
                     key={day.date}
-                    onClick={() => setSelectedDate(isSelected ? null : day.date)}
+                    onClick={() => { setSelectedDate(isSelected ? null : day.date); setHolidayNameInput(''); }}
                     disabled={!hasShifts && !isFuturePreDefinedHoliday}
                     className={cn(
                       'relative flex flex-col items-center justify-center rounded-lg h-10 text-sm transition-all',
@@ -459,7 +461,9 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                 <div className="flex items-center gap-3 rounded-lg border border-sky-500/30 bg-sky-500/5 p-4">
                   <Palmtree className="h-5 w-5 text-sky-500 shrink-0" />
                   <div>
-                    <p className="text-sm font-medium">ยืนยันแล้ว: วันหยุด</p>
+                    <p className="text-sm font-medium">
+                      ยืนยันแล้ว: วันหยุด{holidayDateMap.has(selectedDate) ? ` — ${holidayDateMap.get(selectedDate)}` : ''}
+                    </p>
                     <p className="text-xs text-muted-foreground">วันนี้ไม่ถูกนำมาคำนวณ OEE</p>
                   </div>
                 </div>
@@ -474,54 +478,86 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                       <p className="text-xs text-muted-foreground">กรุณายืนยันว่าวันนี้เป็นวันหยุดหรือวันทำงาน ระบบจะคำนวณ OEE และอนุมัติกะให้อัตโนมัติ</p>
                     </div>
                   </div>
-                  <div className="flex gap-2 ml-8">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={async () => {
-                        // Confirm as holiday — recalc (skip OEE) then auto-approve all shifts
-                        for (const s of selectedSummaries) {
-                          try {
-                            await oeeApi.recalcOeeForShift(s.shift_calendar_id);
-                            await oeeApi.approveShift(s.shift_calendar_id);
-                          } catch (e: any) {
-                            toast({ title: 'ผิดพลาด', description: e.message, variant: 'destructive' });
+                  <div className="ml-8 space-y-2">
+                    <Input
+                      placeholder="ชื่อวันหยุด (เช่น วันหยุดพิเศษ, หยุดซ่อมบำรุง)"
+                      value={holidayNameInput}
+                      onChange={(e) => setHolidayNameInput(e.target.value)}
+                      maxLength={100}
+                      className="text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={async () => {
+                          const trimmedName = holidayNameInput.trim();
+                          if (!trimmedName) {
+                            toast({ title: 'กรุณาระบุชื่อวันหยุด', variant: 'destructive' });
                             return;
                           }
-                        }
-                        toast({ title: 'สำเร็จ', description: 'ยืนยันวันหยุดและอนุมัติกะเรียบร้อยแล้ว' });
-                        queryClient.invalidateQueries({ queryKey: ['shiftSummaries-calendar'] });
-                        queryClient.invalidateQueries({ queryKey: ['shift-event-counts'] });
-                      }}
-                      disabled={recalcMutation.isPending || approveMutation.isPending}
-                    >
-                      <Palmtree className="h-3.5 w-3.5" />
-                      ยืนยันวันหยุด
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={async () => {
-                        // Confirm as working day — recalc with force + auto-approve all shifts
-                        for (const s of selectedSummaries) {
-                          try {
-                            await oeeApi.recalcOeeForShift(s.shift_calendar_id, true);
-                            await oeeApi.approveShift(s.shift_calendar_id);
-                          } catch (e: any) {
-                            toast({ title: 'ผิดพลาด', description: e.message, variant: 'destructive' });
-                            return;
+                          // Save holiday to database
+                          if (company?.id && selectedDate) {
+                            const { error: insertErr } = await supabase
+                              .from('holidays')
+                              .insert({
+                                company_id: company.id,
+                                plant_id: plantId,
+                                holiday_date: selectedDate,
+                                name: trimmedName,
+                                is_recurring: false,
+                              });
+                            if (insertErr) {
+                              toast({ title: 'ผิดพลาด', description: insertErr.message, variant: 'destructive' });
+                              return;
+                            }
                           }
-                        }
-                        toast({ title: 'สำเร็จ', description: 'ยืนยันวันทำงานและอนุมัติกะเรียบร้อยแล้ว (OEE = 0%)' });
-                        queryClient.invalidateQueries({ queryKey: ['shiftSummaries-calendar'] });
-                        queryClient.invalidateQueries({ queryKey: ['shift-event-counts'] });
-                      }}
-                      disabled={recalcMutation.isPending || approveMutation.isPending}
-                    >
-                      <Factory className="h-3.5 w-3.5" />
-                      ยืนยันวันทำงาน (OEE = 0%)
-                    </Button>
+                          // Confirm as holiday — recalc (skip OEE) then auto-approve all shifts
+                          for (const s of selectedSummaries) {
+                            try {
+                              await oeeApi.recalcOeeForShift(s.shift_calendar_id);
+                              await oeeApi.approveShift(s.shift_calendar_id);
+                            } catch (e: any) {
+                              toast({ title: 'ผิดพลาด', description: e.message, variant: 'destructive' });
+                              return;
+                            }
+                          }
+                          setHolidayNameInput('');
+                          toast({ title: 'สำเร็จ', description: `ยืนยันวันหยุด "${trimmedName}" และอนุมัติกะเรียบร้อยแล้ว` });
+                          queryClient.invalidateQueries({ queryKey: ['shiftSummaries-calendar'] });
+                          queryClient.invalidateQueries({ queryKey: ['shift-event-counts'] });
+                          queryClient.invalidateQueries({ queryKey: ['holidays-calendar'] });
+                        }}
+                        disabled={recalcMutation.isPending || approveMutation.isPending || !holidayNameInput.trim()}
+                      >
+                        <Palmtree className="h-3.5 w-3.5" />
+                        ยืนยันวันหยุด
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={async () => {
+                          // Confirm as working day — recalc with force + auto-approve all shifts
+                          for (const s of selectedSummaries) {
+                            try {
+                              await oeeApi.recalcOeeForShift(s.shift_calendar_id, true);
+                              await oeeApi.approveShift(s.shift_calendar_id);
+                            } catch (e: any) {
+                              toast({ title: 'ผิดพลาด', description: e.message, variant: 'destructive' });
+                              return;
+                            }
+                          }
+                          toast({ title: 'สำเร็จ', description: 'ยืนยันวันทำงานและอนุมัติกะเรียบร้อยแล้ว (OEE = 0%)' });
+                          queryClient.invalidateQueries({ queryKey: ['shiftSummaries-calendar'] });
+                          queryClient.invalidateQueries({ queryKey: ['shift-event-counts'] });
+                        }}
+                        disabled={recalcMutation.isPending || approveMutation.isPending}
+                      >
+                        <Factory className="h-3.5 w-3.5" />
+                        ยืนยันวันทำงาน (OEE = 0%)
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
