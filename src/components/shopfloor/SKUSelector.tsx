@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { resolveTimeUnit, fromSeconds, TIME_UNIT_SHORT } from '@/lib/timeUnitUtils';
+import { resolveTimeUnit, fromSeconds, TIME_UNIT_SHORT, formatOutputRate } from '@/lib/timeUnitUtils';
 import type { Product, ProductionStandard } from '@/services/types';
 
 interface SKUSelectorProps {
@@ -85,7 +85,7 @@ export function SKUSelector({
             </div>
             <Badge variant="outline" className="shrink-0 text-xs gap-1">
               <Timer className="h-3 w-3" />
-              Target: {effectiveCycleTime != null ? fromSeconds(effectiveCycleTime, unit).toFixed(unit === 'minutes' ? 2 : 1) : '—'}{unitLabel} [{cycleTimeSource ?? 'N/A'}]
+              Output Rate: {effectiveCycleTime != null ? formatOutputRate(effectiveCycleTime) : '—'} ชิ้น/นาที [{cycleTimeSource ?? 'N/A'}]
             </Badge>
           </div>
           {noBenchmarkWarning && (
@@ -105,7 +105,7 @@ export function SKUSelector({
           </div>
           <Badge variant="secondary" className="shrink-0 text-xs gap-1">
             <Timer className="h-3 w-3" />
-            Target: {fromSeconds(machineCycleTime, unit).toFixed(unit === 'minutes' ? 2 : 1)}{unitLabel} [Machine Default]
+            Output Rate: {formatOutputRate(machineCycleTime)} ชิ้น/นาที [Machine Default]
           </Badge>
         </div>
       ) : null}
