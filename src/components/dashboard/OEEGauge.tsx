@@ -31,9 +31,9 @@ const colorConfig = {
 };
 
 const sizeConfig = {
-  sm: { svgSize: 120, strokeWidth: 10, valueFontClass: 'text-xl font-bold', labelFontClass: 'text-[10px]' },
-  md: { svgSize: 180, strokeWidth: 14, valueFontClass: 'text-3xl font-bold', labelFontClass: 'text-xs' },
-  lg: { svgSize: 220, strokeWidth: 16, valueFontClass: 'text-4xl font-bold', labelFontClass: 'text-sm' },
+  sm: { svgSize: 100, strokeWidth: 8, valueFontClass: 'text-lg font-bold', labelFontClass: 'text-[10px]' },
+  md: { svgSize: 150, strokeWidth: 12, valueFontClass: 'text-2xl font-bold', labelFontClass: 'text-xs' },
+  lg: { svgSize: 200, strokeWidth: 14, valueFontClass: 'text-4xl font-bold', labelFontClass: 'text-sm' },
 };
 
 export function OEEGauge({ value, label, color, size = 'md' }: OEEGaugeProps) {
