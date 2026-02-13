@@ -190,17 +190,15 @@ export default function MonitorPage() {
         <StatPill icon={Pause} label="Idle" count={stats.idle} colorClass="text-status-idle" bgClass="bg-status-idle/10" />
       </div>
 
-      {/* Machine Grid - Grouped by Line */}
+      {/* Machine Layout - Vertical Columns by Line */}
       {isLoading ? (
-        <div className="space-y-4">
+        <div className="flex gap-4 overflow-x-auto pb-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="space-y-3">
-              <Skeleton className="h-6 w-40 rounded" />
-              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-                {Array.from({ length: 3 }).map((_, j) => (
-                  <Skeleton key={j} className="h-40 rounded-lg" />
-                ))}
-              </div>
+            <div key={i} className="min-w-[280px] flex-1 space-y-3">
+              <Skeleton className="h-14 rounded-xl" />
+              {Array.from({ length: 3 }).map((_, j) => (
+                <Skeleton key={j} className="h-36 rounded-lg" />
+              ))}
             </div>
           ))}
         </div>
@@ -212,48 +210,81 @@ export default function MonitorPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-5">
+        <div className="flex gap-4 overflow-x-auto pb-2 items-start">
           {machinesByLine.map(({ lineId, lineName, plantName, machines: lineMachines }) => {
             const lineStats = { running: 0, stopped: 0, maintenance: 0, idle: 0 };
             for (const m of lineMachines) lineStats[m.status]++;
+            const dominantStatus = lineStats.running > 0 ? 'running' : lineStats.stopped > 0 ? 'stopped' : lineStats.maintenance > 0 ? 'maintenance' : 'idle';
+            const statusGlow: Record<string, string> = {
+              running: 'shadow-[0_0_25px_-5px_hsl(var(--status-running)/0.35)]',
+              stopped: 'shadow-[0_0_25px_-5px_hsl(var(--status-stopped)/0.35)]',
+              maintenance: 'shadow-[0_0_25px_-5px_hsl(var(--status-maintenance)/0.35)]',
+              idle: '',
+            };
+            const statusBorder: Record<string, string> = {
+              running: 'border-status-running/40',
+              stopped: 'border-status-stopped/40',
+              maintenance: 'border-status-maintenance/40',
+              idle: 'border-border/50',
+            };
+
             return (
-              <div key={lineId} className="rounded-xl border bg-card/50 overflow-hidden">
-                {/* Line Header */}
-                <div className="flex items-center justify-between gap-3 px-4 py-3 bg-muted/40 border-b">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Factory className="h-4 w-4 text-primary shrink-0" />
-                    <span className="font-semibold text-sm truncate">{lineName}</span>
+              <div
+                key={lineId}
+                className={cn(
+                  'min-w-[280px] max-w-[320px] flex-1 flex flex-col rounded-xl border bg-card/60 backdrop-blur-sm overflow-hidden',
+                  statusBorder[dominantStatus],
+                  statusGlow[dominantStatus],
+                )}
+              >
+                {/* Line Title Banner */}
+                <div className="relative px-4 py-4 border-b border-border/30 bg-gradient-to-br from-primary/10 via-background to-background">
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(var(--primary)/0.08),transparent_70%)]" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-primary/15 border border-primary/20">
+                        <Factory className="h-4 w-4 text-primary" />
+                      </div>
+                      <h3 className="font-bold text-base tracking-tight text-foreground truncate">{lineName}</h3>
+                    </div>
                     {plantName && (
-                      <span className="text-xs text-muted-foreground truncate hidden sm:inline">
-                        <MapPin className="inline h-3 w-3 mr-0.5 -mt-0.5" />{plantName}
-                      </span>
+                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground ml-9">
+                        <MapPin className="h-3 w-3" />
+                        <span className="truncate">{plantName}</span>
+                      </div>
                     )}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {lineStats.running > 0 && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-status-running/10 text-status-running border-0">
-                        {lineStats.running} Running
-                      </Badge>
-                    )}
-                    {lineStats.stopped > 0 && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-status-stopped/10 text-status-stopped border-0">
-                        {lineStats.stopped} Stopped
-                      </Badge>
-                    )}
-                    {lineStats.maintenance > 0 && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-status-maintenance/10 text-status-maintenance border-0">
-                        {lineStats.maintenance} Setup
-                      </Badge>
-                    )}
-                    {lineStats.idle > 0 && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-status-idle/10 text-status-idle border-0">
-                        {lineStats.idle} Idle
-                      </Badge>
-                    )}
+                    {/* Mini status pills */}
+                    <div className="flex items-center gap-1.5 mt-2.5 ml-9 flex-wrap">
+                      {lineStats.running > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-running/15 text-status-running">
+                          <span className="h-1.5 w-1.5 rounded-full bg-status-running animate-pulse" />
+                          {lineStats.running}
+                        </span>
+                      )}
+                      {lineStats.stopped > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-stopped/15 text-status-stopped">
+                          <span className="h-1.5 w-1.5 rounded-full bg-status-stopped" />
+                          {lineStats.stopped}
+                        </span>
+                      )}
+                      {lineStats.maintenance > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-maintenance/15 text-status-maintenance">
+                          <span className="h-1.5 w-1.5 rounded-full bg-status-maintenance" />
+                          {lineStats.maintenance}
+                        </span>
+                      )}
+                      {lineStats.idle > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-idle/15 text-status-idle">
+                          <span className="h-1.5 w-1.5 rounded-full bg-status-idle" />
+                          {lineStats.idle}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                {/* Machines in this line */}
-                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 p-3">
+
+                {/* Machine Cards - Stacked vertically */}
+                <div className="flex flex-col gap-2.5 p-2.5 flex-1">
                   {lineMachines.map(machine => (
                     <MonitorMachineCard
                       key={machine.id}
