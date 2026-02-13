@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Loader2, Clock } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Clock, Download, Upload } from 'lucide-react';
 import { type TimeUnit, TIME_UNIT_LABELS, TIME_UNIT_SHORT, fromSeconds, toSeconds, getInputStep, getInputMin, resolveTimeUnit, toOutputRate, fromOutputRate } from '@/lib/timeUnitUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { exportMasterDataToExcel, parseImportFile } from '@/lib/masterDataExport';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -69,6 +70,8 @@ interface Company {
 export function MachineManager() {
   const queryClient = useQueryClient();
   const { company } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
@@ -316,6 +319,117 @@ export function MachineManager() {
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
+  const MACHINE_EXPORT_COLUMNS = [
+    { key: 'code', header: 'Code', type: 'string' as const },
+    { key: 'name', header: 'Name', type: 'string' as const },
+    { key: 'line_name', header: 'Line', type: 'string' as const },
+    { key: 'plant_name', header: 'Plant', type: 'string' as const },
+    { key: 'output_rate', header: 'Output Rate (pcs/min)', type: 'number' as const },
+    { key: 'ideal_cycle_time_seconds', header: 'Cycle Time (s)', type: 'number' as const },
+    { key: 'target_oee', header: 'Target OEE (%)', type: 'number' as const },
+    { key: 'target_availability', header: 'Target Availability (%)', type: 'number' as const },
+    { key: 'target_performance', header: 'Target Performance (%)', type: 'number' as const },
+    { key: 'target_quality', header: 'Target Quality (%)', type: 'number' as const },
+    { key: 'is_active', header: 'Status', type: 'boolean' as const },
+  ];
+
+  const handleExport = () => {
+    if (!filteredMachines?.length) { toast.error('ไม่มีข้อมูลให้ export'); return; }
+    const exportData = filteredMachines.map((m: any) => ({
+      code: m.code,
+      name: m.name,
+      line_name: m.lines?.name || '',
+      plant_name: m.lines?.plants?.name || '',
+      output_rate: Number(toOutputRate(m.ideal_cycle_time_seconds).toFixed(2)),
+      ideal_cycle_time_seconds: m.ideal_cycle_time_seconds,
+      target_oee: m.target_oee ?? 85,
+      target_availability: m.target_availability ?? 90,
+      target_performance: m.target_performance ?? 95,
+      target_quality: m.target_quality ?? 99,
+      is_active: m.is_active,
+    }));
+    exportMasterDataToExcel(exportData, MACHINE_EXPORT_COLUMNS, `machines_${company?.name || 'all'}`);
+    toast.success('Export สำเร็จ');
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedCompanyId) return;
+    setIsImporting(true);
+    try {
+      const parsed = await parseImportFile(file);
+      if (parsed.length === 0) { toast.error('ไม่พบข้อมูลในไฟล์'); return; }
+
+      // Build line lookup: "lineName (plantName)" or just lineName -> line_id
+      const lineMap = new Map<string, string>();
+      (filterLines || []).forEach(l => {
+        lineMap.set(l.name.toLowerCase(), l.id);
+        if (l.plants?.name) {
+          lineMap.set(`${l.name} (${l.plants.name})`.toLowerCase(), l.id);
+        }
+      });
+
+      let inserted = 0, updated = 0, skipped = 0;
+
+      for (const row of parsed) {
+        const code = (row['code'] || '').trim();
+        const name = (row['name'] || '').trim();
+        if (!code || !name) { skipped++; continue; }
+
+        const lineName = (row['line'] || '').toLowerCase().trim();
+        const lineId = lineMap.get(lineName);
+        if (!lineId) { skipped++; continue; }
+
+        const cycleTimeRaw = parseFloat(row['cycle time (s)'] || row['ideal_cycle_time_seconds'] || '');
+        const outputRateRaw = parseFloat(row['output rate (pcs/min)'] || row['output_rate'] || '');
+        let cycleTime = 60;
+        if (!isNaN(cycleTimeRaw) && cycleTimeRaw > 0) cycleTime = cycleTimeRaw;
+        else if (!isNaN(outputRateRaw) && outputRateRaw > 0) cycleTime = fromOutputRate(outputRateRaw);
+
+        const targetOee = parseFloat(row['target oee (%)'] || row['target_oee'] || '85');
+        const targetAvail = parseFloat(row['target availability (%)'] || row['target_availability'] || '90');
+        const targetPerf = parseFloat(row['target performance (%)'] || row['target_performance'] || '95');
+        const targetQual = parseFloat(row['target quality (%)'] || row['target_quality'] || '99');
+        const statusVal = row['status'] || '';
+        const isActive = statusVal ? statusVal.toLowerCase() === 'active' : true;
+
+        // Check if machine already exists by code
+        const existing = machines?.find(m => m.code.toLowerCase() === code.toLowerCase());
+        if (existing) {
+          const { error } = await supabase.from('machines').update({
+            name, line_id: lineId,
+            ideal_cycle_time_seconds: cycleTime,
+            target_oee: isNaN(targetOee) ? 85 : targetOee,
+            target_availability: isNaN(targetAvail) ? 90 : targetAvail,
+            target_performance: isNaN(targetPerf) ? 95 : targetPerf,
+            target_quality: isNaN(targetQual) ? 99 : targetQual,
+            is_active: isActive,
+          }).eq('id', existing.id);
+          if (error) skipped++; else updated++;
+        } else {
+          const { error } = await supabase.from('machines').insert({
+            code, name, line_id: lineId,
+            company_id: selectedCompanyId,
+            ideal_cycle_time_seconds: cycleTime,
+            target_oee: isNaN(targetOee) ? 85 : targetOee,
+            target_availability: isNaN(targetAvail) ? 90 : targetAvail,
+            target_performance: isNaN(targetPerf) ? 95 : targetPerf,
+            target_quality: isNaN(targetQual) ? 99 : targetQual,
+            is_active: isActive,
+          });
+          if (error) skipped++; else inserted++;
+        }
+      }
+
+      toast.success(`นำเข้าสำเร็จ: เพิ่ม ${inserted}, อัปเดต ${updated}${skipped ? `, ข้าม ${skipped}` : ''}`);
+      queryClient.invalidateQueries({ queryKey: ['admin-machines'] });
+    } catch { toast.error('ไม่สามารถอ่านไฟล์ได้'); }
+    finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -334,6 +448,15 @@ export function MachineManager() {
             ))}
           </SelectContent>
         </Select>
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExport} disabled={!filteredMachines?.length}>
+          <Download className="h-4 w-4" />
+          Export
+        </Button>
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
+          <Upload className="h-4 w-4" />
+          {isImporting ? 'กำลังนำเข้า...' : 'Import'}
+        </Button>
+        <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleImportFile} />
         <Button onClick={handleOpenCreate} size="sm" disabled={!companies?.length}>
           <Plus className="h-4 w-4 mr-2" />
           Add Machine
