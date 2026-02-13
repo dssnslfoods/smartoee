@@ -261,103 +261,157 @@ export default function Auth() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Left side - Industrial Branding */}
+      {/* Left side - Industrial Branding (desktop) */}
       <IndustrialBrandingPanel>
         <LoginBranding />
       </IndustrialBrandingPanel>
 
       {/* Right side - Login form */}
-      <div className="flex w-full items-center justify-center p-6 sm:p-8 lg:w-1/2">
-        {/* Subtle background pattern for right side */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-          className="w-full max-w-md"
-        >
-          <Card className="border-border/60 shadow-lg">
-            {/* Card top accent line */}
-            <div className="h-1 rounded-t-[var(--radius)] bg-primary" />
+      <div className="relative flex w-full flex-col lg:w-1/2 lg:items-center lg:justify-center lg:p-8">
+        
+        {/* ── Mobile: Dark industrial hero header ── */}
+        <div className="relative overflow-hidden bg-sidebar px-6 pb-10 pt-12 lg:hidden">
+          {/* Grid pattern */}
+          <div
+            className="absolute inset-0 opacity-[0.04]"
+            style={{
+              backgroundImage:
+                "linear-gradient(hsl(var(--sidebar-foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--sidebar-foreground)) 1px, transparent 1px)",
+              backgroundSize: "32px 32px",
+            }}
+          />
+          {/* Accent top bar */}
+          <div className="absolute top-0 inset-x-0 h-1 bg-primary" />
+          {/* Radial glow */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.12),transparent_70%)]" />
 
-            <CardHeader className="text-center pt-8 pb-2">
-              {/* Mobile logo */}
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 lg:hidden">
-                <img src="/favicon.png" alt="PNF OEE Logo" className="h-9 w-9 object-contain" />
+          <div className="relative z-10 space-y-4">
+            {/* Logo + title */}
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
+                <img src="/favicon.png" alt="PNF OEE Logo" className="h-7 w-7 object-contain" />
               </div>
-              <CardTitle className="text-2xl font-bold tracking-tight">ยินดีต้อนรับ</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Sign in to access the OEE dashboard
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="pt-4 pb-8 px-6 sm:px-8">
-              <Form {...loginForm}>
-                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5">
-                  <FormField
-                    control={loginForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-semibold text-foreground">Email</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              placeholder="you@company.com"
-                              className="pl-10 h-11 border-input bg-background transition-shadow duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary"
-                              {...field}
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={loginForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-semibold text-foreground">Password</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              type="password"
-                              placeholder="••••••••"
-                              className="pl-10 h-11 border-input bg-background transition-shadow duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary"
-                              {...field}
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button
-                    type="submit"
-                    className="w-full h-11 font-semibold text-sm tracking-wide transition-all duration-200"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Sign In
-                  </Button>
-                </form>
-              </Form>
-
-              {/* Security note */}
-              <div className="mt-6 flex items-center justify-center gap-2 text-muted-foreground/60">
-                <Shield className="h-3.5 w-3.5" />
-                <span className="text-xs">Secure, encrypted connection</span>
+              <div>
+                <h1 className="text-lg font-bold text-sidebar-foreground tracking-tight">PNF OEE System</h1>
+                <p className="text-[10px] text-sidebar-foreground/50 font-medium tracking-wider uppercase">Manufacturing Excellence</p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          {/* Mobile footer */}
-          <p className="mt-6 text-center text-xs text-muted-foreground/40 lg:hidden">
-            © 2026 PNF OEE System
-          </p>
-        </motion.div>
+            {/* OEE mini indicators */}
+            <div className="flex items-center gap-2 pt-1">
+              {[
+                { letter: "A", color: "text-oee-availability", bg: "bg-oee-availability/15" },
+                { letter: "P", color: "text-oee-performance", bg: "bg-oee-performance/15" },
+                { letter: "Q", color: "text-oee-quality", bg: "bg-oee-quality/15" },
+              ].map((m) => (
+                <div key={m.letter} className={`flex h-9 w-9 items-center justify-center rounded-lg ${m.bg}`}>
+                  <span className={`text-lg font-bold ${m.color}`}>{m.letter}</span>
+                </div>
+              ))}
+              <span className="ml-2 text-xs text-sidebar-foreground/40">Monitor · Analyze · Optimize</span>
+            </div>
+          </div>
+
+          {/* Curved bottom edge */}
+          <div className="absolute -bottom-1 inset-x-0">
+            <svg viewBox="0 0 400 24" className="w-full h-6 text-background" preserveAspectRatio="none">
+              <path d="M0,24 L0,12 Q200,-12 400,12 L400,24 Z" fill="currentColor" />
+            </svg>
+          </div>
+        </div>
+
+        {/* ── Login card ── */}
+        <div className="flex flex-1 items-start lg:items-center justify-center px-6 pt-4 pb-8 sm:px-8 lg:pt-0 lg:pb-0">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="w-full max-w-md"
+          >
+            <Card className="border-border/60 shadow-lg">
+              {/* Card top accent line (desktop only — mobile has the hero) */}
+              <div className="hidden lg:block h-1 rounded-t-[var(--radius)] bg-primary" />
+
+              <CardHeader className="text-center pt-6 lg:pt-8 pb-2">
+                {/* Desktop-only logo (mobile shows in hero) */}
+                <div className="hidden lg:flex mx-auto mb-4 h-14 w-14 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+                  <img src="/favicon.png" alt="PNF OEE Logo" className="h-9 w-9 object-contain" />
+                </div>
+                <CardTitle className="text-2xl font-bold tracking-tight">ยินดีต้อนรับ</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Sign in to access the OEE dashboard
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className="pt-4 pb-8 px-6 sm:px-8">
+                <Form {...loginForm}>
+                  <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5">
+                    <FormField
+                      control={loginForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold text-foreground">Email</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              <Input
+                                placeholder="you@company.com"
+                                className="pl-10 h-11 border-input bg-background transition-shadow duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary"
+                                {...field}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={loginForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold text-foreground">Password</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              <Input
+                                type="password"
+                                placeholder="••••••••"
+                                className="pl-10 h-11 border-input bg-background transition-shadow duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary"
+                                {...field}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button
+                      type="submit"
+                      className="w-full h-11 font-semibold text-sm tracking-wide transition-all duration-200"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Sign In
+                    </Button>
+                  </form>
+                </Form>
+
+                {/* Security note */}
+                <div className="mt-6 flex items-center justify-center gap-2 text-muted-foreground/60">
+                  <Shield className="h-3.5 w-3.5" />
+                  <span className="text-xs">Secure, encrypted connection</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Mobile footer */}
+            <p className="mt-6 text-center text-xs text-muted-foreground/40 lg:hidden">
+              © 2026 PNF OEE System
+            </p>
+          </motion.div>
+        </div>
       </div>
     </div>
   );
