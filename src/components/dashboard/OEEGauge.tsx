@@ -88,7 +88,7 @@
          <svg
            width={gaugeSize}
            height={gaugeSize}
-           className={cn('transition-all duration-300', glow)}
+           className="transition-all duration-300"
          >
            {/* Background track */}
            <path
