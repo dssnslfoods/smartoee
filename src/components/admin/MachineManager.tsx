@@ -80,7 +80,7 @@ export function MachineManager() {
     line_id: '', 
     company_id: '',
     ideal_cycle_time_seconds: 60,
-    time_unit: 'seconds' as string,
+    time_unit: 'minutes' as string,
     target_oee: 85,
     target_availability: 90,
     target_performance: 95,
@@ -251,8 +251,8 @@ export function MachineManager() {
   const handleOpenCreate = () => {
     setEditingMachine(null);
     setSelectedCompanyIdForForm(selectedCompanyId || companies?.[0]?.id || '');
-    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || companies?.[0]?.id || '', ideal_cycle_time_seconds: 60, time_unit: 'seconds', target_oee: 85, target_availability: 90, target_performance: 95, target_quality: 99, is_active: true });
-    setCycleTimeDisplay(60);
+    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || companies?.[0]?.id || '', ideal_cycle_time_seconds: 60, time_unit: 'minutes', target_oee: 85, target_availability: 90, target_performance: 95, target_quality: 99, is_active: true });
+    setCycleTimeDisplay(1);
     setIsDialogOpen(true);
   };
 
@@ -281,8 +281,8 @@ export function MachineManager() {
     setIsDialogOpen(false);
     setEditingMachine(null);
     setSelectedCompanyIdForForm(selectedCompanyId || '');
-    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || '', ideal_cycle_time_seconds: 60, time_unit: 'seconds', target_oee: 85, target_availability: 90, target_performance: 95, target_quality: 99, is_active: true });
-    setCycleTimeDisplay(60);
+    setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || '', ideal_cycle_time_seconds: 60, time_unit: 'minutes', target_oee: 85, target_availability: 90, target_performance: 95, target_quality: 99, is_active: true });
+    setCycleTimeDisplay(1);
   };
 
   const handleCompanyChange = (companyId: string) => {
