@@ -14,7 +14,7 @@ import { FullscreenToggle, FullscreenContainer } from '@/components/ui/Fullscree
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { getDashboardOEE, getMachinesWithStatus, getOEETrend, getLines, getPlants } from '@/services/oeeApi';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
 
 type PeriodOption = 'today' | 'yesterday' | '7d' | '14d' | '30d' | '60d';
@@ -108,6 +108,19 @@ export default function Dashboard() {
     if (selectedPlant === 'all') return lines;
     return lines.filter(l => l.plant_id === selectedPlant);
   }, [lines, selectedPlant]);
+
+  // Auto-select when only one option available
+  useEffect(() => {
+    if (plants && plants.length === 1 && selectedPlant === 'all') {
+      setSelectedPlant(plants[0].id);
+    }
+  }, [plants, selectedPlant]);
+
+  useEffect(() => {
+    if (filteredLines.length === 1 && selectedLine === 'all') {
+      setSelectedLine(filteredLines[0].id);
+    }
+  }, [filteredLines, selectedLine]);
 
   // Reset line filter when plant changes
   const handlePlantChange = (plantId: string) => {
