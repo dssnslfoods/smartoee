@@ -122,11 +122,27 @@ export default function MonitorPage() {
 
   const content = (
     <div className="page-container space-y-5">
+      {/* Kiosk company banner */}
+      {isKiosk && company && (
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <Building2 className="h-7 w-7 text-primary" />
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">{company.name}</h1>
+            <span className="text-lg text-muted-foreground font-medium">— Production Monitor</span>
+          </div>
+          <Badge variant="outline" className="gap-1.5 px-2.5 py-1 text-xs font-medium border-status-running/30 text-status-running bg-status-running/5">
+            <Wifi className="h-3 w-3 animate-pulse" />
+            Live
+          </Badge>
+        </div>
+      )}
+
       {/* Header */}
       <PageHeader
-        title="Production Monitor"
-        description="สถานะเครื่องจักรแบบ Real-time"
-        icon={MonitorIcon}
+        title={isKiosk ? '' : 'Production Monitor'}
+        description={isKiosk ? '' : 'สถานะเครื่องจักรแบบ Real-time'}
+        icon={isKiosk ? undefined : MonitorIcon}
+        className={isKiosk ? 'hidden' : undefined}
       >
         {!isKiosk && (
           <FullscreenToggle
