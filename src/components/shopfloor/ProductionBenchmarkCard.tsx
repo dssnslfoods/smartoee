@@ -95,7 +95,7 @@ export function ProductionBenchmarkCard({
         <MetricItem
           icon={<Timer className="h-5 w-5 text-primary" />}
           label="Output Rate"
-          value={cycleTime != null && cycleTime > 0 ? toOutputRate(cycleTime).toFixed(1) : '—'}
+          value={cycleTime != null && cycleTime > 0 ? Math.round(toOutputRate(cycleTime)).toString() : '—'}
           unit="ชิ้น/นาที"
           colorClass="bg-primary/10"
           bgClass="border-primary/20 bg-primary/5"

@@ -34,14 +34,14 @@ export function InlineStandardDialog({
   const unit = resolveTimeUnit(machine.time_unit);
   const unitLabel = TIME_UNIT_SHORT[unit];
 
-  const [outputRateDisplay, setOutputRateDisplay] = useState<number>(toOutputRate(machine.ideal_cycle_time_seconds));
+  const [outputRateDisplay, setOutputRateDisplay] = useState<number>(Math.round(toOutputRate(machine.ideal_cycle_time_seconds)));
   const [setupTimeDisplay, setSetupTimeDisplay] = useState<number>(0);
   const [targetQuality, setTargetQuality] = useState<number>(99);
 
   // Warn if SKU output rate is faster than machine capacity
   const cycleTimeInSeconds = fromOutputRate(outputRateDisplay);
   const cycleTimeWarning = cycleTimeInSeconds < machine.ideal_cycle_time_seconds
-    ? `SKU output rate (${outputRateDisplay.toFixed(1)} ชิ้น/นาที) เร็วกว่า Machine capacity (${toOutputRate(machine.ideal_cycle_time_seconds).toFixed(1)} ชิ้น/นาที)`
+    ? `SKU output rate (${Math.round(outputRateDisplay)} ชิ้น/นาที) เร็วกว่า Machine capacity (${Math.round(toOutputRate(machine.ideal_cycle_time_seconds))} ชิ้น/นาที)`
     : null;
 
   const createMutation = useMutation({
@@ -146,7 +146,7 @@ export function InlineStandardDialog({
             )}
 
             <p className="text-xs text-muted-foreground">
-              Machine Default: {toOutputRate(machine.ideal_cycle_time_seconds).toFixed(1)} ชิ้น/นาที
+              Machine Default: {Math.round(toOutputRate(machine.ideal_cycle_time_seconds))} ชิ้น/นาที
             </p>
           </div>
         </div>

@@ -180,7 +180,7 @@ export function ProductionStandardsManager() {
   const cycleTimeWarning = useMemo(() => {
     if (!selectedMachine || !formData.ideal_cycle_time_seconds) return null;
     if (formData.ideal_cycle_time_seconds < selectedMachine.ideal_cycle_time_seconds) {
-      return `Warning: SKU output rate (${toOutputRate(formData.ideal_cycle_time_seconds).toFixed(1)} ชิ้น/นาที) เร็วกว่า Machine capacity (${toOutputRate(selectedMachine.ideal_cycle_time_seconds).toFixed(1)} ชิ้น/นาที)`;
+      return `Warning: SKU output rate (${Math.round(toOutputRate(formData.ideal_cycle_time_seconds))} ชิ้น/นาที) เร็วกว่า Machine capacity (${Math.round(toOutputRate(selectedMachine.ideal_cycle_time_seconds))} ชิ้น/นาที)`;
     }
     return null;
   }, [formData.ideal_cycle_time_seconds, selectedMachine]);
@@ -563,7 +563,7 @@ export function ProductionStandardsManager() {
                 </TableCell>
                 <TableCell>
                   <>
-                    <span className="font-mono text-sm">{toOutputRate(standard.ideal_cycle_time_seconds).toFixed(1)} ชิ้น/นาที</span>
+                    <span className="font-mono text-sm">{Math.round(toOutputRate(standard.ideal_cycle_time_seconds))} ชิ้น/นาที</span>
                     {standard.machines && standard.ideal_cycle_time_seconds < standard.machines.ideal_cycle_time_seconds && (
                       <AlertTriangle className="inline h-3.5 w-3.5 ml-1 text-destructive" />
                     )}
@@ -623,7 +623,7 @@ export function ProductionStandardsManager() {
                 <SelectContent>
                   {filteredMachines.map(m => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.name} ({m.code}) — {toOutputRate(m.ideal_cycle_time_seconds).toFixed(1)} ชิ้น/นาที
+                      {m.name} ({m.code}) — {Math.round(toOutputRate(m.ideal_cycle_time_seconds))} ชิ้น/นาที
                       {m.lines?.plants?.name ? ` [${m.lines.plants.name}]` : ''}
                     </SelectItem>
                   ))}
@@ -677,7 +677,7 @@ export function ProductionStandardsManager() {
                           type="number"
                           min="0.01"
                           step="0.1"
-                          value={parseFloat(toOutputRate(formData.ideal_cycle_time_seconds).toFixed(2))}
+                          value={Math.round(toOutputRate(formData.ideal_cycle_time_seconds))}
                           onChange={(e) => setFormData({ ...formData, ideal_cycle_time_seconds: fromOutputRate(parseFloat(e.target.value) || 1) })}
                         />
                       </div>

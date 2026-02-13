@@ -83,7 +83,7 @@ export function fromOutputRate(piecesPerMin: number): number {
 /**
  * Format output rate for display
  */
-export function formatOutputRate(cycleTimeSeconds: number | undefined | null, decimals = 1): string {
+export function formatOutputRate(cycleTimeSeconds: number | undefined | null, decimals = 0): string {
   if (cycleTimeSeconds == null || cycleTimeSeconds <= 0) return '—';
   return toOutputRate(cycleTimeSeconds).toFixed(decimals);
 }
