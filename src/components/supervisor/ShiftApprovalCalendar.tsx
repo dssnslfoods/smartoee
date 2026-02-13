@@ -455,6 +455,16 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                 </div>
               )}
 
+              {dateStatusMap.get(selectedDate)?.isConfirmedHoliday && !dateStatusMap.get(selectedDate)?.isPreDefinedHoliday && (
+                <div className="flex items-center gap-3 rounded-lg border border-sky-500/30 bg-sky-500/5 p-4">
+                  <Palmtree className="h-5 w-5 text-sky-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">ยืนยันแล้ว: วันหยุด</p>
+                    <p className="text-xs text-muted-foreground">วันนี้ไม่ถูกนำมาคำนวณ OEE</p>
+                  </div>
+                </div>
+              )}
+
               {dateStatusMap.get(selectedDate)?.isNoActivity && !dateStatusMap.get(selectedDate)?.isPreDefinedHoliday && isSupervisor && (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
                   <div className="flex items-center gap-3">
