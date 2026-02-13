@@ -68,6 +68,7 @@ const navItems: NavItem[] = [
     title: "Recent Activity",
     href: "/recent-activity",
     icon: ScrollText,
+    roles: ["ADMIN"],
   },
   {
     title: "Activity Log",
