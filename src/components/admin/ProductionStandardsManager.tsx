@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Loader2, Cpu, Package, AlertTriangle, Factory, Download, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import * as XLSX from 'xlsx';
+
 import { useAuth } from '@/hooks/useAuth';
 import { resolveTimeUnit, fromSeconds, toSeconds, TIME_UNIT_SHORT, getInputStep, getInputMin } from '@/lib/timeUnitUtils';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,7 @@ import {
 import { toast } from 'sonner';
 import {
   exportMasterDataToExcel, exportMasterDataToCSV,
-  parseCSV, readFileAsText,
+  parseImportFile,
 } from '@/lib/masterDataExport';
 
 interface ProductionStandard {
@@ -356,18 +356,7 @@ export function ProductionStandardsManager() {
     if (!selectedCompanyId) { toast.error('กรุณาเลือกบริษัทก่อน import'); return; }
     setIsImporting(true);
     try {
-      const isExcel = /\.(xlsx|xls)$/i.test(file.name);
-      let parsed: Record<string, string>[];
-
-      if (isExcel) {
-        const buffer = await file.arrayBuffer();
-        const wb = XLSX.read(buffer, { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        parsed = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
-      } else {
-        const content = await readFileAsText(file);
-        parsed = parseCSV(content);
-      }
+      const parsed = await parseImportFile(file);
 
       if (parsed.length === 0) { toast.error('ไม่พบข้อมูลในไฟล์'); setIsImporting(false); return; }
 

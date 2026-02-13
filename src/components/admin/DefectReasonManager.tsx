@@ -23,7 +23,7 @@ import {
 import { toast } from 'sonner';
 import {
   exportMasterDataToExcel, exportMasterDataToCSV,
-  parseCSV, readFileAsText,
+  parseImportFile,
   DEFECT_REASON_COLUMNS,
 } from '@/lib/masterDataExport';
 
@@ -181,8 +181,7 @@ export function DefectReasonManager() {
 
     setIsImporting(true);
     try {
-      const content = await readFileAsText(file);
-      const parsed = parseCSV(content);
+      const parsed = await parseImportFile(file);
 
       if (parsed.length === 0) {
         toast.error('ไม่พบข้อมูลในไฟล์ กรุณาตรวจสอบรูปแบบ (ต้องมี header: Code, Name)');
@@ -228,7 +227,7 @@ export function DefectReasonManager() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,.txt"
+            accept=".csv,.txt,.xlsx,.xls"
             onChange={handleImportFile}
             className="hidden"
           />
