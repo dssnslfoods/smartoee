@@ -86,7 +86,7 @@ const helpSections: HelpSection[] = [
       },
       {
         q: "Performance (P) คำนวณอย่างไร?",
-        a: "Performance วัดความเร็วจริงของการผลิตเทียบกับความเร็วอุดมคติ\n\nสูตร: P = (Total Produced × Ideal Cycle Time) / Run Time × 100%\n\n• Total Produced = Good Qty + Reject Qty (จำนวนผลิตทั้งหมด)\n• Ideal Cycle Time = เวลาอุดมคติต่อชิ้น (วินาที) — ดึงจาก Production Standard ของคู่เครื่องจักร-SKU ถ้าไม่มีจะใช้ค่า Default ของเครื่องจักร\n• Run Time = เวลาทำงานจริง (แปลงเป็นวินาที)\n\nตัวอย่าง: ผลิตได้ 800 ชิ้น, Ideal Cycle Time = 25 วินาที/ชิ้น, Run Time = 24,000 วินาที (400 นาที)\nP = (800 × 25) / 24,000 × 100% = 83.33%\n\nหมายเหตุ: หากมีหลาย SKU ในกะเดียวกัน ระบบจะคำนวณ Weighted Average Ideal Cycle Time ตามสัดส่วนเวลาผลิตของแต่ละ SKU",
+        a: "Performance วัดความเร็วจริงของการผลิตเทียบกับความเร็วอุดมคติ\n\nสูตร: P = Total Produced / (Output Rate × Run Time) × 100%\n\n• Total Produced = Good Qty + Reject Qty (จำนวนผลิตทั้งหมด)\n• Output Rate = จำนวนชิ้นที่ควรผลิตได้ต่อนาที (ชิ้น/นาที) — ดึงจาก Production Standard ของคู่เครื่องจักร-SKU ถ้าไม่มีจะใช้ค่า Default ของเครื่องจักร\n• Run Time = เวลาทำงานจริง (นาที)\n\nตัวอย่าง: ผลิตได้ 800 ชิ้น, Output Rate = 2.4 ชิ้น/นาที, Run Time = 400 นาที\nP = 800 / (2.4 × 400) × 100% = 83.33%\n\n💡 Output Rate คำนวณจาก: 60 / Ideal Cycle Time (วินาที)\nเช่น Ideal Cycle Time = 25 วินาที → Output Rate = 60 / 25 = 2.4 ชิ้น/นาที\n\nหมายเหตุ: หากมีหลาย SKU ในกะเดียวกัน ระบบจะคำนวณ Weighted Average Output Rate ตามสัดส่วนเวลาผลิตของแต่ละ SKU",
       },
       {
         q: "Quality (Q) คำนวณอย่างไร?",
