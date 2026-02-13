@@ -93,6 +93,20 @@ export default function MonitorPage() {
 
   const stats = filteredStats;
 
+  // Group machines by line
+  const machinesByLine = useMemo(() => {
+    const map = new Map<string, { lineId: string; lineName: string; plantName?: string; machines: typeof filteredMachines }>();
+    for (const m of filteredMachines) {
+      const key = m.line_id;
+      if (!map.has(key)) {
+        map.set(key, { lineId: key, lineName: m.line_name || 'Unknown Line', plantName: m.plant_name, machines: [] });
+      }
+      map.get(key)!.machines.push(m);
+    }
+    // Sort lines alphabetically
+    return [...map.values()].sort((a, b) => a.lineName.localeCompare(b.lineName));
+  }, [filteredMachines]);
+
   const content = (
     <div className="page-container space-y-5">
       {/* Header */}
@@ -176,11 +190,18 @@ export default function MonitorPage() {
         <StatPill icon={Pause} label="Idle" count={stats.idle} colorClass="text-status-idle" bgClass="bg-status-idle/10" />
       </div>
 
-      {/* Machine Grid */}
+      {/* Machine Grid - Grouped by Line */}
       {isLoading ? (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 rounded-lg" />
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="space-y-3">
+              <Skeleton className="h-6 w-40 rounded" />
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                {Array.from({ length: 3 }).map((_, j) => (
+                  <Skeleton key={j} className="h-40 rounded-lg" />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       ) : filteredMachines.length === 0 ? (
@@ -191,17 +212,62 @@ export default function MonitorPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-          {filteredMachines.map(machine => (
-            <MonitorMachineCard
-              key={machine.id}
-              machine={machine}
-              onClick={() => {
-                setSelectedMachineId(machine.id);
-                setControlSheetOpen(true);
-              }}
-            />
-          ))}
+        <div className="space-y-5">
+          {machinesByLine.map(({ lineId, lineName, plantName, machines: lineMachines }) => {
+            const lineStats = { running: 0, stopped: 0, maintenance: 0, idle: 0 };
+            for (const m of lineMachines) lineStats[m.status]++;
+            return (
+              <div key={lineId} className="rounded-xl border bg-card/50 overflow-hidden">
+                {/* Line Header */}
+                <div className="flex items-center justify-between gap-3 px-4 py-3 bg-muted/40 border-b">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Factory className="h-4 w-4 text-primary shrink-0" />
+                    <span className="font-semibold text-sm truncate">{lineName}</span>
+                    {plantName && (
+                      <span className="text-xs text-muted-foreground truncate hidden sm:inline">
+                        <MapPin className="inline h-3 w-3 mr-0.5 -mt-0.5" />{plantName}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {lineStats.running > 0 && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-status-running/10 text-status-running border-0">
+                        {lineStats.running} Running
+                      </Badge>
+                    )}
+                    {lineStats.stopped > 0 && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-status-stopped/10 text-status-stopped border-0">
+                        {lineStats.stopped} Stopped
+                      </Badge>
+                    )}
+                    {lineStats.maintenance > 0 && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-status-maintenance/10 text-status-maintenance border-0">
+                        {lineStats.maintenance} Setup
+                      </Badge>
+                    )}
+                    {lineStats.idle > 0 && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-status-idle/10 text-status-idle border-0">
+                        {lineStats.idle} Idle
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                {/* Machines in this line */}
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 p-3">
+                  {lineMachines.map(machine => (
+                    <MonitorMachineCard
+                      key={machine.id}
+                      machine={machine}
+                      onClick={() => {
+                        setSelectedMachineId(machine.id);
+                        setControlSheetOpen(true);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
