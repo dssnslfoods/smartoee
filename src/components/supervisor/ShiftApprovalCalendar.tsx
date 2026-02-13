@@ -328,7 +328,8 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                       isSelected && 'bg-primary text-primary-foreground hover:bg-primary/90',
                       isToday && !isSelected && 'ring-1 ring-primary/50',
                       (isHoliday || isConfirmedHoliday) && !isSelected && 'bg-sky-500/10 text-muted-foreground',
-                      (isNoActivity || isConfirmedWorkingDay) && !isSelected && 'bg-rose-500/10',
+                      isNoActivity && !isSelected && 'bg-violet-500/10',
+                      isConfirmedWorkingDay && !isSelected && 'bg-rose-500/10',
                     )}
                   >
                     <span className="font-medium">{day.day}</span>
@@ -340,7 +341,12 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                             'h-1.5 w-1.5 rounded-full',
                             isSelected ? 'bg-primary-foreground' : 'bg-sky-400'
                           )} />
-                        ) : (isNoActivity || isConfirmedWorkingDay) ? (
+                        ) : isNoActivity ? (
+                          <span className={cn(
+                            'h-1.5 w-1.5 rounded-full',
+                            isSelected ? 'bg-primary-foreground' : 'bg-violet-400'
+                          )} />
+                        ) : isConfirmedWorkingDay ? (
                           <span className={cn(
                             'h-1.5 w-1.5 rounded-full',
                             isSelected ? 'bg-primary-foreground' : 'bg-rose-400'
@@ -383,8 +389,12 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                 ล็อคแล้ว
               </div>
               <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-violet-400" />
+                เลือกประเภทวัน
+              </div>
+              <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-rose-400" />
-                ไม่มีกิจกรรม / วันทำงาน (0%)
+                วันทำงาน (0%)
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-sky-400" />
