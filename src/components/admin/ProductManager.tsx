@@ -165,10 +165,10 @@ export function ProductManager() {
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!products || products.length === 0) { toast.error('ไม่มีข้อมูลให้ export'); return; }
     const companyName = company?.name || 'All';
-    exportMasterDataToExcel(products, PRODUCT_COLUMNS, `products_${companyName}`, 'Products');
+    await exportMasterDataToExcel(products, PRODUCT_COLUMNS, `products_${companyName}`, 'Products');
     toast.success('Export Excel สำเร็จ');
   };
 

@@ -156,10 +156,10 @@ export function SetupReasonManager() {
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!reasons || reasons.length === 0) { toast.error('ไม่มีข้อมูลให้ export'); return; }
     const companyName = company?.name || 'All';
-    exportMasterDataToExcel(reasons, SETUP_REASON_COLUMNS, `setup_reasons_${companyName}`, 'Setup Reasons');
+    await exportMasterDataToExcel(reasons, SETUP_REASON_COLUMNS, `setup_reasons_${companyName}`, 'Setup Reasons');
     toast.success('Export Excel สำเร็จ');
   };
 

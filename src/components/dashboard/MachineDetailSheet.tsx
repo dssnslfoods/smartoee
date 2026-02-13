@@ -136,14 +136,14 @@ import { Bar, BarChart, Cell } from 'recharts';
     toast.success('CSV file downloaded');
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!oeeHistory?.snapshots?.length || !machine) {
       toast.error('No data to export');
       return;
     }
     const exportData = formatOEEForExport(oeeHistory.snapshots);
     const filename = `${machine.code}_OEE_${period}_${format(new Date(), 'yyyyMMdd')}`;
-    exportToExcel(exportData, filename, `${machine.name} OEE`);
+    await exportToExcel(exportData, filename, `${machine.name} OEE`);
     toast.success('Excel file downloaded');
   };
 

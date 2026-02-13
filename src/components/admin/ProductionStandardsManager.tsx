@@ -292,10 +292,10 @@ export function ProductionStandardsManager() {
     }));
   }, [standards]);
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (exportData.length === 0) { toast.error('ไม่มีข้อมูลให้ export'); return; }
     const companyName = company?.name || 'All';
-    exportMasterDataToExcel(exportData, STANDARD_EXPORT_COLUMNS, `production_standards_${companyName}`, 'Standards');
+    await exportMasterDataToExcel(exportData, STANDARD_EXPORT_COLUMNS, `production_standards_${companyName}`, 'Standards');
     toast.success('Export Excel สำเร็จ');
   };
 
