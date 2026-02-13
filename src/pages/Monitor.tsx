@@ -1,19 +1,19 @@
-import { useState, useMemo, useEffect } from 'react';
-import { cn } from '@/lib/utils';
-import { AppLayout } from '@/components/layout/AppLayout';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { MonitorMachineCard } from '@/components/monitor/MonitorMachineCard';
-import { MonitorControlSheet } from '@/components/monitor/MonitorControlSheet';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/hooks/useAuth';
-import { useMonitorData } from '@/hooks/useMonitorData';
-import { useFullscreen } from '@/hooks/useFullscreen';
-import { FullscreenToggle, FullscreenContainer } from '@/components/ui/FullscreenToggle';
-import { useQuery } from '@tanstack/react-query';
-import { getLines, getPlants } from '@/services/oeeApi';
+import { useState, useMemo, useEffect } from "react";
+import { cn } from "@/lib/utils";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { MonitorMachineCard } from "@/components/monitor/MonitorMachineCard";
+import { MonitorControlSheet } from "@/components/monitor/MonitorControlSheet";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/useAuth";
+import { useMonitorData } from "@/hooks/useMonitorData";
+import { useFullscreen } from "@/hooks/useFullscreen";
+import { FullscreenToggle, FullscreenContainer } from "@/components/ui/FullscreenToggle";
+import { useQuery } from "@tanstack/react-query";
+import { getLines, getPlants } from "@/services/oeeApi";
 import {
   Monitor as MonitorIcon,
   Play,
@@ -24,30 +24,30 @@ import {
   Building2,
   Wifi,
   MapPin,
-} from 'lucide-react';
+} from "lucide-react";
 
-type StatusFilter = 'all' | 'running' | 'idle' | 'stopped' | 'maintenance';
+type StatusFilter = "all" | "running" | "idle" | "stopped" | "maintenance";
 
 export default function MonitorPage() {
   const { company, isAdmin } = useAuth();
   const { data, isLoading } = useMonitorData();
   const { isFullscreen, isKiosk, toggleFullscreen, enterKiosk, enterFullscreen } = useFullscreen();
-  const [selectedPlant, setSelectedPlant] = useState<string>('all');
-  const [selectedLine, setSelectedLine] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [selectedPlant, setSelectedPlant] = useState<string>("all");
+  const [selectedLine, setSelectedLine] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
   const [controlSheetOpen, setControlSheetOpen] = useState(false);
 
   const companyId = company?.id;
 
   const { data: plants } = useQuery({
-    queryKey: ['plants', companyId],
+    queryKey: ["plants", companyId],
     queryFn: () => getPlants(companyId),
     enabled: !!companyId || !isAdmin(),
   });
 
   const { data: lines } = useQuery({
-    queryKey: ['lines', companyId],
+    queryKey: ["lines", companyId],
     queryFn: () => getLines(undefined, companyId),
     enabled: !!companyId || !isAdmin(),
   });
@@ -55,19 +55,19 @@ export default function MonitorPage() {
   // Filter lines based on selected plant
   const filteredLines = useMemo(() => {
     if (!lines) return [];
-    if (selectedPlant === 'all') return lines;
-    return lines.filter(l => l.plant_id === selectedPlant);
+    if (selectedPlant === "all") return lines;
+    return lines.filter((l) => l.plant_id === selectedPlant);
   }, [lines, selectedPlant]);
 
   // Auto-select when only one option available
   useEffect(() => {
-    if (plants && plants.length === 1 && selectedPlant === 'all') {
+    if (plants && plants.length === 1 && selectedPlant === "all") {
       setSelectedPlant(plants[0].id);
     }
   }, [plants, selectedPlant]);
 
   useEffect(() => {
-    if (filteredLines.length === 1 && selectedLine === 'all') {
+    if (filteredLines.length === 1 && selectedLine === "all") {
       setSelectedLine(filteredLines[0].id);
     }
   }, [filteredLines, selectedLine]);
@@ -75,21 +75,21 @@ export default function MonitorPage() {
   // Reset line filter when plant changes
   const handlePlantChange = (plantId: string) => {
     setSelectedPlant(plantId);
-    setSelectedLine('all');
+    setSelectedLine("all");
   };
 
   // Filter machines
   const filteredMachines = useMemo(() => {
     if (!data?.machines) return [];
     let result = data.machines;
-    if (selectedPlant !== 'all') {
-      result = result.filter(m => m.plant_id === selectedPlant);
+    if (selectedPlant !== "all") {
+      result = result.filter((m) => m.plant_id === selectedPlant);
     }
-    if (selectedLine !== 'all') {
-      result = result.filter(m => m.line_id === selectedLine);
+    if (selectedLine !== "all") {
+      result = result.filter((m) => m.line_id === selectedLine);
     }
-    if (statusFilter !== 'all') {
-      result = result.filter(m => m.status === statusFilter);
+    if (statusFilter !== "all") {
+      result = result.filter((m) => m.status === statusFilter);
     }
     return result;
   }, [data?.machines, selectedPlant, selectedLine, statusFilter]);
@@ -108,11 +108,14 @@ export default function MonitorPage() {
 
   // Group machines by line
   const machinesByLine = useMemo(() => {
-    const map = new Map<string, { lineId: string; lineName: string; plantName?: string; machines: typeof filteredMachines }>();
+    const map = new Map<
+      string,
+      { lineId: string; lineName: string; plantName?: string; machines: typeof filteredMachines }
+    >();
     for (const m of filteredMachines) {
       const key = m.line_id;
       if (!map.has(key)) {
-        map.set(key, { lineId: key, lineName: m.line_name || 'Unknown Line', plantName: m.plant_name, machines: [] });
+        map.set(key, { lineId: key, lineName: m.line_name || "Unknown Line", plantName: m.plant_name, machines: [] });
       }
       map.get(key)!.machines.push(m);
     }
@@ -130,7 +133,10 @@ export default function MonitorPage() {
             <h1 className="text-2xl font-bold tracking-tight text-foreground">{company.name}</h1>
             <span className="text-lg text-muted-foreground font-medium">— Production Monitor</span>
           </div>
-          <Badge variant="outline" className="gap-1.5 px-2.5 py-1 text-xs font-medium border-status-running/30 text-status-running bg-status-running/5">
+          <Badge
+            variant="outline"
+            className="gap-1.5 px-2.5 py-1 text-xs font-medium border-status-running/30 text-status-running bg-status-running/5"
+          >
             <Wifi className="h-3 w-3 animate-pulse" />
             Live
           </Badge>
@@ -139,10 +145,10 @@ export default function MonitorPage() {
 
       {/* Header */}
       <PageHeader
-        title={isKiosk ? '' : 'Production Monitor'}
-        description={isKiosk ? '' : 'สถานะเครื่องจักรแบบ Real-time'}
+        title={isKiosk ? "" : "Production Monitor"}
+        description={isKiosk ? "" : "สถานะเครื่องจักรแบบ Real-time"}
         icon={isKiosk ? undefined : MonitorIcon}
-        className={isKiosk ? 'hidden' : undefined}
+        className={isKiosk ? "hidden" : undefined}
       >
         {!isKiosk && (
           <FullscreenToggle
@@ -155,10 +161,6 @@ export default function MonitorPage() {
         )}
 
         {/* Realtime indicator */}
-        <Badge variant="outline" className="gap-1.5 px-2.5 py-1 text-xs font-medium border-status-running/30 text-status-running bg-status-running/5">
-          <Wifi className="h-3 w-3 animate-pulse" />
-          Live
-        </Badge>
 
         {!isKiosk && isAdmin() && company && (
           <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary/5 border-primary/20">
@@ -189,8 +191,10 @@ export default function MonitorPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">ทุกโรงงาน</SelectItem>
-                {plants?.map(plant => (
-                  <SelectItem key={plant.id} value={plant.id}>{plant.name}</SelectItem>
+                {plants?.map((plant) => (
+                  <SelectItem key={plant.id} value={plant.id}>
+                    {plant.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -202,8 +206,10 @@ export default function MonitorPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">ทุกไลน์</SelectItem>
-                {filteredLines?.map(line => (
-                  <SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>
+                {filteredLines?.map((line) => (
+                  <SelectItem key={line.id} value={line.id}>
+                    {line.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -213,10 +219,34 @@ export default function MonitorPage() {
 
       {/* Quick Stats Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatPill icon={Play} label="Running" count={stats.running} colorClass="text-status-running" bgClass="bg-status-running/10" />
-        <StatPill icon={AlertTriangle} label="Stopped" count={stats.stopped} colorClass="text-status-stopped" bgClass="bg-status-stopped/10" />
-        <StatPill icon={Wrench} label="Setup" count={stats.maintenance} colorClass="text-status-maintenance" bgClass="bg-status-maintenance/10" />
-        <StatPill icon={Pause} label="Idle" count={stats.idle} colorClass="text-status-idle" bgClass="bg-status-idle/10" />
+        <StatPill
+          icon={Play}
+          label="Running"
+          count={stats.running}
+          colorClass="text-status-running"
+          bgClass="bg-status-running/10"
+        />
+        <StatPill
+          icon={AlertTriangle}
+          label="Stopped"
+          count={stats.stopped}
+          colorClass="text-status-stopped"
+          bgClass="bg-status-stopped/10"
+        />
+        <StatPill
+          icon={Wrench}
+          label="Setup"
+          count={stats.maintenance}
+          colorClass="text-status-maintenance"
+          bgClass="bg-status-maintenance/10"
+        />
+        <StatPill
+          icon={Pause}
+          label="Idle"
+          count={stats.idle}
+          colorClass="text-status-idle"
+          bgClass="bg-status-idle/10"
+        />
       </div>
 
       {/* Machine Layout - Vertical Columns by Line */}
@@ -235,7 +265,7 @@ export default function MonitorPage() {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <MonitorIcon className="h-10 w-10 mx-auto mb-3 opacity-50" />
-            <p>ไม่พบเครื่องจักร{statusFilter !== 'all' ? ` ในสถานะ ${statusFilter}` : ''}</p>
+            <p>ไม่พบเครื่องจักร{statusFilter !== "all" ? ` ในสถานะ ${statusFilter}` : ""}</p>
           </CardContent>
         </Card>
       ) : (
@@ -243,25 +273,32 @@ export default function MonitorPage() {
           {machinesByLine.map(({ lineId, lineName, plantName, machines: lineMachines }) => {
             const lineStats = { running: 0, stopped: 0, maintenance: 0, idle: 0 };
             for (const m of lineMachines) lineStats[m.status]++;
-            const dominantStatus = lineStats.running > 0 ? 'running' : lineStats.stopped > 0 ? 'stopped' : lineStats.maintenance > 0 ? 'maintenance' : 'idle';
+            const dominantStatus =
+              lineStats.running > 0
+                ? "running"
+                : lineStats.stopped > 0
+                  ? "stopped"
+                  : lineStats.maintenance > 0
+                    ? "maintenance"
+                    : "idle";
             const statusGlow: Record<string, string> = {
-              running: 'shadow-[0_0_25px_-5px_hsl(var(--status-running)/0.35)]',
-              stopped: 'shadow-[0_0_25px_-5px_hsl(var(--status-stopped)/0.35)]',
-              maintenance: 'shadow-[0_0_25px_-5px_hsl(var(--status-maintenance)/0.35)]',
-              idle: '',
+              running: "shadow-[0_0_25px_-5px_hsl(var(--status-running)/0.35)]",
+              stopped: "shadow-[0_0_25px_-5px_hsl(var(--status-stopped)/0.35)]",
+              maintenance: "shadow-[0_0_25px_-5px_hsl(var(--status-maintenance)/0.35)]",
+              idle: "",
             };
             const statusBorder: Record<string, string> = {
-              running: 'border-status-running/40',
-              stopped: 'border-status-stopped/40',
-              maintenance: 'border-status-maintenance/40',
-              idle: 'border-border/50',
+              running: "border-status-running/40",
+              stopped: "border-status-stopped/40",
+              maintenance: "border-status-maintenance/40",
+              idle: "border-border/50",
             };
 
             return (
               <div
                 key={lineId}
                 className={cn(
-                  'min-w-[280px] max-w-[320px] flex-1 flex flex-col rounded-xl border bg-card/60 backdrop-blur-sm overflow-hidden',
+                  "min-w-[280px] max-w-[320px] flex-1 flex flex-col rounded-xl border bg-card/60 backdrop-blur-sm overflow-hidden",
                   statusBorder[dominantStatus],
                   statusGlow[dominantStatus],
                 )}
@@ -314,7 +351,7 @@ export default function MonitorPage() {
 
                 {/* Machine Cards - Stacked vertically */}
                 <div className="flex flex-col gap-2.5 p-2.5 flex-1">
-                  {lineMachines.map(machine => (
+                  {lineMachines.map((machine) => (
                     <MonitorMachineCard
                       key={machine.id}
                       machine={machine}
@@ -332,19 +369,20 @@ export default function MonitorPage() {
       )}
 
       {/* Control Sheet */}
-      {selectedMachineId && (() => {
-        const selectedMachine = data?.machines.find(m => m.id === selectedMachineId);
-        return (
-          <MonitorControlSheet
-            machineId={selectedMachineId}
-            machineName={selectedMachine?.name}
-            machineCode={selectedMachine?.code}
-            machineStatus={selectedMachine?.status}
-            open={controlSheetOpen}
-            onOpenChange={setControlSheetOpen}
-          />
-        );
-      })()}
+      {selectedMachineId &&
+        (() => {
+          const selectedMachine = data?.machines.find((m) => m.id === selectedMachineId);
+          return (
+            <MonitorControlSheet
+              machineId={selectedMachineId}
+              machineName={selectedMachine?.name}
+              machineCode={selectedMachine?.code}
+              machineStatus={selectedMachine?.status}
+              open={controlSheetOpen}
+              onOpenChange={setControlSheetOpen}
+            />
+          );
+        })()}
     </div>
   );
 
@@ -374,10 +412,10 @@ function StatPill({
   bgClass: string;
 }) {
   return (
-    <div className={cn('flex items-center gap-3 rounded-lg border px-4 py-3', bgClass, 'border-transparent')}>
-      <Icon className={cn('h-5 w-5', colorClass)} />
+    <div className={cn("flex items-center gap-3 rounded-lg border px-4 py-3", bgClass, "border-transparent")}>
+      <Icon className={cn("h-5 w-5", colorClass)} />
       <div>
-        <p className={cn('text-2xl font-bold tabular-nums', colorClass)}>{count}</p>
+        <p className={cn("text-2xl font-bold tabular-nums", colorClass)}>{count}</p>
         <p className="text-xs text-muted-foreground">{label}</p>
       </div>
     </div>
