@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { Lock, ClipboardCheck, Timer, Clock, Cpu, Package, BarChart3, Palmtree } from 'lucide-react';
+import { Lock, ClipboardCheck, Timer, Clock, Cpu, Package, BarChart3, Palmtree, AlertTriangle, ShieldAlert, Wrench } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -19,6 +19,9 @@ import {
   MachineManager,
   ProductManager,
   ProductionStandardsManager,
+  DowntimeReasonManager,
+  DefectReasonManager,
+  SetupReasonManager,
 } from '@/components/admin';
 import oeeApi from '@/services/oeeApi';
 
@@ -138,6 +141,18 @@ export default function Supervisor() {
                   <Palmtree className="h-4 w-4" />
                   <span className="hidden sm:inline">วันหยุด</span>
                 </TabsTrigger>
+                <TabsTrigger value="downtime" className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="hidden sm:inline">Downtime</span>
+                </TabsTrigger>
+                <TabsTrigger value="defects" className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <ShieldAlert className="h-4 w-4" />
+                  <span className="hidden sm:inline">Defects</span>
+                </TabsTrigger>
+                <TabsTrigger value="setup" className="gap-2 px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <Wrench className="h-4 w-4" />
+                  <span className="hidden sm:inline">Setup</span>
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -199,6 +214,30 @@ export default function Supervisor() {
 
             <TabsContent value="holidays" className="mt-0">
               <HolidayManager />
+            </TabsContent>
+
+            <TabsContent value="downtime" className="mt-0">
+              <Card className="overflow-hidden">
+                <CardContent className="p-4 sm:p-6">
+                  <DowntimeReasonManager />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="defects" className="mt-0">
+              <Card className="overflow-hidden">
+                <CardContent className="p-4 sm:p-6">
+                  <DefectReasonManager />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="setup" className="mt-0">
+              <Card className="overflow-hidden">
+                <CardContent className="p-4 sm:p-6">
+                  <SetupReasonManager />
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         )}
