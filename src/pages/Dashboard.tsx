@@ -255,27 +255,31 @@ export default function Dashboard() {
        </div>
  
        {/* OEE Component Gauges - A P Q */}
-       <div className="grid gap-4 sm:gap-5 md:gap-6 grid-cols-3">
-         {isLoading ? (
-           <>
-             <OEECardSkeleton />
-             <OEECardSkeleton />
-             <OEECardSkeleton />
-           </>
-         ) : (
-           <>
+        <div className="grid gap-2 sm:gap-5 md:gap-6 grid-cols-3">
+          {isLoading ? (
+            <>
+              <OEECardSkeleton />
+              <OEECardSkeleton />
+              <OEECardSkeleton />
+            </>
+          ) : (
+            <>
+              {/* sm on mobile, md on sm+ */}
               <div className="flex flex-col items-center">
-                <OEEGauge value={oee.availability} label="Availability" color="availability" size="md" />
+                <div className="sm:hidden"><OEEGauge value={oee.availability} label="Availability" color="availability" size="sm" /></div>
+                <div className="hidden sm:block"><OEEGauge value={oee.availability} label="Availability" color="availability" size="md" /></div>
               </div>
               <div className="flex flex-col items-center">
-                <OEEGauge value={oee.performance} label="Performance" color="performance" size="md" />
+                <div className="sm:hidden"><OEEGauge value={oee.performance} label="Performance" color="performance" size="sm" /></div>
+                <div className="hidden sm:block"><OEEGauge value={oee.performance} label="Performance" color="performance" size="md" /></div>
               </div>
               <div className="flex flex-col items-center">
-                <OEEGauge value={oee.quality} label="Quality" color="quality" size="md" />
+                <div className="sm:hidden"><OEEGauge value={oee.quality} label="Quality" color="quality" size="sm" /></div>
+                <div className="hidden sm:block"><OEEGauge value={oee.quality} label="Quality" color="quality" size="md" /></div>
               </div>
-           </>
-         )}
-       </div>
+            </>
+          )}
+        </div>
  
        {/* Quick Stats - Racing HUD Style */}
        <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
