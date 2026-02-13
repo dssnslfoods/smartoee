@@ -162,40 +162,53 @@ export function PlannedTimeManager() {
 
   const deleteMutation = useMutation({
     mutationFn: async (template: PlannedTimeTemplate) => {
-      // Check for running events in shift_calendar entries linked to this plant + shift
-      const { data: scIds } = await supabase
-        .from('shift_calendar')
-        .select('id')
-        .eq('plant_id', template.plant_id)
-        .eq('shift_id', template.shift_id);
-
-      const calendarIds = scIds?.map(sc => sc.id) || [];
-
-      if (calendarIds.length > 0) {
-        const { data: runningEvents, error: checkError } = await supabase
-          .from('production_events')
+      if (template.is_active) {
+        // Active template: soft-delete (set is_active = false)
+        // Check for running events first
+        const { data: scIds } = await supabase
+          .from('shift_calendar')
           .select('id')
-          .is('end_ts', null)
-          .in('shift_calendar_id', calendarIds)
-          .limit(1);
+          .eq('plant_id', template.plant_id)
+          .eq('shift_id', template.shift_id);
 
-        if (checkError) throw checkError;
+        const calendarIds = scIds?.map(sc => sc.id) || [];
 
-        if (runningEvents && runningEvents.length > 0) {
-          throw new Error('ไม่สามารถปิด Template ได้ เนื่องจากยังมี Event ที่กำลัง Run อยู่ใน Plant + Shift นี้');
+        if (calendarIds.length > 0) {
+          const { data: runningEvents, error: checkError } = await supabase
+            .from('production_events')
+            .select('id')
+            .is('end_ts', null)
+            .in('shift_calendar_id', calendarIds)
+            .limit(1);
+
+          if (checkError) throw checkError;
+
+          if (runningEvents && runningEvents.length > 0) {
+            throw new Error('ไม่สามารถปิด Template ได้ เนื่องจากยังมี Event ที่กำลัง Run อยู่ใน Plant + Shift นี้');
+          }
         }
-      }
 
-      // Soft-delete: set is_active = false
-      const { error } = await supabase
-        .from('planned_time_templates')
-        .update({ is_active: false })
-        .eq('id', template.id);
-      if (error) throw error;
+        const { error } = await supabase
+          .from('planned_time_templates')
+          .update({ is_active: false })
+          .eq('id', template.id);
+        if (error) throw error;
+      } else {
+        // Inactive template: hard-delete
+        const { error } = await supabase
+          .from('planned_time_templates')
+          .delete()
+          .eq('id', template.id);
+        if (error) throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (_data, template) => {
       queryClient.invalidateQueries({ queryKey: ['planned-time-templates'] });
-      toast.success('ปิด Template เรียบร้อยแล้ว — ข้อมูลที่บันทึกไปแล้วไม่ได้รับผลกระทบ');
+      toast.success(
+        template.is_active
+          ? 'ปิด Template เรียบร้อยแล้ว — ข้อมูลที่บันทึกไปแล้วไม่ได้รับผลกระทบ'
+          : 'ลบ Template ถาวรเรียบร้อยแล้ว'
+      );
       setIsDeleteOpen(false);
       setDeletingTemplate(null);
     },
@@ -432,15 +445,14 @@ export function PlannedTimeManager() {
                       <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(t)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      {t.is_active && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => { setDeletingTemplate(t); setIsDeleteOpen(true); }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => { setDeletingTemplate(t); setIsDeleteOpen(true); }}
+                        title={t.is_active ? 'ปิดใช้งาน (Soft Delete)' : 'ลบถาวร (Hard Delete)'}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -628,11 +640,22 @@ export function PlannedTimeManager() {
       <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>ปิดการใช้งาน Template</AlertDialogTitle>
+            <AlertDialogTitle>
+              {deletingTemplate?.is_active ? 'ปิดการใช้งาน Template' : 'ลบ Template ถาวร'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              ต้องการปิด Template สำหรับ "{deletingTemplate?.plants?.name}" / "{deletingTemplate?.shifts?.name}" หรือไม่?
-              Template จะถูกเปลี่ยนสถานะเป็น Inactive — ข้อมูลที่บันทึกไปแล้วจะไม่ได้รับผลกระทบ
-              {'\n\n'}หากมี Event ที่กำลัง Run อยู่ใน Plant + Shift นี้ ระบบจะไม่อนุญาตให้ปิด
+              {deletingTemplate?.is_active ? (
+                <>
+                  ต้องการปิด Template สำหรับ "{deletingTemplate?.plants?.name}" / "{deletingTemplate?.shifts?.name}" หรือไม่?
+                  Template จะถูกเปลี่ยนสถานะเป็น Inactive — ข้อมูลที่บันทึกไปแล้วจะไม่ได้รับผลกระทบ
+                  {'\n\n'}หากมี Event ที่กำลัง Run อยู่ใน Plant + Shift นี้ ระบบจะไม่อนุญาตให้ปิด
+                </>
+              ) : (
+                <>
+                  ต้องการลบ Template สำหรับ "{deletingTemplate?.plants?.name}" / "{deletingTemplate?.shifts?.name}" ออกจากระบบถาวรหรือไม่?
+                  การดำเนินการนี้ไม่สามารถย้อนกลับได้
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -644,7 +667,7 @@ export function PlannedTimeManager() {
               {deleteMutation.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : null}
-              ปิดการใช้งาน
+              {deletingTemplate?.is_active ? 'ปิดการใช้งาน' : 'ลบถาวร'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
