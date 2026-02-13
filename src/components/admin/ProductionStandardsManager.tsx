@@ -527,8 +527,8 @@ export function ProductionStandardsManager() {
             <TableRow>
               <TableHead>Machine</TableHead>
               <TableHead>SKU</TableHead>
-              <TableHead>Cycle Time</TableHead>
               <TableHead>Setup Time</TableHead>
+              <TableHead>Cycle Time</TableHead>
               <TableHead>Target Quality</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
@@ -560,6 +560,14 @@ export function ProductionStandardsManager() {
                     const machine = machines.find(m => m.id === standard.machine_id);
                     const unit = resolveTimeUnit(machine?.time_unit);
                     const unitLabel = TIME_UNIT_SHORT[unit];
+                    return <span className="font-mono text-sm">{fromSeconds(standard.std_setup_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)}{unitLabel}</span>;
+                  })()}
+                </TableCell>
+                <TableCell>
+                  {(() => {
+                    const machine = machines.find(m => m.id === standard.machine_id);
+                    const unit = resolveTimeUnit(machine?.time_unit);
+                    const unitLabel = TIME_UNIT_SHORT[unit];
                     return (
                       <>
                         <span className="font-mono text-sm">{fromSeconds(standard.ideal_cycle_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)}{unitLabel}</span>
@@ -568,14 +576,6 @@ export function ProductionStandardsManager() {
                         )}
                       </>
                     );
-                  })()}
-                </TableCell>
-                <TableCell>
-                  {(() => {
-                    const machine = machines.find(m => m.id === standard.machine_id);
-                    const unit = resolveTimeUnit(machine?.time_unit);
-                    const unitLabel = TIME_UNIT_SHORT[unit];
-                    return <span className="font-mono text-sm">{fromSeconds(standard.std_setup_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)}{unitLabel}</span>;
                   })()}
                 </TableCell>
                 <TableCell>
@@ -671,16 +671,6 @@ export function ProductionStandardsManager() {
                     <Label className="text-sm font-semibold">📊 Performance Benchmarks ({unitLabel})</Label>
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Ideal Cycle Time ({unitLabel})</Label>
-                        <Input
-                          type="number"
-                          min={getInputMin(unit)}
-                          step={getInputStep(unit)}
-                          value={fromSeconds(formData.ideal_cycle_time_seconds, unit)}
-                          onChange={(e) => setFormData({ ...formData, ideal_cycle_time_seconds: toSeconds(parseFloat(e.target.value) || 0, unit) })}
-                        />
-                      </div>
-                      <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Std. Setup Time ({unitLabel})</Label>
                         <Input
                           type="number"
@@ -688,6 +678,16 @@ export function ProductionStandardsManager() {
                           step={getInputStep(unit)}
                           value={fromSeconds(formData.std_setup_time_seconds, unit)}
                           onChange={(e) => setFormData({ ...formData, std_setup_time_seconds: toSeconds(parseFloat(e.target.value) || 0, unit) })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Ideal Cycle Time ({unitLabel})</Label>
+                        <Input
+                          type="number"
+                          min={getInputMin(unit)}
+                          step={getInputStep(unit)}
+                          value={fromSeconds(formData.ideal_cycle_time_seconds, unit)}
+                          onChange={(e) => setFormData({ ...formData, ideal_cycle_time_seconds: toSeconds(parseFloat(e.target.value) || 0, unit) })}
                         />
                       </div>
                       <div className="space-y-1">
