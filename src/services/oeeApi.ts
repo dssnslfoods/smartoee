@@ -204,6 +204,21 @@ export async function lockShift(
   return handleRpcError(data as unknown as LockShiftResponse) as LockShiftResponse;
 }
 
+export async function unlockShift(
+  shiftCalendarId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const { data, error } = await supabase.rpc('rpc_unlock_shift', {
+    p_shift_calendar_id: shiftCalendarId,
+  });
+
+  if (error) throw error;
+  const result = data as unknown as { ok: boolean; error?: string };
+  if (!result.ok) {
+    throw new Error(result.error || 'Unknown error');
+  }
+  return result;
+}
+
 export async function recalcOeeForShift(
   shiftCalendarId: string,
   forceWorkingDay?: boolean
@@ -1066,6 +1081,7 @@ const oeeApi = {
   addCounts,
   approveShift,
   lockShift,
+  unlockShift,
   recalcOeeForShift,
 
   // Plants
