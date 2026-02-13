@@ -654,6 +654,7 @@ export type Database = {
           id: string
           machine_id: string
           notes: string | null
+          production_event_id: string | null
           reject_qty: number
           shift_calendar_id: string | null
           ts: string
@@ -666,6 +667,7 @@ export type Database = {
           id?: string
           machine_id: string
           notes?: string | null
+          production_event_id?: string | null
           reject_qty?: number
           shift_calendar_id?: string | null
           ts?: string
@@ -678,6 +680,7 @@ export type Database = {
           id?: string
           machine_id?: string
           notes?: string | null
+          production_event_id?: string | null
           reject_qty?: number
           shift_calendar_id?: string | null
           ts?: string
@@ -703,6 +706,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_current_shift_by_machine"
             referencedColumns: ["machine_id"]
+          },
+          {
+            foreignKeyName: "production_counts_production_event_id_fkey"
+            columns: ["production_event_id"]
+            isOneToOne: false
+            referencedRelation: "production_events"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "production_counts_shift_calendar_id_fkey"
