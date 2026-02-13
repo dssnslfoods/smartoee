@@ -49,7 +49,13 @@ export function CompanySwitcher({ isCollapsed = false }: CompanySwitcherProps) {
         .order('name');
 
       if (error) throw error;
-      setCompanies(data || []);
+      const list = data || [];
+      setCompanies(list);
+
+      // Auto-select first company if none selected
+      if (!company && list.length > 0) {
+        selectCompanyForAdmin(list[0]);
+      }
     } catch (error) {
       console.error('Error fetching companies:', error);
     } finally {
