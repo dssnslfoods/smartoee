@@ -276,7 +276,7 @@ export function MachineManager() {
       target_quality: machine.target_quality ?? 99,
       is_active: machine.is_active 
     });
-    setOutputRateDisplay(toOutputRate(machine.ideal_cycle_time_seconds));
+    setOutputRateDisplay(Math.round(toOutputRate(machine.ideal_cycle_time_seconds)));
     setIsDialogOpen(true);
   };
 
@@ -340,7 +340,7 @@ export function MachineManager() {
       name: m.name,
       line_name: m.lines?.name || '',
       plant_name: m.lines?.plants?.name || '',
-      output_rate: Number(toOutputRate(m.ideal_cycle_time_seconds).toFixed(2)),
+      output_rate: Math.round(toOutputRate(m.ideal_cycle_time_seconds)),
       ideal_cycle_time_seconds: m.ideal_cycle_time_seconds,
       target_oee: m.target_oee ?? 85,
       target_availability: m.target_availability ?? 90,
@@ -494,7 +494,7 @@ export function MachineManager() {
                     {line?.name} ({line?.plants?.name || '-'})
                   </TableCell>
                   <TableCell>
-                    {toOutputRate(machine.ideal_cycle_time_seconds).toFixed(1)} ชิ้น/นาที
+                    {Math.round(toOutputRate(machine.ideal_cycle_time_seconds))} ชิ้น/นาที
                   </TableCell>
                   <TableCell>
                     <span className="text-sm font-medium">{machine.target_oee ?? 85}%</span>
