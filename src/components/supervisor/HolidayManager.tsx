@@ -120,12 +120,12 @@ export function HolidayManager() {
     setIsDialogOpen(false);
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const exportData = holidays.map(h => ({
       ...h,
       plant_name: h.plant_id ? (plants.find(p => p.id === h.plant_id)?.name || '') : 'ทุกโรงงาน',
     }));
-    exportMasterDataToExcel(exportData, HOLIDAY_COLUMNS, `holidays_${filterYear}`);
+    await exportMasterDataToExcel(exportData, HOLIDAY_COLUMNS, `holidays_${filterYear}`);
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {

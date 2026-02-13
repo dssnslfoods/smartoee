@@ -151,13 +151,13 @@ export function DefectReasonManager() {
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!reasons || reasons.length === 0) {
       toast.error('ไม่มีข้อมูลให้ export');
       return;
     }
     const companyName = company?.name || 'All';
-    exportMasterDataToExcel(reasons, DEFECT_REASON_COLUMNS, `defect_reasons_${companyName}`, 'Defect Reasons');
+    await exportMasterDataToExcel(reasons, DEFECT_REASON_COLUMNS, `defect_reasons_${companyName}`, 'Defect Reasons');
     toast.success('Export Excel สำเร็จ');
   };
 

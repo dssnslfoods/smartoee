@@ -1,8 +1,9 @@
 /**
  * Master Data Import/Export Utilities
- * Handles Excel export and CSV/Excel import for Downtime and Defect reasons
+ * Handles Excel (.xlsx) export and CSV/Excel import
  */
 import readXlsxFile from 'read-excel-file';
+import ExcelJS from 'exceljs';
 
 // ==================== EXPORT ====================
 
@@ -23,15 +24,56 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-export function exportMasterDataToExcel<T extends Record<string, any>>(
+export async function exportMasterDataToExcel<T extends Record<string, any>>(
   data: T[],
   columns: ExportColumn[],
   filename: string,
-  _sheetName: string = 'Data'
-): void {
-  // Export as CSV with .xlsx-compatible format (BOM + UTF-8)
-  // This avoids the vulnerable xlsx package while maintaining compatibility
-  exportMasterDataToCSV(data, columns, filename);
+  sheetName: string = 'Data'
+): Promise<void> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet(sheetName);
+
+  // Define columns
+  sheet.columns = columns.map(col => ({
+    header: col.header,
+    key: col.key,
+    width: Math.max(col.header.length + 4, 15),
+  }));
+
+  // Style header row
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true };
+  headerRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFE0E0E0' },
+  };
+
+  // Add data rows
+  data.forEach(row => {
+    const rowData: Record<string, any> = {};
+    columns.forEach(col => {
+      const val = row[col.key];
+      if (col.type === 'boolean') {
+        rowData[col.key] = Boolean(val) ? 'Active' : 'Inactive';
+      } else if (col.type === 'number') {
+        rowData[col.key] = Number(val) || 0;
+      } else {
+        rowData[col.key] = String(val ?? '');
+      }
+    });
+    sheet.addRow(rowData);
+  });
+
+  // Auto-filter
+  sheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: columns.length },
+  };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  downloadBlob(blob, `${filename}.xlsx`);
 }
 
 export function exportMasterDataToCSV<T extends Record<string, any>>(
@@ -45,7 +87,6 @@ export function exportMasterDataToCSV<T extends Record<string, any>>(
       const val = row[col.key];
       if (col.type === 'boolean') return Boolean(val) ? 'Active' : 'Inactive';
       const str = String(val ?? '');
-      // Escape CSV values containing commas or quotes
       if (str.includes(',') || str.includes('"') || str.includes('\n')) {
         return `"${str.replace(/"/g, '""')}"`;
       }
@@ -54,7 +95,6 @@ export function exportMasterDataToCSV<T extends Record<string, any>>(
   );
 
   const csvContent = [headers.join(','), ...rows].join('\n');
-  // BOM for Excel to recognize UTF-8
   const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
   downloadBlob(blob, `${filename}.csv`);
 }
@@ -65,14 +105,10 @@ export interface ParsedRow {
   [key: string]: string;
 }
 
-/**
- * Parse an Excel (.xlsx/.xls) file into rows using read-excel-file (safe library)
- */
 export async function parseExcelFile(file: File): Promise<ParsedRow[]> {
   const rows = await readXlsxFile(file);
   if (rows.length < 2) return [];
 
-  // First row is headers
   const headers = rows[0].map(h => String(h ?? '').trim().toLowerCase());
   const result: ParsedRow[] = [];
 
@@ -90,9 +126,6 @@ export async function parseExcelFile(file: File): Promise<ParsedRow[]> {
   return result;
 }
 
-/**
- * Parse a file (CSV or Excel) based on extension
- */
 export async function parseImportFile(file: File): Promise<ParsedRow[]> {
   const isExcel = /\.(xlsx|xls)$/i.test(file.name);
   if (isExcel) {
@@ -102,9 +135,6 @@ export async function parseImportFile(file: File): Promise<ParsedRow[]> {
   return parseCSV(content);
 }
 
-/**
- * Parse a CSV file content into rows
- */
 export function parseCSV(content: string): ParsedRow[] {
   const lines = content.split(/\r?\n/).filter(line => line.trim());
   if (lines.length < 2) return [];
@@ -159,9 +189,6 @@ function parseCSVLine(line: string): string[] {
   return result;
 }
 
-/**
- * Read a file and return its text content
- */
 export function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -171,7 +198,7 @@ export function readFileAsText(file: File): Promise<string> {
   });
 }
 
-// ==================== DOWNTIME REASON COLUMNS ====================
+// ==================== COLUMN DEFINITIONS ====================
 
 export const DOWNTIME_REASON_COLUMNS: ExportColumn[] = [
   { header: 'Code', key: 'code', type: 'string' },

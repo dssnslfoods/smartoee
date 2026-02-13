@@ -333,7 +333,7 @@ export function MachineManager() {
     { key: 'is_active', header: 'Status', type: 'boolean' as const },
   ];
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!filteredMachines?.length) { toast.error('ไม่มีข้อมูลให้ export'); return; }
     const exportData = filteredMachines.map((m: any) => ({
       code: m.code,
@@ -348,7 +348,7 @@ export function MachineManager() {
       target_quality: m.target_quality ?? 99,
       is_active: m.is_active,
     }));
-    exportMasterDataToExcel(exportData, MACHINE_EXPORT_COLUMNS, `machines_${company?.name || 'all'}`);
+    await exportMasterDataToExcel(exportData, MACHINE_EXPORT_COLUMNS, `machines_${company?.name || 'all'}`);
     toast.success('Export สำเร็จ');
   };
 

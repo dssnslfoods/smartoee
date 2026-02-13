@@ -166,13 +166,13 @@ export function DowntimeReasonManager() {
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!reasons || reasons.length === 0) {
       toast.error('ไม่มีข้อมูลให้ export');
       return;
     }
     const companyName = company?.name || 'All';
-    exportMasterDataToExcel(reasons, DOWNTIME_REASON_COLUMNS, `downtime_reasons_${companyName}`, 'Downtime Reasons');
+    await exportMasterDataToExcel(reasons, DOWNTIME_REASON_COLUMNS, `downtime_reasons_${companyName}`, 'Downtime Reasons');
     toast.success('Export Excel สำเร็จ');
   };
 
