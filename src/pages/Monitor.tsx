@@ -127,11 +127,11 @@ export default function MonitorPage() {
     <div className="page-container space-y-5">
       {/* Kiosk company banner */}
       {isKiosk && company && (
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-7 w-7 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">{company.name}</h1>
-            <span className="text-lg text-muted-foreground font-medium">— Production Monitor</span>
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Building2 className="h-5 w-5 sm:h-7 sm:w-7 text-primary shrink-0" />
+            <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-foreground truncate">{company.name}</h1>
+            <span className="hidden sm:inline text-lg text-muted-foreground font-medium">— Production Monitor</span>
           </div>
           <Badge
             variant="outline"
@@ -172,7 +172,7 @@ export default function MonitorPage() {
         {!isKiosk && (
           <>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-              <SelectTrigger className="w-[140px] bg-background border-border/50">
+              <SelectTrigger className="w-full sm:w-[140px] bg-background border-border/50">
                 <SelectValue placeholder="สถานะ" />
               </SelectTrigger>
               <SelectContent>
@@ -185,7 +185,7 @@ export default function MonitorPage() {
             </Select>
 
             <Select value={selectedPlant} onValueChange={handlePlantChange}>
-              <SelectTrigger className="w-[160px] bg-background border-border/50">
+              <SelectTrigger className="w-full sm:w-[160px] bg-background border-border/50">
                 <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
                 <SelectValue placeholder="เลือกโรงงาน" />
               </SelectTrigger>
@@ -200,7 +200,7 @@ export default function MonitorPage() {
             </Select>
 
             <Select value={selectedLine} onValueChange={setSelectedLine}>
-              <SelectTrigger className="w-[160px] bg-background border-border/50">
+              <SelectTrigger className="w-full sm:w-[160px] bg-background border-border/50">
                 <Factory className="mr-2 h-4 w-4 text-muted-foreground" />
                 <SelectValue placeholder="เลือกไลน์" />
               </SelectTrigger>
@@ -218,7 +218,7 @@ export default function MonitorPage() {
       </PageHeader>
 
       {/* Quick Stats Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-4 gap-2 sm:gap-3">
         <StatPill
           icon={Play}
           label="Running"
@@ -251,9 +251,9 @@ export default function MonitorPage() {
 
       {/* Machine Layout - Vertical Columns by Line */}
       {isLoading ? (
-        <div className="flex gap-4 overflow-x-auto pb-2">
+        <div className="flex flex-col gap-4 md:flex-row md:overflow-x-auto md:pb-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="min-w-[280px] flex-1 space-y-3">
+            <div key={i} className="w-full md:min-w-[280px] md:flex-1 space-y-3">
               <Skeleton className="h-14 rounded-xl" />
               {Array.from({ length: 3 }).map((_, j) => (
                 <Skeleton key={j} className="h-36 rounded-lg" />
@@ -269,7 +269,7 @@ export default function MonitorPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-2 items-start">
+        <div className="flex flex-col gap-4 md:flex-row md:overflow-x-auto md:pb-2 md:items-start">
           {machinesByLine.map(({ lineId, lineName, plantName, machines: lineMachines }) => {
             const lineStats = { running: 0, stopped: 0, maintenance: 0, idle: 0 };
             for (const m of lineMachines) lineStats[m.status]++;
@@ -298,7 +298,7 @@ export default function MonitorPage() {
               <div
                 key={lineId}
                 className={cn(
-                  "min-w-[280px] max-w-[320px] flex-1 flex flex-col rounded-xl border bg-card/60 backdrop-blur-sm overflow-hidden",
+                  "w-full md:min-w-[280px] md:max-w-[320px] flex-1 flex flex-col rounded-xl border bg-card/60 backdrop-blur-sm overflow-hidden",
                   statusBorder[dominantStatus],
                   statusGlow[dominantStatus],
                 )}
@@ -412,11 +412,11 @@ function StatPill({
   bgClass: string;
 }) {
   return (
-    <div className={cn("flex items-center gap-3 rounded-lg border px-4 py-3", bgClass, "border-transparent")}>
-      <Icon className={cn("h-5 w-5", colorClass)} />
-      <div>
-        <p className={cn("text-2xl font-bold tabular-nums", colorClass)}>{count}</p>
-        <p className="text-xs text-muted-foreground">{label}</p>
+    <div className={cn("flex items-center gap-2 sm:gap-3 rounded-lg border px-2.5 sm:px-4 py-2.5 sm:py-3", bgClass, "border-transparent")}>
+      <Icon className={cn("h-4 w-4 sm:h-5 sm:w-5 shrink-0", colorClass)} />
+      <div className="min-w-0">
+        <p className={cn("text-lg sm:text-2xl font-bold tabular-nums", colorClass)}>{count}</p>
+        <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{label}</p>
       </div>
     </div>
   );
