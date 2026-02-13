@@ -24,7 +24,7 @@ import {
 import { toast } from 'sonner';
 import {
   exportMasterDataToExcel, exportMasterDataToCSV,
-  parseCSV, readFileAsText,
+  parseImportFile,
 } from '@/lib/masterDataExport';
 
 interface Product {
@@ -185,8 +185,7 @@ export function ProductManager() {
     if (!selectedCompanyId) { toast.error('กรุณาเลือกบริษัทก่อน import'); return; }
     setIsImporting(true);
     try {
-      const content = await readFileAsText(file);
-      const parsed = parseCSV(content);
+      const parsed = await parseImportFile(file);
       if (parsed.length === 0) { toast.error('ไม่พบข้อมูลในไฟล์'); return; }
       const rows = parsed
         .filter(row => row.code && row.name)
@@ -218,7 +217,7 @@ export function ProductManager() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <input ref={fileInputRef} type="file" accept=".csv,.txt" onChange={handleImportFile} className="hidden" />
+          <input ref={fileInputRef} type="file" accept=".csv,.txt,.xlsx,.xls" onChange={handleImportFile} className="hidden" />
           <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isImporting || !selectedCompanyId}>
             {isImporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
             Import

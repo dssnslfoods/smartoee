@@ -26,7 +26,7 @@ import { toast } from 'sonner';
 import type { DowntimeCategory } from '@/services/types';
 import {
   exportMasterDataToExcel, exportMasterDataToCSV,
-  parseCSV, readFileAsText,
+  parseImportFile,
   DOWNTIME_REASON_COLUMNS,
 } from '@/lib/masterDataExport';
 
@@ -196,8 +196,7 @@ export function DowntimeReasonManager() {
 
     setIsImporting(true);
     try {
-      const content = await readFileAsText(file);
-      const parsed = parseCSV(content);
+      const parsed = await parseImportFile(file);
 
       if (parsed.length === 0) {
         toast.error('ไม่พบข้อมูลในไฟล์ กรุณาตรวจสอบรูปแบบ (ต้องมี header: Code, Name, Category)');
@@ -249,7 +248,7 @@ export function DowntimeReasonManager() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,.txt"
+            accept=".csv,.txt,.xlsx,.xls"
             onChange={handleImportFile}
             className="hidden"
           />

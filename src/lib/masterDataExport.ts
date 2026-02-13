@@ -87,6 +87,36 @@ export interface ParsedRow {
 }
 
 /**
+ * Parse an Excel (.xlsx/.xls) file into rows
+ */
+export async function parseExcelFile(file: File): Promise<ParsedRow[]> {
+  const buffer = await file.arrayBuffer();
+  const wb = XLSX.read(buffer, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: '' });
+  // Normalize headers to lowercase strings
+  return raw.map(row => {
+    const normalized: ParsedRow = {};
+    for (const [key, value] of Object.entries(row)) {
+      normalized[key.trim().toLowerCase()] = String(value ?? '').trim();
+    }
+    return normalized;
+  });
+}
+
+/**
+ * Parse a file (CSV or Excel) based on extension
+ */
+export async function parseImportFile(file: File): Promise<ParsedRow[]> {
+  const isExcel = /\.(xlsx|xls)$/i.test(file.name);
+  if (isExcel) {
+    return parseExcelFile(file);
+  }
+  const content = await readFileAsText(file);
+  return parseCSV(content);
+}
+
+/**
  * Parse a CSV file content into rows
  */
 export function parseCSV(content: string): ParsedRow[] {
