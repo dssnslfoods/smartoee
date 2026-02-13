@@ -27,6 +27,7 @@ import {
   FileDown,
   ClipboardList,
   CalendarDays,
+  Calculator,
   X,
 } from "lucide-react";
 
@@ -51,19 +52,65 @@ const helpSections: HelpSection[] = [
     items: [
       {
         q: "ระบบ PNF OEE คืออะไร?",
-        a: "PNF OEE System เป็นแอปพลิเคชันเว็บสำหรับติดตามประสิทธิภาพการผลิตแบบ Real-time โดยวัดผลจากตัวชี้วัด 3 ตัวหลัก ได้แก่ Availability (อัตราการใช้งาน), Performance (ประสิทธิภาพ) และ Quality (คุณภาพ) ซึ่งรวมกันเป็นค่า OEE = A × P × Q",
+        a: "PNF OEE System เป็นแอปพลิเคชันเว็บสำหรับติดตามประสิทธิภาพการผลิตแบบ Real-time โดยวัดผลจากตัวชี้วัด 3 ตัวหลัก ได้แก่ Availability (อัตราการใช้งาน), Performance (ประสิทธิภาพ) และ Quality (คุณภาพ) ซึ่งรวมกันเป็นค่า OEE = A × P × Q ระบบรองรับการจัดการหลายบริษัท หลายโรงงาน และหลายไลน์การผลิตในระบบเดียว",
       },
       {
         q: "ใครควรใช้ระบบนี้?",
-        a: "ผู้ใช้งานแบ่งเป็น 4 กลุ่ม ได้แก่ (1) Staff/Operator - บันทึกเหตุการณ์การผลิตและจำนวนผลิต (2) Supervisor - ตรวจสอบ อนุมัติ และล็อคกะ (3) Executive - ดู Dashboard วิเคราะห์ภาพรวม (4) Admin - ตั้งค่าระบบและจัดการข้อมูลหลัก",
+        a: "ผู้ใช้งานแบ่งเป็น 4 กลุ่ม ได้แก่ (1) Staff/Operator - บันทึกเหตุการณ์การผลิตและจำนวนผลิต (2) Supervisor - ตรวจสอบ อนุมัติ ล็อคกะ จัดการข้อมูลหลักด้านการผลิต (3) Executive - ดู Dashboard วิเคราะห์ภาพรวม (4) Admin - ตั้งค่าโครงสร้างระบบและจัดการข้อมูลหลัก",
       },
       {
         q: "ขั้นตอนการทำงานหลักของระบบเป็นอย่างไร?",
-        a: "Admin ตั้งค่าข้อมูลหลัก (โรงงาน, ไลน์, เครื่องจักร, สินค้า) → สร้างบัญชีผู้ใช้ → Supervisor กำหนดสิทธิ์เครื่องจักร → Staff บันทึกเหตุการณ์และจำนวนผลิตบน Shopfloor → Supervisor ตรวจสอบ คำนวณ OEE อนุมัติ และล็อคกะ → Executive ดู Dashboard วิเคราะห์",
+        a: "Admin ตั้งค่าข้อมูลหลัก (โรงงาน, ไลน์, เครื่องจักร, สินค้า) → สร้างบัญชีผู้ใช้ → Supervisor กำหนดสิทธิ์เครื่องจักร, ตั้งค่ากะ, Planned Production Time, มาตรฐานการผลิต → Staff บันทึกเหตุการณ์และจำนวนผลิตบน Shopfloor → Supervisor ตรวจสอบ Preview → คำนวณ OEE → อนุมัติ → ล็อคกะ → Executive ดู Dashboard วิเคราะห์",
       },
       {
         q: "ระบบมีข้อจำกัดอะไรบ้าง?",
-        a: "ระบบทำงานบนเว็บเบราว์เซอร์เท่านั้น (ไม่มี Mobile App), ต้องใช้อินเทอร์เน็ตตลอดเวลา, ผู้ใช้ไม่สามารถสมัครเองได้ต้องให้ Admin สร้างบัญชีให้, ระบบทำงานตามกะ (Shift-based) ต้องตั้งค่าตารางกะก่อนใช้งาน, RUN event ผูกกับสินค้า 1 รายการ",
+        a: "ระบบทำงานบนเว็บเบราว์เซอร์เท่านั้น (ไม่มี Mobile App), ต้องใช้อินเทอร์เน็ตตลอดเวลา, ผู้ใช้ไม่สามารถสมัครเองได้ต้องให้ Admin สร้างบัญชีให้, ระบบทำงานตามกะ (Shift-based) ต้องตั้งค่าตารางกะก่อนใช้งาน, RUN event ผูกกับสินค้า 1 รายการ, ระบบบังคับไม่ให้บันทึกข้อมูลนอกเวลากะ",
+      },
+    ],
+  },
+
+  /* -------- OEE Calculation Formulas -------- */
+  {
+    id: "oee-formulas",
+    title: "สูตรการคำนวณ OEE",
+    icon: BarChart3,
+    badge: "สำคัญ",
+    items: [
+      {
+        q: "OEE คืออะไร? คำนวณอย่างไร?",
+        a: "OEE (Overall Equipment Effectiveness) คือดัชนีชี้วัดประสิทธิภาพโดยรวมของเครื่องจักร คำนวณจาก 3 ปัจจัยคูณกัน:\n\nOEE = Availability × Performance × Quality\n\nตัวอย่าง: A = 90%, P = 85%, Q = 98%\nOEE = 0.90 × 0.85 × 0.98 = 74.97%\n\nระดับมาตรฐาน:\n• World Class: ≥ 85%\n• Acceptable: 60–84%\n• Needs Improvement: < 60%",
+      },
+      {
+        q: "Availability (A) คำนวณอย่างไร?",
+        a: "Availability วัดสัดส่วนเวลาที่เครื่องจักรทำงานจริงเทียบกับเวลาที่วางแผนไว้\n\nสูตร: A = Run Time / Planned Production Time × 100%\n\n• Run Time = ผลรวมระยะเวลาของเหตุการณ์ RUN ทั้งหมดในกะ (นาที)\n• Planned Production Time = ระยะเวลากะ − เวลาหักแผนล่วงหน้า (พัก, ประชุม, ซ่อมบำรุง, อาหาร, อื่นๆ)\n\nตัวอย่าง: กะ 8 ชม. (480 นาที) หักพัก 30 นาที หักประชุม 15 นาที\nPlanned Production Time = 480 − 30 − 15 = 435 นาที\nRun Time = 400 นาที\nA = 400 / 435 × 100% = 91.95%\n\nหมายเหตุ: หากไม่มีการตั้งค่า Planned Production Time Template จะใช้ค่าเวลาเต็มจาก Shift Calendar",
+      },
+      {
+        q: "Performance (P) คำนวณอย่างไร?",
+        a: "Performance วัดความเร็วจริงของการผลิตเทียบกับความเร็วอุดมคติ\n\nสูตร: P = (Total Produced × Ideal Cycle Time) / Run Time × 100%\n\n• Total Produced = Good Qty + Reject Qty (จำนวนผลิตทั้งหมด)\n• Ideal Cycle Time = เวลาอุดมคติต่อชิ้น (วินาที) — ดึงจาก Production Standard ของคู่เครื่องจักร-SKU ถ้าไม่มีจะใช้ค่า Default ของเครื่องจักร\n• Run Time = เวลาทำงานจริง (แปลงเป็นวินาที)\n\nตัวอย่าง: ผลิตได้ 800 ชิ้น, Ideal Cycle Time = 25 วินาที/ชิ้น, Run Time = 24,000 วินาที (400 นาที)\nP = (800 × 25) / 24,000 × 100% = 83.33%\n\nหมายเหตุ: หากมีหลาย SKU ในกะเดียวกัน ระบบจะคำนวณ Weighted Average Ideal Cycle Time ตามสัดส่วนเวลาผลิตของแต่ละ SKU",
+      },
+      {
+        q: "Quality (Q) คำนวณอย่างไร?",
+        a: "Quality วัดสัดส่วนชิ้นงานดีเทียบกับจำนวนผลิตทั้งหมด\n\nสูตร: Q = Good Qty / Total Produced × 100%\n\n• Good Qty = จำนวนชิ้นงานดีที่ผ่านมาตรฐาน\n• Total Produced = Good Qty + Reject Qty\n\nตัวอย่าง: Good = 780 ชิ้น, Reject = 20 ชิ้น\nQ = 780 / (780 + 20) × 100% = 97.5%\n\nหมายเหตุ: หาก Total Produced = 0 ระบบจะคำนวณ Quality = 100% (ไม่มีของเสีย)",
+      },
+      {
+        q: "Output Rate คืออะไร? ต่างจาก Ideal Cycle Time อย่างไร?",
+        a: "Output Rate คือจำนวนชิ้นงานที่ควรผลิตได้ต่อนาที เป็นการแสดงผล Ideal Cycle Time ในรูปแบบที่เข้าใจง่ายกว่า\n\nสูตรแปลง: Output Rate = 60 / Ideal Cycle Time (วินาที)\n\nตัวอย่าง: Ideal Cycle Time = 3 วินาที/ชิ้น\nOutput Rate = 60 / 3 = 20 ชิ้น/นาที\n\nในระบบ PNF OEE ทุกหน้าจอ (เครื่องจักร, มาตรฐาน, Shopfloor) จะแสดงเป็น Output Rate (ชิ้น/นาที) แทน Ideal Cycle Time แต่ฐานข้อมูลยังจัดเก็บเป็นวินาทีเสมอ ค่าที่แสดงจะปัดเป็นจำนวนเต็ม",
+      },
+      {
+        q: "Planned Production Time คำนวณอย่างไร?",
+        a: "Planned Production Time (PPT) คือเวลาที่วางแผนไว้สำหรับผลิตจริง หลังหักเวลาที่ไม่ได้ผลิตตามแผน\n\nสูตร: PPT = ระยะเวลากะ − (พัก + อาหาร + ประชุม + ซ่อมบำรุง + อื่นๆ)\n\nตัวอย่าง: กะ 8 ชม. (480 นาที)\n• พัก: 20 นาที\n• อาหาร: 30 นาที\n• ประชุม: 15 นาที\n• ซ่อมบำรุง: 10 นาที\nPPT = 480 − (20 + 30 + 15 + 10) = 405 นาที\n\nPPT ตั้งค่าที่ระดับ Plant + Shift ผ่าน Planned Time Template บน Supervisor Dashboard ระบบตรวจสอบว่าเวลาหักรวมไม่เกินระยะเวลากะ",
+      },
+      {
+        q: "ระบบคำนวณ OEE เมื่อมีหลาย SKU ในกะเดียวกันอย่างไร?",
+        a: "เมื่อเครื่องจักรผลิตหลาย SKU ในกะเดียว ระบบใช้ Weighted Average Ideal Cycle Time:\n\n1. สำหรับแต่ละ RUN event ระบบหา Ideal Cycle Time จาก Production Standard ของคู่เครื่องจักร-SKU นั้น\n2. ถ้าไม่มี Standard จะใช้ค่า Default ของเครื่องจักร\n3. คำนวณ Weighted Average โดยถ่วงน้ำหนักตามระยะเวลา RUN ของแต่ละ SKU\n\nสูตร: Weighted ICT = Σ(ICTᵢ × Durationᵢ) / Σ(Durationᵢ)\n\nจากนั้นนำ Weighted ICT ไปใช้ในสูตร Performance ตามปกติ",
+      },
+      {
+        q: "Six Big Losses คืออะไร? เกี่ยวกับ OEE อย่างไร?",
+        a: "Six Big Losses เป็นกรอบการวิเคราะห์ความสูญเสียที่สัมพันธ์กับ OEE 3 ตัว:\n\nAvailability Losses:\n1. Breakdown (เครื่องเสีย) — หยุดกะทันหัน\n2. Setup/Changeover (ตั้งเครื่อง/เปลี่ยนรุ่น) — หยุดตามแผน\n\nPerformance Losses:\n3. Small Stops (หยุดเล็กน้อย) — หยุดสั้นๆ บ่อยๆ\n4. Slow Cycles (เครื่องทำงานช้า) — ผลิตช้ากว่าอุดมคติ\n\nQuality Losses:\n5. Startup Rejects (ของเสียช่วงเริ่มเครื่อง)\n6. Production Rejects (ของเสียระหว่างผลิต)\n\nในระบบ PNF OEE สามารถดู Loss Category ได้บน Executive Dashboard ผ่าน Pareto Chart และ Loss Category Breakdown",
+      },
+      {
+        q: "OEE ระดับ Line และ Plant คำนวณอย่างไร?",
+        a: "OEE ระดับ Line: คำนวณจากค่าเฉลี่ยของ OEE ทุกเครื่องจักรในไลน์นั้น\nOEE ระดับ Plant: คำนวณจากค่าเฉลี่ยของ OEE ทุกเครื่องจักรในโรงงานนั้น\n\nค่า A, P, Q ของแต่ละระดับเป็นค่าเฉลี่ยของเครื่องจักรในกลุ่ม ไม่ใช่การคูณค่าเฉลี่ยของ A × P × Q\n\nข้อมูล Snapshot จะถูกบันทึกที่ 3 ระดับ: MACHINE, LINE, PLANT ทุกครั้งที่ Supervisor คำนวณ OEE",
       },
     ],
   },
@@ -159,7 +206,7 @@ const helpSections: HelpSection[] = [
       },
       {
         q: "ทำไมต้องเลือก SKU ก่อนกด Start Run?",
-        a: 'ระบบต้องรู้ว่ากำลังผลิตสินค้าอะไร เพื่อใช้ Ideal Cycle Time ของสินค้านั้นในการคำนวณ Performance ของ OEE ถ้าไม่เลือก SKU ระบบจะแจ้งเตือน "กรุณาเลือก SKU ก่อนเริ่มงาน"',
+        a: 'ระบบต้องรู้ว่ากำลังผลิตสินค้าอะไร เพื่อใช้ Output Rate (Ideal Cycle Time) ของสินค้านั้นในการคำนวณ Performance ของ OEE ถ้าไม่เลือก SKU ระบบจะแจ้งเตือน "กรุณาเลือก SKU ก่อนเริ่มงาน" เมื่อเลือก SKU จะแสดง Output Rate (ชิ้น/นาที) ของคู่เครื่องจักร-SKU นั้น',
       },
       {
         q: "เปลี่ยน SKU ระหว่างผลิตได้หรือไม่?",
@@ -179,7 +226,7 @@ const helpSections: HelpSection[] = [
       },
       {
         q: "Production Benchmark Card แสดงอะไร?",
-        a: "เมื่อเลือกเครื่องจักรและ SKU แล้ว Benchmark Card จะแสดง: Ideal Cycle Time, Standard Setup Time, Target Quality ดึงจากตาราง Production Standards ถ้าไม่มีค่ามาตรฐาน จะแสดงค่า Default ของเครื่องจักร",
+        a: "เมื่อเลือกเครื่องจักรและ SKU แล้ว Benchmark Card จะแสดง: Output Rate (ชิ้น/นาที), Standard Setup Time, Target Quality ดึงจากตาราง Production Standards ถ้าไม่มีค่ามาตรฐานเฉพาะคู่เครื่องจักร-SKU จะแสดงค่า Default ของเครื่องจักร Supervisor สามารถสร้างมาตรฐานใหม่ได้โดยตรงจากหน้า Shopfloor",
       },
     ],
   },
@@ -297,11 +344,11 @@ const helpSections: HelpSection[] = [
       },
       {
         q: "Machine มีฟิลด์อะไรสำคัญบ้าง?",
-        a: "ฟิลด์สำคัญ: ชื่อ, Code (ต้อง Unique), ไลน์, Ideal Cycle Time (วินาที), Time Unit (วินาที/นาที), Target OEE/A/P/Q (เป้าหมาย OEE เฉพาะเครื่อง) ค่าเป้าหมายจะแสดงเปรียบเทียบกับค่าจริงใน Dashboard",
+        a: "ฟิลด์สำคัญ: ชื่อ, Code (ต้อง Unique), ไลน์, Output Rate (ชิ้น/นาที — ระบบแปลงเป็น Ideal Cycle Time เก็บในฐานข้อมูลเป็นวินาทีอัตโนมัติ), Target OEE/A/P/Q (เป้าหมาย OEE เฉพาะเครื่อง) ค่าเป้าหมายจะแสดงเปรียบเทียบกับค่าจริงใน Dashboard",
       },
       {
         q: "Production Standards คืออะไร?",
-        a: "มาตรฐานการผลิตคือค่า Cycle Time, Setup Time, Target Quality สำหรับคู่เครื่องจักร-สินค้าเฉพาะ ถ้ามีค่ามาตรฐานจะใช้แทนค่า Default ของเครื่องจักรในการคำนวณ Performance ของ OEE",
+        a: "มาตรฐานการผลิตคือค่า Output Rate (ชิ้น/นาที), Setup Time, Target Quality สำหรับคู่เครื่องจักร-สินค้าเฉพาะ ถ้ามีค่ามาตรฐานจะใช้แทนค่า Default ของเครื่องจักรในการคำนวณ Performance ของ OEE Supervisor สามารถสร้างมาตรฐานได้ทั้งจากแท็บมาตรฐานและจากหน้า Shopfloor โดยตรง (Inline Standard Dialog)",
       },
       {
         q: "Downtime Category มีประเภทอะไรบ้าง?",
@@ -569,7 +616,7 @@ export default function HelpCenter() {
     <div class="line"></div>
     <div class="subtitle">คู่มือการใช้งานระบบ</div>
     <div class="meta">
-      เวอร์ชัน 2.1<br/>
+      เวอร์ชัน 2.2<br/>
       วันที่พิมพ์: ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}<br/><p>
    © 2026 PNF OEE System. Designed and Developed by Arnon Arpaket. All rights reserved.
     </div>
@@ -588,7 +635,7 @@ export default function HelpCenter() {
   ${sectionsHTML}
 
   <div class="footer-note">
-    PNF OEE System — คู่มือการใช้งาน v2.1 — ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}
+    PNF OEE System — คู่มือการใช้งาน v2.2 — ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}
   </div>
 </body>
 </html>`);
@@ -611,7 +658,7 @@ export default function HelpCenter() {
       <div className="page-container space-y-5 max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
-          <PageHeader title="Help Center" description="คู่มือการใช้งานระบบ PNF OEE v2.1" icon={HelpCircle} />
+          <PageHeader title="Help Center" description="คู่มือการใช้งานระบบ PNF OEE v2.2 — รวมสูตรคำนวณ OEE" icon={HelpCircle} />
           <Button variant="outline" size="sm" onClick={handleExportPDF} className="shrink-0 gap-2 mt-1">
             <FileDown className="h-4 w-4" />
             Export PDF
@@ -714,7 +761,7 @@ export default function HelpCenter() {
 
         {/* Footer stats */}
         <div className="text-center text-xs text-muted-foreground pb-2">
-          ทั้งหมด {helpSections.length} หมวด · {helpSections.reduce((s, sec) => s + sec.items.length, 0)} คำถาม · เวอร์ชัน 2.1
+          ทั้งหมด {helpSections.length} หมวด · {helpSections.reduce((s, sec) => s + sec.items.length, 0)} คำถาม · เวอร์ชัน 2.2
         </div>
       </div>
     </AppLayout>
