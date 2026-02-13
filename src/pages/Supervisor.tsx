@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { Lock, ClipboardCheck, Timer, Clock, Cpu, Package, BarChart3, Palmtree } from 'lucide-react';
@@ -33,6 +33,13 @@ export default function Supervisor() {
     queryKey: ['plants', companyId],
     queryFn: () => oeeApi.getPlants(companyId),
   });
+
+  // Auto-select first plant when plants load
+  useEffect(() => {
+    if (!selectedPlantId && plants.length > 0) {
+      setSelectedPlantId(plants[0].id);
+    }
+  }, [plants, selectedPlantId]);
 
   const isSupervisor = hasRole('SUPERVISOR') || hasRole('ADMIN');
 
