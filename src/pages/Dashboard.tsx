@@ -264,23 +264,23 @@ export default function Dashboard() {
            </>
          ) : (
            <>
-             <Card className="relative overflow-hidden bg-gradient-to-br from-card via-card to-oee-availability/5 border-oee-availability/30 shadow-[0_0_20px_-5px_hsl(var(--oee-availability)/0.3)] hover:shadow-[0_0_30px_-5px_hsl(var(--oee-availability)/0.5)] transition-shadow">
-               <CardContent className="p-3 sm:p-5 flex flex-col items-center justify-center">
-                 <OEEGauge value={oee.availability} label="Availability" color="availability" size="sm" />
-               </CardContent>
-             </Card>
- 
-             <Card className="relative overflow-hidden bg-gradient-to-br from-card via-card to-oee-performance/5 border-oee-performance/30 shadow-[0_0_20px_-5px_hsl(var(--oee-performance)/0.3)] hover:shadow-[0_0_30px_-5px_hsl(var(--oee-performance)/0.5)] transition-shadow">
-               <CardContent className="p-3 sm:p-5 flex flex-col items-center justify-center">
-                 <OEEGauge value={oee.performance} label="Performance" color="performance" size="sm" />
-               </CardContent>
-             </Card>
- 
-             <Card className="relative overflow-hidden bg-gradient-to-br from-card via-card to-oee-quality/5 border-oee-quality/30 shadow-[0_0_20px_-5px_hsl(var(--oee-quality)/0.3)] hover:shadow-[0_0_30px_-5px_hsl(var(--oee-quality)/0.5)] transition-shadow">
-               <CardContent className="p-3 sm:p-5 flex flex-col items-center justify-center">
-                 <OEEGauge value={oee.quality} label="Quality" color="quality" size="sm" />
-               </CardContent>
-             </Card>
+              <Card className="relative overflow-hidden border-0 bg-transparent shadow-none">
+                <CardContent className="p-3 sm:p-5 flex flex-col items-center justify-center">
+                  <OEEGauge value={oee.availability} label="Availability" color="availability" size="sm" />
+                </CardContent>
+              </Card>
+  
+              <Card className="relative overflow-hidden border-0 bg-transparent shadow-none">
+                <CardContent className="p-3 sm:p-5 flex flex-col items-center justify-center">
+                  <OEEGauge value={oee.performance} label="Performance" color="performance" size="sm" />
+                </CardContent>
+              </Card>
+  
+              <Card className="relative overflow-hidden border-0 bg-transparent shadow-none">
+                <CardContent className="p-3 sm:p-5 flex flex-col items-center justify-center">
+                  <OEEGauge value={oee.quality} label="Quality" color="quality" size="sm" />
+                </CardContent>
+              </Card>
            </>
          )}
        </div>
