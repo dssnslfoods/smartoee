@@ -102,10 +102,11 @@ export function ShiftActivityDetail({ shiftCalendarId, isLocked = false, isSuper
   const deleteAllMutation = useMutation({
     mutationFn: async () => {
       // Delete ALL production_counts for this shift (both linked and unlinked)
-      await supabase
+      const { error: countsError } = await supabase
         .from('production_counts')
         .delete()
         .eq('shift_calendar_id', shiftCalendarId);
+      if (countsError) throw countsError;
       const { error } = await supabase
         .from('production_events')
         .delete()
