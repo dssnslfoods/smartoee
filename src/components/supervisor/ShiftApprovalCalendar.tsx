@@ -291,13 +291,15 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                 if (!day) return <div key={`empty-${i}`} />;
                 const info = dateStatusMap.get(day.date);
                 const isFutureDate = day.date > todayStr;
+                const isFuturePreDefinedHoliday = isFutureDate && holidayDateMap.has(day.date);
                 const hasShifts = !!info && !isFutureDate;
                 const hasUnapproved = hasShifts && (info?.hasUnapproved || false);
                 const allLocked = hasShifts && (info?.allLocked || false);
-                const isHoliday = hasShifts && (info?.isHoliday || false);
+                const isHoliday = (hasShifts && (info?.isHoliday || false)) || isFuturePreDefinedHoliday;
                 const isNoActivity = hasShifts && (info?.isNoActivity && !info?.isPreDefinedHoliday || false);
-                const isConfirmedHoliday = hasShifts && (info?.isConfirmedHoliday && !info?.hasUnapproved && !isNoActivity || false);
+                const isConfirmedHoliday = (hasShifts && (info?.isConfirmedHoliday && !info?.hasUnapproved && !isNoActivity || false)) || isFuturePreDefinedHoliday;
                 const isConfirmedWorkingDay = hasShifts && (info?.isConfirmedWorkingDay && !info?.hasUnapproved && !isNoActivity || false);
+                const showDot = hasShifts || isFuturePreDefinedHoliday;
                 const isSelected = selectedDate === day.date;
                 const isToday = day.date === todayStr;
 
@@ -305,10 +307,10 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                   <button
                     key={day.date}
                     onClick={() => setSelectedDate(isSelected ? null : day.date)}
-                    disabled={!hasShifts}
+                    disabled={!hasShifts && !isFuturePreDefinedHoliday}
                     className={cn(
                       'relative flex flex-col items-center justify-center rounded-lg h-10 text-sm transition-all',
-                      hasShifts ? 'hover:bg-accent cursor-pointer' : 'text-muted-foreground/40 cursor-default',
+                      (hasShifts || isFuturePreDefinedHoliday) ? 'hover:bg-accent cursor-pointer' : 'text-muted-foreground/40 cursor-default',
                       isSelected && 'bg-primary text-primary-foreground hover:bg-primary/90',
                       isToday && !isSelected && 'ring-1 ring-primary/50',
                       (isHoliday || isConfirmedHoliday) && !isSelected && 'bg-sky-500/10 text-muted-foreground',
@@ -317,7 +319,7 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                   >
                     <span className="font-medium">{day.day}</span>
                     {/* Status dots */}
-                    {hasShifts && (
+                    {showDot && (
                       <div className="absolute bottom-0.5 flex gap-0.5">
                         {(isHoliday || isConfirmedHoliday) ? (
                           <span className={cn(
