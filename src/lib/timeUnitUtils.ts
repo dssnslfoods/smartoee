@@ -60,6 +60,6 @@ export function getInputMin(unit: TimeUnit): string {
  * Safely resolve a time_unit string to a TimeUnit enum value
  */
 export function resolveTimeUnit(unit: string | undefined | null): TimeUnit {
-  if (unit === 'minutes') return 'minutes';
-  return 'seconds';
+  if (unit === 'seconds') return 'seconds';
+  return 'minutes';
 }
