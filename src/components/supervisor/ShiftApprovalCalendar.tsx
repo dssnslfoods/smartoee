@@ -420,12 +420,33 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                 </p>
               </CardContent>
             </Card>
-          ) : selectedSummaries.length === 0 ? (
+          ) : selectedSummaries.length === 0 && !holidayDateMap.has(selectedDate) ? (
             <Card className="border-dashed">
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                 <p className="text-muted-foreground">ไม่พบข้อมูลกะสำหรับวันนี้</p>
               </CardContent>
             </Card>
+          ) : selectedSummaries.length === 0 && holidayDateMap.has(selectedDate) ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">
+                  {format(new Date(selectedDate + 'T00:00:00'), 'EEEE d MMMM yyyy', { locale: th })}
+                </h3>
+                <Badge className="bg-sky-500/15 text-sky-600 hover:bg-sky-500/20 border-0 font-medium">
+                  <Palmtree className="h-3.5 w-3.5 mr-1" />
+                  วันหยุดพิเศษ
+                </Badge>
+              </div>
+              <div className="flex items-center gap-3 rounded-lg border border-sky-500/30 bg-sky-500/5 p-4">
+                <Palmtree className="h-5 w-5 text-sky-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">
+                    วันหยุดพิเศษ: {holidayDateMap.get(selectedDate)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">วันนี้ไม่ถูกนำมาคำนวณ OEE</p>
+                </div>
+              </div>
+            </div>
           ) : (
             <>
               <div className="flex items-center justify-between">
