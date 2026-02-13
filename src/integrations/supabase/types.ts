@@ -1430,18 +1430,32 @@ export type Database = {
         }
         Returns: Json
       }
-      rpc_add_counts_backdate: {
-        Args: {
-          p_defect_reason_id?: string
-          p_good_qty: number
-          p_machine_id: string
-          p_notes?: string
-          p_reject_qty?: number
-          p_shift_calendar_id?: string
-          p_ts?: string
-        }
-        Returns: Json
-      }
+      rpc_add_counts_backdate:
+        | {
+            Args: {
+              p_defect_reason_id?: string
+              p_good_qty: number
+              p_machine_id: string
+              p_notes?: string
+              p_reject_qty?: number
+              p_shift_calendar_id?: string
+              p_ts?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_defect_reason_id?: string
+              p_good_qty: number
+              p_machine_id: string
+              p_notes?: string
+              p_production_event_id?: string
+              p_reject_qty?: number
+              p_shift_calendar_id?: string
+              p_ts?: string
+            }
+            Returns: Json
+          }
       rpc_approve_shift: {
         Args: { p_shift_calendar_id: string }
         Returns: Json

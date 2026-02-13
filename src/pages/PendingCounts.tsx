@@ -85,25 +85,23 @@ export default function PendingCounts() {
         : { data: [] };
       const profileMap = new Map((profiles || []).map(p => [p.user_id, p.full_name]));
 
-      // Get shift_calendar_ids with counts
-      const scIds = [...new Set(runEvents.map(e => e.shift_calendar_id).filter(Boolean))];
+      // Get event IDs that already have counts (per-event tracking)
+      const eventIds = runEvents.map(e => e.id);
       const { data: countsData } = await supabase
         .from('production_counts')
-        .select('machine_id, shift_calendar_id')
-        .in('machine_id', machineIds)
-        .in('shift_calendar_id', scIds as string[]);
+        .select('production_event_id')
+        .in('production_event_id', eventIds)
+        .not('production_event_id', 'is', null);
 
-      // Build set of machine+shift combos that have counts
-      const hasCountsSet = new Set<string>();
-      for (const c of countsData || []) {
-        hasCountsSet.add(`${c.machine_id}::${c.shift_calendar_id}`);
-      }
+      // Build set of event IDs that have counts
+      const hasCountsSet = new Set<string>(
+        (countsData || []).map((c: any) => c.production_event_id).filter(Boolean)
+      );
 
       // Filter to events without counts
       const results: PendingRun[] = [];
       for (const ev of runEvents) {
-        const key = `${ev.machine_id}::${ev.shift_calendar_id}`;
-        if (hasCountsSet.has(key)) continue;
+        if (hasCountsSet.has(ev.id)) continue;
 
         const machine = machineMap.get(ev.machine_id);
         const product = ev.products as { name: string; code: string } | null;
@@ -160,7 +158,8 @@ export default function PendingCounts() {
         data.defectReasonId,
         data.notes,
         selectedEvent.shift_calendar_id || undefined,
-        selectedEvent.end_ts
+        selectedEvent.end_ts,
+        selectedEvent.id
       );
     },
     onSuccess: (data) => {

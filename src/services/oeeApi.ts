@@ -158,7 +158,8 @@ export async function addCountsBackdate(
   defectReasonId?: string,
   notes?: string,
   shiftCalendarId?: string,
-  ts?: string
+  ts?: string,
+  productionEventId?: string
 ): Promise<AddCountsResponse> {
   const { data, error } = await supabase.rpc('rpc_add_counts_backdate' as any, {
     p_machine_id: machineId,
@@ -168,6 +169,7 @@ export async function addCountsBackdate(
     p_notes: notes || null,
     p_shift_calendar_id: shiftCalendarId || null,
     p_ts: ts || null,
+    p_production_event_id: productionEventId || null,
   });
 
   if (error) throw error;
