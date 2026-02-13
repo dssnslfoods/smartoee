@@ -113,8 +113,8 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
       if (!s.shift_date) continue;
       const existing = map.get(s.shift_date) || { 
         summaries: [], hasUnapproved: false, allLocked: true, 
-        isHoliday: true, isPreDefinedHoliday: false, isNoActivity: true,
-        isConfirmedHoliday: true, isConfirmedWorkingDay: true,
+        isHoliday: false, isPreDefinedHoliday: false, isNoActivity: true,
+        isConfirmedHoliday: false, isConfirmedWorkingDay: false,
       };
       existing.summaries.push(s);
       if (!s.approval_status || s.approval_status === 'DRAFT') {
@@ -138,15 +138,15 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
       } else if (s.approval_status === 'APPROVED' || s.approval_status === 'LOCKED') {
         // Approved with no real activity: check if OEE=0% (working day) or no OEE (holiday)
         existing.isNoActivity = false; // No longer "unconfirmed no-activity"
-        existing.isHoliday = false; // Override the default holiday assumption
         // Distinguish: forced working day has downtime (= planned_time * machines), holiday has 0
         const hasDowntimeSnapshot = (s.total_downtime != null && Number(s.total_downtime) > 0);
         if (hasDowntimeSnapshot) {
           // Has downtime = confirmed as working day (OEE forced to 0%)
-          existing.isConfirmedHoliday = false;
+          existing.isConfirmedWorkingDay = true;
         } else {
           // No downtime = confirmed as holiday (no OEE snapshots)
-          existing.isConfirmedWorkingDay = false;
+          existing.isConfirmedHoliday = true;
+          existing.isHoliday = true;
         }
       }
       // Check pre-defined holidays (overrides activity check)
