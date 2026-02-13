@@ -1372,6 +1372,10 @@ export type Database = {
       }
     }
     Functions: {
+      ensure_shift_calendar: {
+        Args: { p_local_date: string; p_local_time: string; p_plant_id: string }
+        Returns: string
+      }
       get_line_from_machine: { Args: { _machine_id: string }; Returns: string }
       get_user_company: { Args: { _user_id: string }; Returns: string }
       get_user_permitted_machine_ids: { Args: never; Returns: string[] }
