@@ -5,6 +5,7 @@ export { ProductManager } from './ProductManager';
 export { ProductionStandardsManager } from './ProductionStandardsManager';
 export { DowntimeReasonManager } from './DowntimeReasonManager';
 export { DefectReasonManager } from './DefectReasonManager';
+export { SetupReasonManager } from './SetupReasonManager';
 export { UserManager } from './UserManager';
 export { CompanyManager } from './CompanyManager';
 export { PlannedTimeManager } from './PlannedTimeManager';
