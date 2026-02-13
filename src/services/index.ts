@@ -41,6 +41,7 @@ export {
   // Query Functions - Reasons
   getDowntimeReasons,
   getDefectReasons,
+  getSetupReasons,
 
   // Query Functions - Products
   getProducts,
@@ -105,6 +106,7 @@ export type {
   ShiftCalendar,
   DowntimeReason,
   DefectReason,
+  SetupReason,
   Product,
   ProductionStandard,
   ProductionEvent,

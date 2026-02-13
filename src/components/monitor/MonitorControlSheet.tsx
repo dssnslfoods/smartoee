@@ -18,6 +18,7 @@ import {
   getProducts,
   getDowntimeReasons,
   getDefectReasons,
+  getSetupReasons,
   getProductionStandard,
   getProductionStandardsForMachine,
   startEvent,
@@ -86,6 +87,12 @@ export function MonitorControlSheet({
   const { data: downtimeReasons = [] } = useQuery({
     queryKey: ['downtimeReasons', companyId],
     queryFn: () => getDowntimeReasons(undefined, companyId),
+    enabled: !!machineId && open,
+  });
+
+  const { data: setupReasons = [] } = useQuery({
+    queryKey: ['setupReasons', companyId],
+    queryFn: () => getSetupReasons(companyId),
     enabled: !!machineId && open,
   });
 
@@ -305,6 +312,7 @@ export function MonitorControlSheet({
                   <EventControls
                     currentEvent={currentEvent}
                     downtimeReasons={downtimeReasons}
+                    setupReasons={setupReasons}
                     selectedProduct={selectedProduct}
                     machineCycleTime={machine?.ideal_cycle_time_seconds}
                     effectiveCycleTime={effectiveCycleTime}

@@ -130,6 +130,14 @@ export interface DefectReason {
   created_at: string;
 }
 
+export interface SetupReason {
+  id: string;
+  code: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface Product {
   id: string;
   company_id: string;

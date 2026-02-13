@@ -35,6 +35,7 @@ import {
   getProductionEvents,
   getDowntimeReasons,
   getDefectReasons,
+  getSetupReasons,
   startEvent,
   stopEvent,
   addCounts,
@@ -203,6 +204,12 @@ export default function Shopfloor() {
   const { data: downtimeReasons = [] } = useQuery({
     queryKey: ['downtimeReasons', company?.id],
     queryFn: () => getDowntimeReasons(undefined, company?.id),
+    enabled: isAuthenticated === true,
+  });
+
+  const { data: setupReasons = [] } = useQuery({
+    queryKey: ['setupReasons', company?.id],
+    queryFn: () => getSetupReasons(company?.id),
     enabled: isAuthenticated === true,
   });
 
@@ -591,6 +598,7 @@ export default function Shopfloor() {
                       <EventControls
                         currentEvent={currentEvent}
                         downtimeReasons={downtimeReasons}
+                        setupReasons={setupReasons}
                         selectedProduct={selectedProduct}
                         machineCycleTime={selectedMachine?.ideal_cycle_time_seconds}
                         effectiveCycleTime={effectiveCycleTime}
