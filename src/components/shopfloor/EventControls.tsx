@@ -21,11 +21,12 @@ import { Play, Pause, StopCircle, Wrench, Loader2, Clock, Timer } from 'lucide-r
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { th } from 'date-fns/locale';
-import type { ProductionEvent, DowntimeReason, Product } from '@/services/types';
+import type { ProductionEvent, DowntimeReason, Product, SetupReason } from '@/services/types';
 
 interface EventControlsProps {
   currentEvent: ProductionEvent | null | undefined;
   downtimeReasons: DowntimeReason[];
+  setupReasons: SetupReason[];
   selectedProduct: Product | null;
   machineCycleTime?: number;
   effectiveCycleTime?: number;
@@ -42,6 +43,7 @@ interface EventControlsProps {
 export function EventControls({
   currentEvent,
   downtimeReasons,
+  setupReasons,
   selectedProduct,
   machineCycleTime,
   effectiveCycleTime: propEffectiveCycleTime,
@@ -273,7 +275,7 @@ export function EventControls({
                 <SelectValue placeholder="เลือกสาเหตุ" />
               </SelectTrigger>
               <SelectContent>
-                {downtimeCategories.CHANGEOVER.map((reason) => (
+                {setupReasons.map((reason) => (
                   <SelectItem key={reason.id} value={reason.id}>
                     {reason.name}
                   </SelectItem>

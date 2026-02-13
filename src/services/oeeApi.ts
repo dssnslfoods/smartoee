@@ -9,6 +9,7 @@ import type {
   ShiftCalendar,
   DowntimeReason,
   DefectReason,
+  SetupReason,
   ProductionEvent,
   ProductionCount,
   OeeSnapshot,
@@ -430,6 +431,22 @@ export async function getDefectReasons(companyId?: string): Promise<DefectReason
   const { data, error } = await query;
   if (error) throw error;
   return data || [];
+}
+
+export async function getSetupReasons(companyId?: string): Promise<SetupReason[]> {
+  let query = supabase
+    .from('setup_reasons')
+    .select('*')
+    .eq('is_active', true)
+    .order('name');
+
+  if (companyId) {
+    query = query.eq('company_id', companyId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []) as SetupReason[];
 }
 
 // =============================================
@@ -1106,6 +1123,7 @@ const oeeApi = {
   // Reasons
   getDowntimeReasons,
   getDefectReasons,
+  getSetupReasons,
 
   // Products & Standards
   getProducts: getProducts,
