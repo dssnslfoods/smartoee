@@ -74,6 +74,11 @@ export function ShiftActivityDetail({ shiftCalendarId, isLocked = false, isSuper
 
   const deleteSingleMutation = useMutation({
     mutationFn: async (eventId: string) => {
+      // Delete linked production_counts first
+      await supabase
+        .from('production_counts')
+        .delete()
+        .eq('production_event_id', eventId);
       const { error } = await supabase
         .from('production_events')
         .delete()
@@ -96,6 +101,14 @@ export function ShiftActivityDetail({ shiftCalendarId, isLocked = false, isSuper
 
   const deleteAllMutation = useMutation({
     mutationFn: async () => {
+      // Delete linked production_counts first
+      const eventIds = events.map((e: any) => e.id);
+      if (eventIds.length > 0) {
+        await supabase
+          .from('production_counts')
+          .delete()
+          .in('production_event_id', eventIds);
+      }
       const { error } = await supabase
         .from('production_events')
         .delete()
