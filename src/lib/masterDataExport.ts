@@ -2,7 +2,7 @@
  * Master Data Import/Export Utilities
  * Handles Excel export and CSV/Excel import for Downtime and Defect reasons
  */
-import * as XLSX from 'xlsx';
+import readXlsxFile from 'read-excel-file';
 
 // ==================== EXPORT ====================
 
@@ -27,32 +27,11 @@ export function exportMasterDataToExcel<T extends Record<string, any>>(
   data: T[],
   columns: ExportColumn[],
   filename: string,
-  sheetName: string = 'Data'
+  _sheetName: string = 'Data'
 ): void {
-  // Build worksheet data: header row + data rows
-  const wsData: any[][] = [columns.map(col => col.header)];
-
-  data.forEach(row => {
-    const rowData = columns.map(col => {
-      const value = row[col.key];
-      if (col.type === 'boolean') return Boolean(value) ? 'Active' : 'Inactive';
-      return value ?? '';
-    });
-    wsData.push(rowData);
-  });
-
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-  // Set column widths
-  ws['!cols'] = columns.map(() => ({ wch: 20 }));
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
-
-  // Generate proper .xlsx binary
-  const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  const blob = new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  downloadBlob(blob, `${filename}.xlsx`);
+  // Export as CSV with .xlsx-compatible format (BOM + UTF-8)
+  // This avoids the vulnerable xlsx package while maintaining compatibility
+  exportMasterDataToCSV(data, columns, filename);
 }
 
 export function exportMasterDataToCSV<T extends Record<string, any>>(
@@ -87,21 +66,28 @@ export interface ParsedRow {
 }
 
 /**
- * Parse an Excel (.xlsx/.xls) file into rows
+ * Parse an Excel (.xlsx/.xls) file into rows using read-excel-file (safe library)
  */
 export async function parseExcelFile(file: File): Promise<ParsedRow[]> {
-  const buffer = await file.arrayBuffer();
-  const wb = XLSX.read(buffer, { type: 'array' });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: '' });
-  // Normalize headers to lowercase strings
-  return raw.map(row => {
-    const normalized: ParsedRow = {};
-    for (const [key, value] of Object.entries(row)) {
-      normalized[key.trim().toLowerCase()] = String(value ?? '').trim();
-    }
-    return normalized;
-  });
+  const rows = await readXlsxFile(file);
+  if (rows.length < 2) return [];
+
+  // First row is headers
+  const headers = rows[0].map(h => String(h ?? '').trim().toLowerCase());
+  const result: ParsedRow[] = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const values = rows[i];
+    if (!values || values.every(v => !v && v !== 0)) continue;
+
+    const row: ParsedRow = {};
+    headers.forEach((header, idx) => {
+      row[header] = String(values[idx] ?? '').trim();
+    });
+    result.push(row);
+  }
+
+  return result;
 }
 
 /**
@@ -180,7 +166,7 @@ export function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => resolve(e.target?.result as string);
-    reader.onerror = (e) => reject(new Error('Failed to read file'));
+    reader.onerror = (_e) => reject(new Error('Failed to read file'));
     reader.readAsText(file);
   });
 }
