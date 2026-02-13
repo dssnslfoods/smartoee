@@ -355,6 +355,31 @@ export default function Shopfloor() {
     }
   }, [selectedLineId, isStaff]);
 
+  // Auto-select when only one option is available
+  useEffect(() => {
+    if (!isStaff && plants.length === 1 && !selectedPlantId) {
+      setSelectedPlantId(plants[0].id);
+    }
+  }, [plants, isStaff, selectedPlantId]);
+
+  useEffect(() => {
+    if (!isStaff && lines.length === 1 && !selectedLineId && selectedPlantId) {
+      setSelectedLineId(lines[0].id);
+    }
+  }, [lines, isStaff, selectedLineId, selectedPlantId]);
+
+  useEffect(() => {
+    if (!isStaff && machines.length === 1 && !selectedMachineId && selectedLineId) {
+      setSelectedMachineId(machines[0].id);
+    }
+  }, [machines, isStaff, selectedMachineId, selectedLineId]);
+
+  useEffect(() => {
+    if (isStaff && staffMachines.length === 1 && !selectedMachineId) {
+      setSelectedMachineId(staffMachines[0].id);
+    }
+  }, [staffMachines, isStaff, selectedMachineId]);
+
   if (isAuthenticated === null) {
     return (
       <AppLayout>
