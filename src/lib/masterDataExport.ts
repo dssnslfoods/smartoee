@@ -185,3 +185,11 @@ export const DEFECT_REASON_COLUMNS: ExportColumn[] = [
   { header: 'Name', key: 'name', type: 'string' },
   { header: 'Status', key: 'is_active', type: 'boolean' },
 ];
+
+export const HOLIDAY_COLUMNS: ExportColumn[] = [
+  { header: 'Date', key: 'holiday_date', type: 'string' },
+  { header: 'Name', key: 'name', type: 'string' },
+  { header: 'Description', key: 'description', type: 'string' },
+  { header: 'Plant', key: 'plant_name', type: 'string' },
+  { header: 'Recurring', key: 'is_recurring', type: 'boolean' },
+];

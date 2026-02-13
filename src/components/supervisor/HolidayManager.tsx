@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { Plus, Trash2, CalendarOff, RefreshCw, Palmtree } from 'lucide-react';
+import { Plus, Trash2, CalendarOff, RefreshCw, Palmtree, Download, Upload } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import oeeApi from '@/services/oeeApi';
+import { exportMasterDataToExcel, parseImportFile, HOLIDAY_COLUMNS } from '@/lib/masterDataExport';
 
 interface Holiday {
   id: string;
@@ -41,6 +42,7 @@ export function HolidayManager() {
   const [formPlantId, setFormPlantId] = useState<string>('all');
   const [formRecurring, setFormRecurring] = useState(false);
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: plants = [] } = useQuery({
     queryKey: ['plants', companyId],
@@ -118,6 +120,74 @@ export function HolidayManager() {
     setIsDialogOpen(false);
   };
 
+  const handleExport = () => {
+    const exportData = holidays.map(h => ({
+      ...h,
+      plant_name: h.plant_id ? (plants.find(p => p.id === h.plant_id)?.name || '') : 'ทุกโรงงาน',
+    }));
+    exportMasterDataToExcel(exportData, HOLIDAY_COLUMNS, `holidays_${filterYear}`);
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !companyId) return;
+    try {
+      const rows = await parseImportFile(file);
+      if (rows.length === 0) {
+        toast({ title: 'ไม่พบข้อมูล', description: 'ไฟล์ว่างหรือรูปแบบไม่ถูกต้อง', variant: 'destructive' });
+        return;
+      }
+
+      // Build plant name -> id map
+      const plantMap = new Map(plants.map(p => [p.name.toLowerCase(), p.id]));
+
+      let inserted = 0;
+      let skipped = 0;
+
+      for (const row of rows) {
+        const name = row['name'] || '';
+        const dateStr = row['date'] || '';
+        if (!name || !dateStr) { skipped++; continue; }
+
+        // Normalize date (accept YYYY-MM-DD or DD/MM/YYYY)
+        let holiday_date = dateStr;
+        const slashMatch = dateStr.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
+        if (slashMatch) {
+          holiday_date = `${slashMatch[3]}-${slashMatch[2].padStart(2, '0')}-${slashMatch[1].padStart(2, '0')}`;
+        }
+
+        const plantName = (row['plant'] || '').toLowerCase().trim();
+        const plantId = plantName && plantName !== 'ทุกโรงงาน' && plantName !== 'all'
+          ? plantMap.get(plantName) || null
+          : null;
+
+        const recurring = row['recurring'] || '';
+        const is_recurring = recurring.toLowerCase() === 'active' || recurring === 'true' || recurring === '1' || recurring === 'ใช่';
+
+        const { error } = await supabase.from('holidays').insert({
+          company_id: companyId,
+          plant_id: plantId,
+          holiday_date,
+          name,
+          description: row['description'] || null,
+          is_recurring,
+          created_by: user?.id,
+        });
+        if (error) { skipped++; } else { inserted++; }
+      }
+
+      toast({
+        title: 'นำเข้าสำเร็จ',
+        description: `เพิ่ม ${inserted} รายการ${skipped ? `, ข้าม ${skipped} รายการ` : ''}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['holidays'] });
+    } catch (err: any) {
+      toast({ title: 'ผิดพลาด', description: err.message, variant: 'destructive' });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const currentYear = new Date().getFullYear();
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
 
@@ -134,7 +204,7 @@ export function HolidayManager() {
               <CardDescription>กำหนดวันหยุดนักขัตฤกษ์และวันหยุดพิเศษล่วงหน้า</CardDescription>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Select value={filterYear} onValueChange={setFilterYear}>
               <SelectTrigger className="w-[100px]">
                 <SelectValue />
@@ -145,6 +215,21 @@ export function HolidayManager() {
                 ))}
               </SelectContent>
             </Select>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExport} disabled={holidays.length === 0}>
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-4 w-4" />
+              Import
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              className="hidden"
+              onChange={handleImport}
+            />
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-1.5">
