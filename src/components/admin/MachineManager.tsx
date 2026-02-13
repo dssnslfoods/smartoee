@@ -73,6 +73,7 @@ export function MachineManager() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const [deletingMachine, setDeletingMachine] = useState<Machine | null>(null);
+  const [filterLineId, setFilterLineId] = useState<string>('all');
   const [formData, setFormData] = useState({ 
     name: '', 
     code: '', 
@@ -140,7 +141,7 @@ export function MachineManager() {
       let query = supabase
         .from('machines')
         .select('*, lines(name, plants(name)), companies(name)')
-        .order('name');
+        .order('code');
       
       // Filter by selected company if available
       if (selectedCompanyId) {
@@ -151,6 +152,31 @@ export function MachineManager() {
       if (error) throw error;
       return data;
     },
+  });
+
+  // Also fetch lines for filter dropdown (using the main company context)
+  const { data: filterLines } = useQuery({
+    queryKey: ['admin-lines-filter', selectedCompanyId],
+    queryFn: async () => {
+      let query = supabase
+        .from('lines')
+        .select('id, name, plant_id, company_id, plants(name)')
+        .eq('is_active', true)
+        .order('name');
+      if (selectedCompanyId) {
+        query = query.eq('company_id', selectedCompanyId);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as Line[];
+    },
+  });
+
+  const filteredMachines = machines?.filter((m) => {
+    if (filterLineId && filterLineId !== 'all') {
+      return m.line_id === filterLineId;
+    }
+    return true;
   });
 
   const createMutation = useMutation({
@@ -292,8 +318,22 @@ export function MachineManager() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-lg font-semibold">Machines</h3>
+        <div className="flex-1" />
+        <Select value={filterLineId} onValueChange={setFilterLineId}>
+          <SelectTrigger className="w-[180px] bg-background">
+            <SelectValue placeholder="กรองตามไลน์" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">ทุกไลน์</SelectItem>
+            {filterLines?.map((line) => (
+              <SelectItem key={line.id} value={line.id}>
+                {line.name} ({line.plants?.name})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button onClick={handleOpenCreate} size="sm" disabled={!companies?.length}>
           <Plus className="h-4 w-4 mr-2" />
           Add Machine
@@ -319,7 +359,7 @@ export function MachineManager() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {machines?.map((machine) => {
+            {filteredMachines?.map((machine) => {
               const line = machine.lines as { name: string; plants: { name: string } | null } | null;
               const company = machine.companies as { name: string } | null;
               return (
@@ -360,7 +400,7 @@ export function MachineManager() {
                 </TableRow>
               );
             })}
-            {machines?.length === 0 && (
+            {filteredMachines?.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   No machines found
