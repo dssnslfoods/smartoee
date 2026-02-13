@@ -4,7 +4,7 @@ import { Plus, Pencil, Trash2, Loader2, Cpu, Package, AlertTriangle, Factory, Do
 import { supabase } from '@/integrations/supabase/client';
 
 import { useAuth } from '@/hooks/useAuth';
-import { resolveTimeUnit, fromSeconds, toSeconds, TIME_UNIT_SHORT, getInputStep, getInputMin } from '@/lib/timeUnitUtils';
+import { resolveTimeUnit, fromSeconds, toSeconds, TIME_UNIT_SHORT, getInputStep, getInputMin, toOutputRate, fromOutputRate } from '@/lib/timeUnitUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -180,9 +180,7 @@ export function ProductionStandardsManager() {
   const cycleTimeWarning = useMemo(() => {
     if (!selectedMachine || !formData.ideal_cycle_time_seconds) return null;
     if (formData.ideal_cycle_time_seconds < selectedMachine.ideal_cycle_time_seconds) {
-      const unit = resolveTimeUnit(selectedMachine.time_unit);
-      const unitLabel = TIME_UNIT_SHORT[unit];
-      return `Warning: SKU speed (${fromSeconds(formData.ideal_cycle_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)}${unitLabel}) exceeds machine capacity (${fromSeconds(selectedMachine.ideal_cycle_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)}${unitLabel})`;
+      return `Warning: SKU output rate (${toOutputRate(formData.ideal_cycle_time_seconds).toFixed(1)} ชิ้น/นาที) เร็วกว่า Machine capacity (${toOutputRate(selectedMachine.ideal_cycle_time_seconds).toFixed(1)} ชิ้น/นาที)`;
     }
     return null;
   }, [formData.ideal_cycle_time_seconds, selectedMachine]);
@@ -528,7 +526,7 @@ export function ProductionStandardsManager() {
               <TableHead>Machine</TableHead>
               <TableHead>SKU</TableHead>
               <TableHead>Setup Time</TableHead>
-              <TableHead>Cycle Time</TableHead>
+              <TableHead>Output Rate</TableHead>
               <TableHead>Target Quality</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
@@ -564,19 +562,12 @@ export function ProductionStandardsManager() {
                   })()}
                 </TableCell>
                 <TableCell>
-                  {(() => {
-                    const machine = machines.find(m => m.id === standard.machine_id);
-                    const unit = resolveTimeUnit(machine?.time_unit);
-                    const unitLabel = TIME_UNIT_SHORT[unit];
-                    return (
-                      <>
-                        <span className="font-mono text-sm">{fromSeconds(standard.ideal_cycle_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)}{unitLabel}</span>
-                        {standard.machines && standard.ideal_cycle_time_seconds < standard.machines.ideal_cycle_time_seconds && (
-                          <AlertTriangle className="inline h-3.5 w-3.5 ml-1 text-destructive" />
-                        )}
-                      </>
-                    );
-                  })()}
+                  <>
+                    <span className="font-mono text-sm">{toOutputRate(standard.ideal_cycle_time_seconds).toFixed(1)} ชิ้น/นาที</span>
+                    {standard.machines && standard.ideal_cycle_time_seconds < standard.machines.ideal_cycle_time_seconds && (
+                      <AlertTriangle className="inline h-3.5 w-3.5 ml-1 text-destructive" />
+                    )}
+                  </>
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className="font-mono text-xs">
@@ -632,7 +623,7 @@ export function ProductionStandardsManager() {
                 <SelectContent>
                   {filteredMachines.map(m => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.name} ({m.code}) — CT: {fromSeconds(m.ideal_cycle_time_seconds, resolveTimeUnit(m.time_unit)).toFixed(resolveTimeUnit(m.time_unit) === 'minutes' ? 2 : 1)}{TIME_UNIT_SHORT[resolveTimeUnit(m.time_unit)]}
+                      {m.name} ({m.code}) — {toOutputRate(m.ideal_cycle_time_seconds).toFixed(1)} ชิ้น/นาที
                       {m.lines?.plants?.name ? ` [${m.lines.plants.name}]` : ''}
                     </SelectItem>
                   ))}
@@ -668,7 +659,7 @@ export function ProductionStandardsManager() {
                 const unitLabel = TIME_UNIT_SHORT[unit];
                 return (
                   <>
-                    <Label className="text-sm font-semibold">📊 Performance Benchmarks ({unitLabel})</Label>
+                    <Label className="text-sm font-semibold">📊 Performance Benchmarks</Label>
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Std. Setup Time ({unitLabel})</Label>
@@ -681,13 +672,13 @@ export function ProductionStandardsManager() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Ideal Cycle Time ({unitLabel})</Label>
+                        <Label className="text-xs text-muted-foreground">Output Rate (ชิ้น/นาที)</Label>
                         <Input
                           type="number"
-                          min={getInputMin(unit)}
-                          step={getInputStep(unit)}
-                          value={fromSeconds(formData.ideal_cycle_time_seconds, unit)}
-                          onChange={(e) => setFormData({ ...formData, ideal_cycle_time_seconds: toSeconds(parseFloat(e.target.value) || 0, unit) })}
+                          min="0.01"
+                          step="0.1"
+                          value={parseFloat(toOutputRate(formData.ideal_cycle_time_seconds).toFixed(2))}
+                          onChange={(e) => setFormData({ ...formData, ideal_cycle_time_seconds: fromOutputRate(parseFloat(e.target.value) || 1) })}
                         />
                       </div>
                       <div className="space-y-1">

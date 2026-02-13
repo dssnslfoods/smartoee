@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Loader2, Clock } from 'lucide-react';
-import { type TimeUnit, TIME_UNIT_LABELS, TIME_UNIT_SHORT, fromSeconds, toSeconds, getInputStep, getInputMin, resolveTimeUnit } from '@/lib/timeUnitUtils';
+import { type TimeUnit, TIME_UNIT_LABELS, TIME_UNIT_SHORT, fromSeconds, toSeconds, getInputStep, getInputMin, resolveTimeUnit, toOutputRate, fromOutputRate } from '@/lib/timeUnitUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -87,8 +87,8 @@ export function MachineManager() {
     target_quality: 99,
     is_active: true 
   });
-  // Display value for cycle time (converted from seconds to chosen unit)
-  const [cycleTimeDisplay, setCycleTimeDisplay] = useState<number>(60);
+  // Display value for output rate (pieces per minute)
+  const [outputRateDisplay, setOutputRateDisplay] = useState<number>(1);
   const [selectedCompanyIdForForm, setSelectedCompanyIdForForm] = useState<string>('');
 
   // Use the admin's selected company context
@@ -252,7 +252,7 @@ export function MachineManager() {
     setEditingMachine(null);
     setSelectedCompanyIdForForm(selectedCompanyId || companies?.[0]?.id || '');
     setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || companies?.[0]?.id || '', ideal_cycle_time_seconds: 60, time_unit: 'minutes', target_oee: 85, target_availability: 90, target_performance: 95, target_quality: 99, is_active: true });
-    setCycleTimeDisplay(1);
+    setOutputRateDisplay(1);
     setIsDialogOpen(true);
   };
 
@@ -273,7 +273,7 @@ export function MachineManager() {
       target_quality: machine.target_quality ?? 99,
       is_active: machine.is_active 
     });
-    setCycleTimeDisplay(fromSeconds(machine.ideal_cycle_time_seconds, unit));
+    setOutputRateDisplay(toOutputRate(machine.ideal_cycle_time_seconds));
     setIsDialogOpen(true);
   };
 
@@ -282,7 +282,7 @@ export function MachineManager() {
     setEditingMachine(null);
     setSelectedCompanyIdForForm(selectedCompanyId || '');
     setFormData({ name: '', code: '', line_id: '', company_id: selectedCompanyId || '', ideal_cycle_time_seconds: 60, time_unit: 'minutes', target_oee: 85, target_availability: 90, target_performance: 95, target_quality: 99, is_active: true });
-    setCycleTimeDisplay(1);
+    setOutputRateDisplay(1);
   };
 
   const handleCompanyChange = (companyId: string) => {
@@ -352,7 +352,7 @@ export function MachineManager() {
               <TableHead>Code</TableHead>
               <TableHead>Company</TableHead>
               <TableHead>Line</TableHead>
-              <TableHead>Cycle Time</TableHead>
+              <TableHead>Output Rate</TableHead>
               <TableHead>Target OEE</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
@@ -371,10 +371,7 @@ export function MachineManager() {
                     {line?.name} ({line?.plants?.name || '-'})
                   </TableCell>
                   <TableCell>
-                    {(() => {
-                      const unit = resolveTimeUnit(machine.time_unit);
-                      return `${fromSeconds(machine.ideal_cycle_time_seconds, unit).toFixed(unit === 'minutes' ? 2 : 1)} ${TIME_UNIT_SHORT[unit]}`;
-                    })()}
+                    {toOutputRate(machine.ideal_cycle_time_seconds).toFixed(1)} ชิ้น/นาที
                   </TableCell>
                   <TableCell>
                     <span className="text-sm font-medium">{machine.target_oee ?? 85}%</span>
@@ -481,11 +478,7 @@ export function MachineManager() {
                 value={formData.time_unit}
                 onValueChange={(v) => {
                   const newUnit = v as TimeUnit;
-                  const oldUnit = resolveTimeUnit(formData.time_unit);
-                  // Convert display value to new unit
-                  const currentSeconds = toSeconds(cycleTimeDisplay, oldUnit);
-                  setCycleTimeDisplay(fromSeconds(currentSeconds, newUnit));
-                  setFormData({ ...formData, time_unit: newUnit, ideal_cycle_time_seconds: currentSeconds });
+                  setFormData({ ...formData, time_unit: newUnit });
                 }}
               >
                 <SelectTrigger>
@@ -501,17 +494,17 @@ export function MachineManager() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cycle_time">Ideal Cycle Time ({TIME_UNIT_SHORT[resolveTimeUnit(formData.time_unit)]})</Label>
+              <Label htmlFor="output_rate">Output Rate (ชิ้น/นาที)</Label>
               <Input
-                id="cycle_time"
+                id="output_rate"
                 type="number"
-                min={getInputMin(resolveTimeUnit(formData.time_unit))}
-                step={getInputStep(resolveTimeUnit(formData.time_unit))}
-                value={cycleTimeDisplay}
+                min="0.01"
+                step="0.1"
+                value={outputRateDisplay}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value) || 0;
-                  setCycleTimeDisplay(val);
-                  setFormData({ ...formData, ideal_cycle_time_seconds: toSeconds(val, resolveTimeUnit(formData.time_unit)) });
+                  setOutputRateDisplay(val);
+                  setFormData({ ...formData, ideal_cycle_time_seconds: fromOutputRate(val) });
                 }}
               />
             </div>

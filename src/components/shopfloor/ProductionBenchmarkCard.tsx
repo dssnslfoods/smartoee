@@ -2,7 +2,7 @@ import { Timer, Wrench, ShieldCheck, Gauge, AlertTriangle, Cpu, Package } from '
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
-import { resolveTimeUnit, fromSeconds, TIME_UNIT_SHORT } from '@/lib/timeUnitUtils';
+import { resolveTimeUnit, fromSeconds, TIME_UNIT_SHORT, toOutputRate } from '@/lib/timeUnitUtils';
 import type { ProductionStandard } from '@/services/types';
 
 interface ProductionBenchmarkCardProps {
@@ -94,9 +94,9 @@ export function ProductionBenchmarkCard({
       <div className="grid grid-cols-3 gap-3">
         <MetricItem
           icon={<Timer className="h-5 w-5 text-primary" />}
-          label="Cycle Time"
-          value={cycleTime != null ? fromSeconds(cycleTime, unit).toFixed(unit === 'minutes' ? 2 : 1) : '—'}
-          unit={unitLabel}
+          label="Output Rate"
+          value={cycleTime != null && cycleTime > 0 ? toOutputRate(cycleTime).toFixed(1) : '—'}
+          unit="ชิ้น/นาที"
           colorClass="bg-primary/10"
           bgClass="border-primary/20 bg-primary/5"
         />

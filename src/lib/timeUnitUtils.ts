@@ -63,3 +63,27 @@ export function resolveTimeUnit(unit: string | undefined | null): TimeUnit {
   if (unit === 'seconds') return 'seconds';
   return 'minutes';
 }
+
+/**
+ * Convert cycle time in seconds to output rate (pieces per minute)
+ */
+export function toOutputRate(cycleTimeSeconds: number): number {
+  if (cycleTimeSeconds <= 0) return 0;
+  return 60 / cycleTimeSeconds;
+}
+
+/**
+ * Convert output rate (pieces per minute) back to cycle time in seconds
+ */
+export function fromOutputRate(piecesPerMin: number): number {
+  if (piecesPerMin <= 0) return 0;
+  return 60 / piecesPerMin;
+}
+
+/**
+ * Format output rate for display
+ */
+export function formatOutputRate(cycleTimeSeconds: number | undefined | null, decimals = 1): string {
+  if (cycleTimeSeconds == null || cycleTimeSeconds <= 0) return '—';
+  return toOutputRate(cycleTimeSeconds).toFixed(decimals);
+}
