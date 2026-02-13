@@ -264,23 +264,15 @@ export default function Dashboard() {
            </>
          ) : (
            <>
-              <Card className="relative overflow-hidden border-0 bg-transparent shadow-none">
-                <CardContent className="p-3 sm:p-5 flex flex-col items-center justify-center">
-                  <OEEGauge value={oee.availability} label="Availability" color="availability" size="sm" />
-                </CardContent>
-              </Card>
-  
-              <Card className="relative overflow-hidden border-0 bg-transparent shadow-none">
-                <CardContent className="p-3 sm:p-5 flex flex-col items-center justify-center">
-                  <OEEGauge value={oee.performance} label="Performance" color="performance" size="sm" />
-                </CardContent>
-              </Card>
-  
-              <Card className="relative overflow-hidden border-0 bg-transparent shadow-none">
-                <CardContent className="p-3 sm:p-5 flex flex-col items-center justify-center">
-                  <OEEGauge value={oee.quality} label="Quality" color="quality" size="sm" />
-                </CardContent>
-              </Card>
+              <div className="flex flex-col items-center">
+                <OEEGauge value={oee.availability} label="Availability" color="availability" size="md" />
+              </div>
+              <div className="flex flex-col items-center">
+                <OEEGauge value={oee.performance} label="Performance" color="performance" size="md" />
+              </div>
+              <div className="flex flex-col items-center">
+                <OEEGauge value={oee.quality} label="Quality" color="quality" size="md" />
+              </div>
            </>
          )}
        </div>
