@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -58,6 +58,19 @@ export default function MonitorPage() {
     if (selectedPlant === 'all') return lines;
     return lines.filter(l => l.plant_id === selectedPlant);
   }, [lines, selectedPlant]);
+
+  // Auto-select when only one option available
+  useEffect(() => {
+    if (plants && plants.length === 1 && selectedPlant === 'all') {
+      setSelectedPlant(plants[0].id);
+    }
+  }, [plants, selectedPlant]);
+
+  useEffect(() => {
+    if (filteredLines.length === 1 && selectedLine === 'all') {
+      setSelectedLine(filteredLines[0].id);
+    }
+  }, [filteredLines, selectedLine]);
 
   // Reset line filter when plant changes
   const handlePlantChange = (plantId: string) => {
