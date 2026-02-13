@@ -538,7 +538,11 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                       />
                     )}
 
-                    <ShiftActivityDetail shiftCalendarId={summary.shift_calendar_id} />
+                    <ShiftActivityDetail
+                      shiftCalendarId={summary.shift_calendar_id}
+                      isLocked={summary.approval_status === 'LOCKED'}
+                      isSupervisor={isSupervisor}
+                    />
                   </CardContent>
                 </Card>
               ))}
