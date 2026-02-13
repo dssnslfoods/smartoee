@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, Lock, AlertTriangle, Loader2, ClipboardList } from 'lucide-react';
+import { CheckCircle2, Lock, Unlock, AlertTriangle, Loader2, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -29,9 +29,11 @@ interface ApprovalControlsProps {
   lockedAt: string | null;
   onApprove: () => void;
   onLock: () => void;
+  onUnlock?: () => void;
   onRecalc: () => void;
   isApproving: boolean;
   isLocking: boolean;
+  isUnlocking?: boolean;
   isRecalculating: boolean;
 }
 
@@ -44,9 +46,11 @@ export function ApprovalControls({
   lockedAt,
   onApprove,
   onLock,
+  onUnlock,
   onRecalc,
   isApproving,
   isLocking,
+  isUnlocking,
   isRecalculating,
 }: ApprovalControlsProps) {
   const navigate = useNavigate();
@@ -261,11 +265,59 @@ export function ApprovalControls({
           </AlertDialog>
         )}
 
-        {/* Locked State */}
+        {/* Locked State with Unlock */}
         {isLocked && (
-          <div className="flex items-center gap-2 text-status-idle bg-status-idle/10 px-4 py-2.5 rounded-lg">
-            <Lock className="h-4 w-4" />
-            <span className="font-medium text-sm">กะนี้ถูกล็อคแล้ว - ไม่สามารถแก้ไขได้</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-status-idle bg-status-idle/10 px-4 py-2.5 rounded-lg">
+              <Lock className="h-4 w-4" />
+              <span className="font-medium text-sm">กะนี้ถูกล็อคแล้ว</span>
+            </div>
+            {onUnlock && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-amber-500/50 text-amber-600 hover:bg-amber-500/10 min-w-[120px]"
+                    disabled={isUnlocking}
+                  >
+                    {isUnlocking ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Unlock className="h-4 w-4 mr-2" />
+                    )}
+                    {isUnlocking ? 'กำลังปลดล็อค...' : 'ปลดล็อค'}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="max-w-md">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-amber-500" />
+                      ยืนยันการปลดล็อคกะ?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="space-y-3 text-sm">
+                      <p>
+                        <strong className="text-foreground">คำเตือน:</strong> หลังจากปลดล็อคแล้ว 
+                        พนักงานจะสามารถแก้ไขข้อมูลในกะนี้ได้อีกครั้ง รวมถึง:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-2">
+                        <li>เพิ่ม/แก้ไข Production Events</li>
+                        <li>เพิ่ม/แก้ไข Production Counts</li>
+                        <li>คำนวณ OEE ใหม่</li>
+                      </ul>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={onUnlock}
+                      className="bg-amber-500 hover:bg-amber-600"
+                    >
+                      ยืนยันปลดล็อค
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         )}
       </div>

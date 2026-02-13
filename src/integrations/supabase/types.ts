@@ -1493,6 +1493,7 @@ export type Database = {
         Args: { p_machine_id: string; p_notes?: string }
         Returns: Json
       }
+      rpc_unlock_shift: { Args: { p_shift_calendar_id: string }; Returns: Json }
       rpc_update_event: {
         Args: {
           p_end_ts?: string

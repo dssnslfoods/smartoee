@@ -205,6 +205,17 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
     onError: (e: Error) => toast({ title: 'ผิดพลาด', description: e.message, variant: 'destructive' }),
   });
 
+  const unlockMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await oeeApi.unlockShift(id);
+    },
+    onSuccess: () => {
+      toast({ title: 'สำเร็จ', description: 'ปลดล็อคกะเรียบร้อยแล้ว' });
+      queryClient.invalidateQueries({ queryKey: ['shiftSummaries-calendar'] });
+    },
+    onError: (e: Error) => toast({ title: 'ผิดพลาด', description: e.message, variant: 'destructive' }),
+  });
+
   const recalcMutation = useMutation({
     mutationFn: async ({ id, forceWorkingDay }: { id: string; forceWorkingDay?: boolean }) => {
       const result = await oeeApi.recalcOeeForShift(id, forceWorkingDay);
@@ -531,9 +542,11 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                         lockedAt={summary.locked_at}
                         onApprove={() => approveMutation.mutate(summary.shift_calendar_id)}
                         onLock={() => lockMutation.mutate(summary.shift_calendar_id)}
+                        onUnlock={() => unlockMutation.mutate(summary.shift_calendar_id)}
                         onRecalc={() => recalcMutation.mutate({ id: summary.shift_calendar_id })}
                         isApproving={approveMutation.isPending}
                         isLocking={lockMutation.isPending}
+                        isUnlocking={unlockMutation.isPending}
                         isRecalculating={recalcMutation.isPending}
                       />
                     )}
