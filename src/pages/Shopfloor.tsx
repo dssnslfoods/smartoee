@@ -523,7 +523,7 @@ export default function Shopfloor() {
                 </CardHeader>
                 <CardContent className="pt-4">
                   <SKUSelector
-                    products={products}
+                    products={products.filter(p => !p.line_id || p.line_id === selectedMachine?.line_id)}
                     selectedProductId={selectedProductId}
                     onProductChange={handleProductChange}
                     standardsMap={standardsMap}
