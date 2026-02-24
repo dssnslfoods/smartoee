@@ -272,7 +272,7 @@ export function MonitorControlSheet({
               </CardHeader>
               <CardContent>
                 <SKUSelector
-                  products={products}
+                  products={products.filter(p => !p.line_id || p.line_id === machine?.line_id)}
                   selectedProductId={selectedProductId}
                   onProductChange={handleProductChange}
                   standardsMap={standardsMap}

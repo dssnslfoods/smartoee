@@ -144,6 +144,7 @@ export interface Product {
   code: string;
   name: string;
   description?: string;
+  line_id?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
