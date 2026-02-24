@@ -844,13 +844,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "production_events_reason_id_fkey"
-            columns: ["reason_id"]
-            isOneToOne: false
-            referencedRelation: "downtime_reasons"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "production_events_shift_calendar_id_fkey"
             columns: ["shift_calendar_id"]
             isOneToOne: false
