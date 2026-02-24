@@ -9,6 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
@@ -34,6 +37,15 @@ interface Product {
   description: string | null;
   is_active: boolean;
   company_id: string;
+  line_id: string | null;
+}
+
+interface Line {
+  id: string;
+  name: string;
+  code: string | null;
+  plant_id: string;
+  plant_name?: string;
 }
 
 const PRODUCT_COLUMNS = [
@@ -53,10 +65,33 @@ export function ProductManager() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
-    code: '', name: '', description: '', is_active: true,
+    code: '', name: '', description: '', is_active: true, line_id: '' as string,
   });
 
   const selectedCompanyId = company?.id;
+
+  // Fetch lines with plant info for the selector
+  const { data: lines } = useQuery({
+    queryKey: ['admin-lines-for-products', selectedCompanyId],
+    queryFn: async () => {
+      let query = supabase.from('lines').select('id, name, code, plant_id').eq('is_active', true).order('name');
+      if (selectedCompanyId) query = query.eq('company_id', selectedCompanyId);
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Fetch plant names
+      const plantIds = [...new Set((data || []).map(l => l.plant_id))];
+      if (plantIds.length === 0) return [] as Line[];
+      const { data: plants } = await supabase.from('plants').select('id, name').in('id', plantIds);
+      const plantMap = new Map((plants || []).map(p => [p.id, p.name]));
+
+      return (data || []).map(l => ({
+        ...l,
+        plant_name: plantMap.get(l.plant_id) || '',
+      })) as Line[];
+    },
+    enabled: !!selectedCompanyId,
+  });
 
   const { data: products, isLoading } = useQuery({
     queryKey: ['admin-products', selectedCompanyId],
@@ -69,11 +104,15 @@ export function ProductManager() {
     },
   });
 
+  // Build a line lookup map
+  const lineMap = new Map((lines || []).map(l => [l.id, l]));
+
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const { error } = await supabase.from('products').insert({
         code: data.code, name: data.name, description: data.description || null,
         is_active: data.is_active, company_id: selectedCompanyId!,
+        line_id: data.line_id || null,
       } as any);
       if (error) throw error;
     },
@@ -91,6 +130,7 @@ export function ProductManager() {
       const { error } = await supabase.from('products').update({
         code: data.code, name: data.name, description: data.description || null,
         is_active: data.is_active,
+        line_id: data.line_id || null,
       } as any).eq('id', id);
       if (error) throw error;
     },
@@ -133,7 +173,7 @@ export function ProductManager() {
 
   const handleOpenCreate = () => {
     setEditingProduct(null);
-    setFormData({ code: '', name: '', description: '', is_active: true });
+    setFormData({ code: '', name: '', description: '', is_active: true, line_id: '' });
     setIsDialogOpen(true);
   };
 
@@ -143,6 +183,7 @@ export function ProductManager() {
       code: product.code, name: product.name,
       description: product.description || '',
       is_active: product.is_active,
+      line_id: product.line_id || '',
     });
     setIsDialogOpen(true);
   };
@@ -150,7 +191,7 @@ export function ProductManager() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingProduct(null);
-    setFormData({ code: '', name: '', description: '', is_active: true });
+    setFormData({ code: '', name: '', description: '', is_active: true, line_id: '' });
   };
 
   const handleSubmit = () => {
@@ -247,37 +288,48 @@ export function ProductManager() {
             <TableRow>
               <TableHead>Code</TableHead>
               <TableHead>Name</TableHead>
+              <TableHead>Line</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {products?.map((product) => (
-              <TableRow key={product.id}>
-                <TableCell className="font-mono">{product.code}</TableCell>
-                <TableCell className="font-medium">{product.name}</TableCell>
-                <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">{product.description || '—'}</TableCell>
-                <TableCell>
-                  <span className={product.is_active ? 'text-status-running' : 'text-muted-foreground'}>
-                    {product.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(product)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => { setDeletingProduct(product); setIsDeleteOpen(true); }}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+            {products?.map((product) => {
+              const line = product.line_id ? lineMap.get(product.line_id) : null;
+              return (
+                <TableRow key={product.id}>
+                  <TableCell className="font-mono">{product.code}</TableCell>
+                  <TableCell className="font-medium">{product.name}</TableCell>
+                  <TableCell className="text-sm">
+                    {line ? (
+                      <span>{line.name} <span className="text-muted-foreground">({line.plant_name})</span></span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">{product.description || '—'}</TableCell>
+                  <TableCell>
+                    <span className={product.is_active ? 'text-status-running' : 'text-muted-foreground'}>
+                      {product.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(product)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => { setDeletingProduct(product); setIsDeleteOpen(true); }}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
             {products?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                   ไม่พบ Product/SKU {company ? `ของบริษัท ${company.name}` : ''}
                 </TableCell>
               </TableRow>
@@ -305,6 +357,22 @@ export function ProductManager() {
                 <Label htmlFor="name">Name *</Label>
                 <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., Widget A" />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="line">Line</Label>
+              <Select value={formData.line_id} onValueChange={(val) => setFormData({ ...formData, line_id: val === '__none__' ? '' : val })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือก Line (ไม่บังคับ)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— ไม่ระบุ —</SelectItem>
+                  {lines?.map((line) => (
+                    <SelectItem key={line.id} value={line.id}>
+                      {line.name} ({line.plant_name})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>

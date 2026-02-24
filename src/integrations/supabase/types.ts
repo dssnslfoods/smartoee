@@ -920,6 +920,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          line_id: string | null
           name: string
           updated_at: string
         }
@@ -930,6 +931,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          line_id?: string | null
           name: string
           updated_at?: string
         }
@@ -940,10 +942,26 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          line_id?: string | null
           name?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_shift_by_machine"
+            referencedColumns: ["line_id"]
+          },
+        ]
       }
       setup_reasons: {
         Row: {
