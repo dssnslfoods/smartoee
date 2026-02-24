@@ -55,8 +55,7 @@ export default function RecentActivity() {
         .select(`
           id, event_type, start_ts, end_ts, notes, machine_id, product_id, reason_id, created_by,
           machines!production_events_machine_id_fkey ( name, code ),
-          products!production_events_product_id_fkey ( name, code ),
-          downtime_reasons!production_events_reason_id_fkey ( name, category )
+          products!production_events_product_id_fkey ( name, code )
         `)
         .gte('start_ts', dateRange.from.toISOString())
         .lte('start_ts', dateRange.to.toISOString())
@@ -70,6 +69,18 @@ export default function RecentActivity() {
 
       const { data, error } = await query;
       if (error) throw error;
+
+      // Fetch reason names from both downtime_reasons and setup_reasons
+      const reasonIds = [...new Set((data || []).map(e => e.reason_id).filter(Boolean))] as string[];
+      const reasonLookup = new Map<string, { name: string; category: string }>();
+      if (reasonIds.length > 0) {
+        const [{ data: dtReasons }, { data: setupReasons }] = await Promise.all([
+          supabase.from('downtime_reasons').select('id, name, category').in('id', reasonIds),
+          supabase.from('setup_reasons').select('id, name').in('id', reasonIds),
+        ]);
+        for (const r of dtReasons || []) reasonLookup.set(r.id, r);
+        for (const r of setupReasons || []) reasonLookup.set(r.id, { name: r.name, category: 'CHANGEOVER' });
+      }
 
       // Fetch creator names for non-staff
       let creatorsMap = new Map<string, string>();
@@ -96,7 +107,7 @@ export default function RecentActivity() {
         created_by: e.created_by,
         machine: e.machines ? { name: e.machines.name, code: e.machines.code } : null,
         product: e.products ? { name: e.products.name, code: e.products.code } : null,
-        reason: e.downtime_reasons ? { name: e.downtime_reasons.name, category: e.downtime_reasons.category } : null,
+        reason: e.reason_id && reasonLookup.has(e.reason_id) ? reasonLookup.get(e.reason_id)! : null,
         creator: creatorsMap.has(e.created_by) ? { full_name: creatorsMap.get(e.created_by)! } : null,
       }));
     },

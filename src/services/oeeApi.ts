@@ -453,13 +453,35 @@ export async function getSetupReasons(companyId?: string): Promise<SetupReason[]
 // QUERY FUNCTIONS - Production Events
 // =============================================
 
+// Helper: enrich events with reason data from both downtime_reasons and setup_reasons
+async function enrichEventsWithReasons<T extends { reason_id?: string | null }>(events: T[]): Promise<(T & { reason?: DowntimeReason })[]> {
+  const reasonIds = [...new Set(events.map(e => e.reason_id).filter(Boolean))] as string[];
+  if (reasonIds.length === 0) return events as (T & { reason?: DowntimeReason })[];
+
+  const [{ data: dtReasons }, { data: setupReasons }] = await Promise.all([
+    supabase.from('downtime_reasons').select('*').in('id', reasonIds),
+    supabase.from('setup_reasons').select('*').in('id', reasonIds),
+  ]);
+
+  const reasonMap = new Map<string, DowntimeReason>();
+  for (const r of dtReasons || []) reasonMap.set(r.id, r);
+  for (const r of setupReasons || []) {
+    reasonMap.set(r.id, { ...r, category: 'CHANGEOVER' as DowntimeCategory });
+  }
+
+  return events.map(e => ({
+    ...e,
+    reason: e.reason_id ? reasonMap.get(e.reason_id) : undefined,
+  }));
+}
+
 export async function getProductionEvents(
   machineId: string,
   shiftCalendarId?: string
 ): Promise<ProductionEvent[]> {
   let query = supabase
     .from('production_events')
-    .select('*, machine:machines(*), reason:downtime_reasons(*), product:products(*)')
+    .select('*, machine:machines(*), product:products(*)')
     .eq('machine_id', machineId)
     .order('start_ts', { ascending: false });
 
@@ -469,7 +491,7 @@ export async function getProductionEvents(
 
   const { data, error } = await query;
   if (error) throw error;
-  return data || [];
+  return enrichEventsWithReasons(data || []);
 }
 
 export async function getProductionEventsByShift(
@@ -477,12 +499,12 @@ export async function getProductionEventsByShift(
 ): Promise<ProductionEvent[]> {
   const { data, error } = await supabase
     .from('production_events')
-    .select('*, machine:machines(*), reason:downtime_reasons(*), product:products(*)')
+    .select('*, machine:machines(*), product:products(*)')
     .eq('shift_calendar_id', shiftCalendarId)
     .order('start_ts', { ascending: true });
 
   if (error) throw error;
-  return data || [];
+  return enrichEventsWithReasons(data || []);
 }
 
 export async function getProductionCountsByShift(
@@ -501,7 +523,7 @@ export async function getProductionCountsByShift(
 export async function getCurrentEvent(machineId: string): Promise<ProductionEvent | null> {
   const { data, error } = await supabase
     .from('production_events')
-    .select('*, machine:machines(*), reason:downtime_reasons(*), product:products(*)')
+    .select('*, machine:machines(*), product:products(*)')
     .eq('machine_id', machineId)
     .is('end_ts', null)
     .order('start_ts', { ascending: false })
@@ -509,7 +531,9 @@ export async function getCurrentEvent(machineId: string): Promise<ProductionEven
     .maybeSingle();
 
   if (error) throw error;
-  return data;
+  if (!data) return null;
+  const enriched = await enrichEventsWithReasons([data]);
+  return enriched[0] || null;
 }
 
 // =============================================
@@ -910,14 +934,7 @@ export async function getMachineDowntimeBreakdown(
   // Get all downtime/setup events for this machine
   const { data: events, error } = await supabase
     .from('production_events')
-    .select(`
-      id,
-      event_type,
-      start_ts,
-      end_ts,
-      reason_id,
-      reason:downtime_reasons(id, name, code, category)
-    `)
+    .select(`id, event_type, start_ts, end_ts, reason_id`)
     .eq('machine_id', machineId)
     .in('event_type', ['DOWNTIME', 'SETUP'])
     .gte('start_ts', startDate.toISOString())
@@ -926,17 +943,32 @@ export async function getMachineDowntimeBreakdown(
   if (error) throw error;
   if (!events || events.length === 0) return [];
 
+  // Fetch reason details from both tables
+  const reasonIds = [...new Set(events.map(e => e.reason_id).filter(Boolean))] as string[];
+  const reasonLookup = new Map<string, { id: string; name: string; code: string; category: string }>();
+  if (reasonIds.length > 0) {
+    const [{ data: dtReasons }, { data: setupReasons }] = await Promise.all([
+      supabase.from('downtime_reasons').select('id, name, code, category').in('id', reasonIds),
+      supabase.from('setup_reasons').select('id, name, code').in('id', reasonIds),
+    ]);
+    for (const r of dtReasons || []) reasonLookup.set(r.id, r);
+    for (const r of setupReasons || []) reasonLookup.set(r.id, { ...r, category: 'CHANGEOVER' });
+  }
+
+  if (error) throw error;
+  if (!events || events.length === 0) return [];
+
   // Aggregate by reason
   const breakdownMap = new Map<string, DowntimeBreakdown>();
   
   for (const event of events) {
-    if (!event.reason_id || !event.reason) continue;
+    if (!event.reason_id) continue;
+    const reason = reasonLookup.get(event.reason_id);
+    if (!reason) continue;
     
     const endTs = event.end_ts ? new Date(event.end_ts) : new Date();
     const startTs = new Date(event.start_ts);
     const durationMinutes = Math.round((endTs.getTime() - startTs.getTime()) / (1000 * 60));
-    
-    const reason = event.reason as unknown as { id: string; name: string; code: string; category: string };
     
     if (breakdownMap.has(event.reason_id)) {
       const existing = breakdownMap.get(event.reason_id)!;
