@@ -135,12 +135,29 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
     queryFn: async () => {
       const { data, error } = await supabase
         .from('production_events')
-        .select('id, event_type, start_ts, end_ts, reason_id, line_id, downtime_reasons(name, category)')
+        .select('id, event_type, start_ts, end_ts, reason_id, line_id')
         .in('event_type', ['DOWNTIME', 'SETUP'])
         .gte('start_ts', dates.periodStartISO)
         .not('end_ts', 'is', null);
       if (error) throw error;
-      return data || [];
+      const events = data || [];
+      
+      // Fetch reason names from both tables
+      const reasonIds = [...new Set(events.map(e => e.reason_id).filter(Boolean))] as string[];
+      const reasonMap = new Map<string, { name: string; category: string }>();
+      if (reasonIds.length > 0) {
+        const [{ data: dtReasons }, { data: setupReasons }] = await Promise.all([
+          supabase.from('downtime_reasons').select('id, name, category').in('id', reasonIds),
+          supabase.from('setup_reasons').select('id, name').in('id', reasonIds),
+        ]);
+        for (const r of dtReasons || []) reasonMap.set(r.id, r);
+        for (const r of setupReasons || []) reasonMap.set(r.id, { name: r.name, category: 'CHANGEOVER' });
+      }
+      
+      return events.map(e => ({
+        ...e,
+        _reason: e.reason_id ? reasonMap.get(e.reason_id) : undefined,
+      }));
     },
     refetchInterval: isAutoRefresh ? 30000 : false,
   });
@@ -236,7 +253,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
     if (!downtimeEvents?.length) return [];
     const reasonMap = new Map<string, number>();
     downtimeEvents.forEach(event => {
-      const reasonName = (event.downtime_reasons as any)?.name || 'Unknown';
+      const reasonName = event._reason?.name || 'Unknown';
       const duration = event.end_ts && event.start_ts
         ? (new Date(event.end_ts).getTime() - new Date(event.start_ts).getTime()) / 60000
         : 0;
@@ -294,7 +311,7 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
     if (!downtimeEvents?.length) return [];
     const catMap = new Map<string, number>();
     downtimeEvents.forEach(event => {
-      const cat = (event.downtime_reasons as any)?.category || 'UNKNOWN';
+      const cat = event._reason?.category || 'UNKNOWN';
       const duration = event.end_ts && event.start_ts
         ? (new Date(event.end_ts).getTime() - new Date(event.start_ts).getTime()) / 60000
         : 0;

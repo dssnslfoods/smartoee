@@ -54,16 +54,28 @@ async function fetchMonitorData(companyId?: string): Promise<{ machines: Monitor
   // Get open events (end_ts IS NULL) with product + operator info
   const { data: events, error: eventError } = await supabase
     .from('production_events')
-    .select('machine_id, event_type, start_ts, notes, product_id, reason_id, created_by, products(name, code), downtime_reasons(name)')
+    .select('machine_id, event_type, start_ts, notes, product_id, reason_id, created_by, products(name, code)')
     .in('machine_id', machineIds)
     .is('end_ts', null);
 
   if (eventError) throw eventError;
 
+  // Fetch reason names from both downtime_reasons and setup_reasons
+  const reasonIds = [...new Set((events || []).map(e => e.reason_id).filter(Boolean))] as string[];
+  const reasonMap = new Map<string, string>();
+  if (reasonIds.length > 0) {
+    const [{ data: dtReasons }, { data: setupReasons }] = await Promise.all([
+      supabase.from('downtime_reasons').select('id, name').in('id', reasonIds),
+      supabase.from('setup_reasons').select('id, name').in('id', reasonIds),
+    ]);
+    for (const r of dtReasons || []) reasonMap.set(r.id, r.name);
+    for (const r of setupReasons || []) reasonMap.set(r.id, r.name);
+  }
+
   // Build event lookup
-  const eventMap = new Map<string, typeof events extends (infer T)[] | null ? T : never>();
+  const eventMap = new Map<string, (typeof events extends (infer T)[] | null ? T : never) & { _reasonName?: string }>();
   for (const ev of events || []) {
-    eventMap.set(ev.machine_id, ev);
+    eventMap.set(ev.machine_id, { ...ev, _reasonName: ev.reason_id ? reasonMap.get(ev.reason_id) : undefined });
   }
 
   // Get operator names for active events
@@ -98,7 +110,7 @@ async function fetchMonitorData(companyId?: string): Promise<{ machines: Monitor
     stats[status]++;
 
     const product = ev?.products as { name: string; code: string } | null;
-    const reason = ev?.downtime_reasons as { name: string } | null;
+    const reasonName = ev?._reasonName;
 
     return {
       id: machine.id,
@@ -113,7 +125,7 @@ async function fetchMonitorData(companyId?: string): Promise<{ machines: Monitor
       startTs: ev?.start_ts,
       productName: product?.name,
       productCode: product?.code,
-      reasonName: reason?.name,
+      reasonName: reasonName,
       notes: ev?.notes ?? undefined,
       operatorName: ev?.created_by ? operatorMap.get(ev.created_by) : undefined,
     };
