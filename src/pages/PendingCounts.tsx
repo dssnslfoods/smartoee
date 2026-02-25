@@ -13,7 +13,7 @@ import { AddCountsForm } from '@/components/shopfloor/AddCountsForm';
 import { useAuth } from '@/hooks/useAuth';
 import { getDefectReasons, addCountsBackdate } from '@/services';
 import { cn } from '@/lib/utils';
-import { ClipboardList, Play, Package, Clock, ChevronLeft, CheckCircle2, Calendar, Factory, User, Layers } from 'lucide-react';
+import { ClipboardList, Play, Package, Clock, ChevronLeft, CheckCircle2, Calendar, Factory, User, Layers, SplitSquareHorizontal, Equal } from 'lucide-react';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -91,6 +91,7 @@ export default function PendingCounts() {
   const [selectedGroup, setSelectedGroup] = useState<PendingGroup | null>(null);
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'list' | 'group-select' | 'form'>('list');
+  const [splitMode, setSplitMode] = useState<'proportional' | 'equal'>('proportional');
   const [autoSelected, setAutoSelected] = useState(false);
 
   // Fetch all pending RUN events
@@ -228,7 +229,6 @@ export default function PendingCounts() {
       const eventsToRecord = selectedGroup.events.filter(e => selectedEventIds.has(e.id));
       const count = eventsToRecord.length;
 
-      // Split quantities across events proportionally by duration
       const totalMs = eventsToRecord.reduce((sum, e) => sum + (new Date(e.end_ts).getTime() - new Date(e.start_ts).getTime()), 0);
 
       const results: any[] = [];
@@ -238,11 +238,19 @@ export default function PendingCounts() {
       for (let i = 0; i < eventsToRecord.length; i++) {
         const ev = eventsToRecord[i];
         const isLast = i === eventsToRecord.length - 1;
-        const evMs = new Date(ev.end_ts).getTime() - new Date(ev.start_ts).getTime();
-        const ratio = totalMs > 0 ? evMs / totalMs : 1 / count;
 
-        const goodForThis = isLast ? remainGood : Math.round(data.goodQty * ratio);
-        const rejectForThis = isLast ? remainReject : Math.round(data.rejectQty * ratio);
+        let goodForThis: number;
+        let rejectForThis: number;
+
+        if (splitMode === 'equal') {
+          goodForThis = isLast ? remainGood : Math.round(data.goodQty / count);
+          rejectForThis = isLast ? remainReject : Math.round(data.rejectQty / count);
+        } else {
+          const evMs = new Date(ev.end_ts).getTime() - new Date(ev.start_ts).getTime();
+          const ratio = totalMs > 0 ? evMs / totalMs : 1 / count;
+          goodForThis = isLast ? remainGood : Math.round(data.goodQty * ratio);
+          rejectForThis = isLast ? remainReject : Math.round(data.rejectQty * ratio);
+        }
         remainGood -= goodForThis;
         remainReject -= rejectForThis;
 
@@ -419,12 +427,49 @@ export default function PendingCounts() {
                 </div>
               )}
 
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-primary">
-                {isBulk
-                  ? `จำนวนที่ใส่จะถูกแบ่งตามสัดส่วนเวลาของแต่ละเหตุการณ์ (${eventsInScope.length} เหตุการณ์)`
-                  : 'บันทึกจำนวนผลิตสำหรับเหตุการณ์นี้'
-                }
-              </div>
+              {isBulk ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">วิธีแบ่งจำนวน</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSplitMode('proportional')}
+                      className={cn(
+                        'flex items-center gap-2 rounded-lg border-2 p-3 text-left transition-all text-xs',
+                        splitMode === 'proportional'
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-card hover:bg-muted/30 text-muted-foreground'
+                      )}
+                    >
+                      <SplitSquareHorizontal className="h-4 w-4 shrink-0" />
+                      <div>
+                        <div className="font-medium">ตามสัดส่วนเวลา</div>
+                        <div className="text-[10px] opacity-70 mt-0.5">แบ่งตามระยะเวลาแต่ละเหตุการณ์</div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSplitMode('equal')}
+                      className={cn(
+                        'flex items-center gap-2 rounded-lg border-2 p-3 text-left transition-all text-xs',
+                        splitMode === 'equal'
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-card hover:bg-muted/30 text-muted-foreground'
+                      )}
+                    >
+                      <Equal className="h-4 w-4 shrink-0" />
+                      <div>
+                        <div className="font-medium">แบ่งเท่าๆ กัน</div>
+                        <div className="text-[10px] opacity-70 mt-0.5">แบ่งเท่ากันทุกเหตุการณ์</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-primary">
+                  บันทึกจำนวนผลิตสำหรับเหตุการณ์นี้
+                </div>
+              )}
 
               <AddCountsForm
                 defectReasons={defectReasons}
