@@ -508,7 +508,7 @@ export function PlannedTimeManager() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? 'แก้ไข Template' : 'เพิ่ม Planned Production Time'}</DialogTitle>
             <DialogDescription>
@@ -516,45 +516,46 @@ export function PlannedTimeManager() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {/* Plant + Shift selectors */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Plant *</Label>
-                <Select value={formData.plant_id} onValueChange={v => setFormData(p => ({ ...p, plant_id: v }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="เลือก Plant" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plants?.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} {p.code && `(${p.code})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Shift *</Label>
-                <Select value={formData.shift_id} onValueChange={v => setFormData(p => ({ ...p, shift_id: v }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="เลือก Shift" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {shifts?.map(s => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name} ({formatTime(s.start_time)}-{formatTime(s.end_time)})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          {/* Plant + Shift selectors - full width */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Plant *</Label>
+              <Select value={formData.plant_id} onValueChange={v => setFormData(p => ({ ...p, plant_id: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือก Plant" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plants?.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} {p.code && `(${p.code})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Shift *</Label>
+              <Select value={formData.shift_id} onValueChange={v => setFormData(p => ({ ...p, shift_id: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือก Shift" />
+                </SelectTrigger>
+                <SelectContent>
+                  {shifts?.map(s => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name} ({formatTime(s.start_time)}-{formatTime(s.end_time)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-            {/* Deduction fields */}
+          {/* 2-column landscape layout */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            {/* Left column: Deduction fields */}
             <div className="space-y-3 rounded-lg border p-4">
               <h4 className="text-sm font-semibold text-muted-foreground">รายการเวลาหัก (นาที)</h4>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
                 <div className="space-y-1">
                   <Label className="text-xs">พักเบรค (Break)</Label>
                   <Input
@@ -591,111 +592,111 @@ export function PlannedTimeManager() {
                     onChange={e => setFormData(p => ({ ...p, maintenance_minutes: Number(e.target.value) || 0 }))}
                   />
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">อื่นๆ (Other)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={formData.other_minutes}
-                    onChange={e => setFormData(p => ({ ...p, other_minutes: Number(e.target.value) || 0 }))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">ชื่อรายการอื่นๆ</Label>
-                  <Input
-                    value={formData.other_label}
-                    onChange={e => setFormData(p => ({ ...p, other_label: e.target.value }))}
-                    placeholder="เช่น ทำความสะอาด"
-                  />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">อื่นๆ (Other)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={formData.other_minutes}
+                      onChange={e => setFormData(p => ({ ...p, other_minutes: Number(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">ชื่อรายการอื่นๆ</Label>
+                    <Input
+                      value={formData.other_label}
+                      onChange={e => setFormData(p => ({ ...p, other_label: e.target.value }))}
+                      placeholder="เช่น ทำความสะอาด"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Auto-Break Stop Schedule */}
-            <div className="space-y-3 rounded-lg border border-dashed border-orange-300 dark:border-orange-700 p-4">
-              <div className="flex items-center gap-2">
-                <PauseCircle className="h-4 w-4 text-orange-500" />
-                <h4 className="text-sm font-semibold text-orange-700 dark:text-orange-400">Auto-Stop พักกลางวัน</h4>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                ระบบจะหยุดเครื่องจักรอัตโนมัติเมื่อถึงเวลาพัก (ไม่บังคับ — เว้นว่างหากไม่ต้องการ)
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">เวลาเริ่มพัก</Label>
-                  <Input
-                    type="time"
-                    value={formData.break_start_time}
-                    onChange={e => setFormData(p => ({ ...p, break_start_time: e.target.value }))}
-                    placeholder="12:00"
-                  />
+            {/* Right column: Auto-Stop + Settings + Summary */}
+            <div className="space-y-4">
+              {/* Auto-Break Stop Schedule */}
+              <div className="space-y-3 rounded-lg border border-dashed border-orange-300 dark:border-orange-700 p-4">
+                <div className="flex items-center gap-2">
+                  <PauseCircle className="h-4 w-4 text-orange-500" />
+                  <h4 className="text-sm font-semibold text-orange-700 dark:text-orange-400">Auto-Stop พักกลางวัน</h4>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">เวลาสิ้นสุดพัก (คำนวณอัตโนมัติ)</Label>
-                  <Input
-                    type="time"
-                    value={calcBreakEndTime(formData.break_start_time, formData.break_minutes) || ''}
-                    disabled
-                    className="bg-muted"
-                  />
-                </div>
-              </div>
-              {formData.break_start_time && (
-                <p className="text-xs text-orange-600 dark:text-orange-400">
-                  ⏸ เครื่องจักรทุกเครื่องใน Plant นี้จะถูกหยุดอัตโนมัติ เวลา {formData.break_start_time} น. (พัก {formData.break_minutes} นาที ถึง {calcBreakEndTime(formData.break_start_time, formData.break_minutes)} น.) — User ต้องกด Start เองหลังหมดเวลาพัก
+                <p className="text-xs text-muted-foreground">
+                  ระบบจะหยุดเครื่องจักรอัตโนมัติเมื่อถึงเวลาพัก (ไม่บังคับ)
                 </p>
-              )}
-            </div>
-
-            {/* Summary */}
-            <div className="rounded-lg bg-muted/50 p-4 space-y-1">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">เวลากะทั้งหมด</span>
-                <span className="font-medium tabular-nums">
-                  {shiftDurationMinutes != null ? `${shiftDurationMinutes} นาที` : '— เลือก Shift —'}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">รวมเวลาหัก</span>
-                <span className="font-medium tabular-nums text-destructive">- {totalDeduction} นาที</span>
-              </div>
-              <div className="border-t my-2" />
-              <div className="flex justify-between text-base font-semibold">
-                <span>Planned Production Time</span>
-                <span className={`tabular-nums ${plannedProductionTime != null && plannedProductionTime < 0 ? 'text-destructive' : 'text-primary'}`}>
-                  {plannedProductionTime != null ? `${plannedProductionTime} นาที` : '—'}
-                </span>
-              </div>
-            </div>
-
-            {/* Effective From */}
-            <div className="space-y-2">
-              <Label htmlFor="ppt-effective-from">
-                <div className="flex items-center gap-1.5">
-                  <CalendarDays className="h-3.5 w-3.5" />
-                  เริ่มใช้ตั้งแต่วันที่ *
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">เวลาเริ่มพัก</Label>
+                    <Input
+                      type="time"
+                      value={formData.break_start_time}
+                      onChange={e => setFormData(p => ({ ...p, break_start_time: e.target.value }))}
+                      placeholder="12:00"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">สิ้นสุด (อัตโนมัติ)</Label>
+                    <Input
+                      type="time"
+                      value={calcBreakEndTime(formData.break_start_time, formData.break_minutes) || ''}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
                 </div>
-              </Label>
-              <Input
-                id="ppt-effective-from"
-                type="date"
-                value={formData.effective_from}
-                onChange={e => setFormData(p => ({ ...p, effective_from: e.target.value }))}
-              />
-              <p className="text-xs text-muted-foreground">
-                การเปลี่ยนแปลงจะมีผลตั้งแต่วันที่นี้เป็นต้นไป — ไม่กระทบข้อมูลที่บันทึกไปแล้ว
-              </p>
-            </div>
+                {formData.break_start_time && (
+                  <p className="text-xs text-orange-600 dark:text-orange-400">
+                    ⏸ หยุดอัตโนมัติ {formData.break_start_time} น. (พัก {formData.break_minutes} นาที ถึง {calcBreakEndTime(formData.break_start_time, formData.break_minutes)} น.)
+                  </p>
+                )}
+              </div>
 
-            <div className="flex items-center gap-2">
-              <Switch
-                id="template-active"
-                checked={formData.is_active}
-                onCheckedChange={checked => setFormData(p => ({ ...p, is_active: checked }))}
-              />
-              <Label htmlFor="template-active">Active</Label>
+              {/* Effective From + Active */}
+              <div className="grid grid-cols-2 gap-3 items-end">
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <CalendarDays className="h-3.5 w-3.5" />
+                      เริ่มใช้ตั้งแต่ *
+                    </div>
+                  </Label>
+                  <Input
+                    type="date"
+                    value={formData.effective_from}
+                    onChange={e => setFormData(p => ({ ...p, effective_from: e.target.value }))}
+                  />
+                </div>
+                <div className="flex items-center gap-2 pb-1">
+                  <Switch
+                    id="template-active"
+                    checked={formData.is_active}
+                    onCheckedChange={checked => setFormData(p => ({ ...p, is_active: checked }))}
+                  />
+                  <Label htmlFor="template-active">Active</Label>
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="rounded-lg bg-muted/50 p-4 space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">เวลากะทั้งหมด</span>
+                  <span className="font-medium tabular-nums">
+                    {shiftDurationMinutes != null ? `${shiftDurationMinutes} นาที` : '— เลือก Shift —'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">รวมเวลาหัก</span>
+                  <span className="font-medium tabular-nums text-destructive">- {totalDeduction} นาที</span>
+                </div>
+                <div className="border-t my-2" />
+                <div className="flex justify-between text-base font-semibold">
+                  <span>Planned Production Time</span>
+                  <span className={`tabular-nums ${plannedProductionTime != null && plannedProductionTime < 0 ? 'text-destructive' : 'text-primary'}`}>
+                    {plannedProductionTime != null ? `${plannedProductionTime} นาที` : '—'}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
