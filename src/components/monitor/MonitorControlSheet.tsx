@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -138,12 +138,10 @@ export function MonitorControlSheet({
     ? `No benchmark for ${selectedProduct.code} on ${machine.name}`
     : null;
 
-  // Set product from current event when sheet opens
-  useState(() => {
-    if (currentEvent?.product_id && !selectedProductId) {
-      setSelectedProductId(currentEvent.product_id);
-    }
-  });
+  // Reset SKU when machine changes — each machine must have its own SKU selection
+  useEffect(() => {
+    setSelectedProductId(null);
+  }, [machineId]);
 
   // Mutations
   const startEventMutation = useMutation({

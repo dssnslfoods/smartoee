@@ -348,6 +348,11 @@ export default function Shopfloor() {
     startEventMutation.mutate({ eventType: 'RUN' });
   };
 
+  // Reset SKU selection when machine changes — each machine must have its own SKU selection
+  useEffect(() => {
+    setSelectedProductId(null);
+  }, [selectedMachineId]);
+
   // Reset effects only for non-STAFF flow
   useEffect(() => {
     if (!isStaff) {
