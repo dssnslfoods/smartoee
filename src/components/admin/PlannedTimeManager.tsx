@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Copy, Loader2, Clock, Factory, CalendarDays } from 'lucide-react';
+import { Plus, Pencil, Trash2, Copy, Loader2, Clock, Factory, CalendarDays, PauseCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,6 +34,8 @@ interface PlannedTimeTemplate {
   maintenance_minutes: number;
   other_minutes: number;
   other_label: string | null;
+  break_start_time: string | null;
+  break_end_time: string | null;
   is_active: boolean;
   effective_from: string;
   plants?: { id: string; name: string; code: string | null } | null;
@@ -49,6 +51,8 @@ const emptyForm = {
   maintenance_minutes: 0,
   other_minutes: 0,
   other_label: '',
+  break_start_time: '',
+  break_end_time: '',
   is_active: true,
   effective_from: new Date().toISOString().slice(0, 10),
 };
@@ -134,6 +138,8 @@ export function PlannedTimeManager() {
         maintenance_minutes: data.maintenance_minutes,
         other_minutes: data.other_minutes,
         other_label: data.other_label || null,
+        break_start_time: data.break_start_time || null,
+        break_end_time: data.break_end_time || null,
         is_active: data.is_active,
         effective_from: data.effective_from,
       };
@@ -245,6 +251,8 @@ export function PlannedTimeManager() {
         maintenance_minutes: t.maintenance_minutes,
         other_minutes: t.other_minutes,
         other_label: t.other_label,
+        break_start_time: t.break_start_time,
+        break_end_time: t.break_end_time,
         is_active: true,
         effective_from: new Date().toISOString().slice(0, 10),
       }));
@@ -277,6 +285,8 @@ export function PlannedTimeManager() {
       maintenance_minutes: t.maintenance_minutes,
       other_minutes: t.other_minutes,
       other_label: t.other_label || '',
+      break_start_time: t.break_start_time?.slice(0, 5) || '',
+      break_end_time: t.break_end_time?.slice(0, 5) || '',
       is_active: true,
       effective_from: new Date().toISOString().slice(0, 10),
     });
@@ -300,6 +310,8 @@ export function PlannedTimeManager() {
       maintenance_minutes: t.maintenance_minutes,
       other_minutes: t.other_minutes,
       other_label: t.other_label || '',
+      break_start_time: t.break_start_time?.slice(0, 5) || '',
+      break_end_time: t.break_end_time?.slice(0, 5) || '',
       is_active: t.is_active,
       effective_from: t.effective_from || new Date().toISOString().slice(0, 10),
     });
@@ -318,6 +330,15 @@ export function PlannedTimeManager() {
     if (totalDeduction < 0) { toast.error('เวลาหักต้องไม่ติดลบ'); return; }
     if (plannedProductionTime != null && plannedProductionTime < 0) {
       toast.error('เวลาหักรวมมากกว่าเวลากะทั้งหมด');
+      return;
+    }
+    // Validate break time: both must be set or both empty
+    if ((formData.break_start_time && !formData.break_end_time) || (!formData.break_start_time && formData.break_end_time)) {
+      toast.error('กรุณาระบุเวลาเริ่มและสิ้นสุดพักทั้งคู่');
+      return;
+    }
+    if (formData.break_start_time && formData.break_end_time && formData.break_start_time >= formData.break_end_time) {
+      toast.error('เวลาเริ่มพักต้องน้อยกว่าเวลาสิ้นสุดพัก');
       return;
     }
     upsertMutation.mutate(editingId ? { ...formData, id: editingId } : formData);
@@ -385,6 +406,7 @@ export function PlannedTimeManager() {
               <TableHead className="text-right">บำรุงรักษา</TableHead>
               <TableHead className="text-right">อื่นๆ</TableHead>
               <TableHead className="text-right">รวมหัก</TableHead>
+              <TableHead>Auto-Stop พัก</TableHead>
               <TableHead className="text-right">Planned Prod. Time</TableHead>
               <TableHead>สถานะ</TableHead>
               <TableHead className="w-[80px]">Actions</TableHead>
@@ -429,6 +451,16 @@ export function PlannedTimeManager() {
                     )}
                   </TableCell>
                   <TableCell className="text-right font-semibold tabular-nums">{ded} นาที</TableCell>
+                  <TableCell>
+                    {t.break_start_time && t.break_end_time ? (
+                      <Badge variant="outline" className="gap-1">
+                        <PauseCircle className="h-3 w-3" />
+                        {(t.break_start_time as string).slice(0, 5)}-{(t.break_end_time as string).slice(0, 5)}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right font-semibold tabular-nums text-primary">
                     {ppt != null ? `${ppt} นาที` : '-'}
                   </TableCell>
@@ -460,7 +492,7 @@ export function PlannedTimeManager() {
             })}
             {templates?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
                   ยังไม่มี Template — กดปุ่ม "เพิ่ม Template" เพื่อเริ่มกำหนดเวลาหัก
                 </TableCell>
               </TableRow>
@@ -574,6 +606,42 @@ export function PlannedTimeManager() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Auto-Break Stop Schedule */}
+            <div className="space-y-3 rounded-lg border border-dashed border-orange-300 dark:border-orange-700 p-4">
+              <div className="flex items-center gap-2">
+                <PauseCircle className="h-4 w-4 text-orange-500" />
+                <h4 className="text-sm font-semibold text-orange-700 dark:text-orange-400">Auto-Stop พักกลางวัน</h4>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                ระบบจะหยุดเครื่องจักรอัตโนมัติเมื่อถึงเวลาพัก (ไม่บังคับ — เว้นว่างหากไม่ต้องการ)
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">เวลาเริ่มพัก</Label>
+                  <Input
+                    type="time"
+                    value={formData.break_start_time}
+                    onChange={e => setFormData(p => ({ ...p, break_start_time: e.target.value }))}
+                    placeholder="12:00"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">เวลาสิ้นสุดพัก</Label>
+                  <Input
+                    type="time"
+                    value={formData.break_end_time}
+                    onChange={e => setFormData(p => ({ ...p, break_end_time: e.target.value }))}
+                    placeholder="13:00"
+                  />
+                </div>
+              </div>
+              {formData.break_start_time && formData.break_end_time && (
+                <p className="text-xs text-orange-600 dark:text-orange-400">
+                  ⏸ เครื่องจักรทุกเครื่องใน Plant นี้จะถูกหยุดอัตโนมัติ เวลา {formData.break_start_time} น. — User ต้องกด Start เองหลังหมดเวลาพัก
+                </p>
+              )}
             </div>
 
             {/* Summary */}
@@ -746,6 +814,8 @@ export function PlannedTimeManager() {
           maintenance_minutes: 'บำรุงรักษา (นาที)',
           other_minutes: 'อื่นๆ (นาที)',
           other_label: 'ชื่อรายการอื่นๆ',
+          break_start_time: 'เวลาเริ่มพัก (Auto-Stop)',
+          break_end_time: 'เวลาสิ้นสุดพัก (Auto-Stop)',
           is_active: 'สถานะ',
           effective_from: 'เริ่มใช้ตั้งแต่',
         }}

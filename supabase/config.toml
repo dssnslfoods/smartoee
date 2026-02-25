@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.auto-close-events]
 verify_jwt = false
+
+[functions.auto-break-stop]
+verify_jwt = false
+
+[functions.generate-shift-calendar]
+verify_jwt = false

@@ -515,7 +515,9 @@ export type Database = {
       }
       planned_time_templates: {
         Row: {
+          break_end_time: string | null
           break_minutes: number
+          break_start_time: string | null
           company_id: string
           created_at: string
           effective_from: string
@@ -531,7 +533,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          break_end_time?: string | null
           break_minutes?: number
+          break_start_time?: string | null
           company_id: string
           created_at?: string
           effective_from?: string
@@ -547,7 +551,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          break_end_time?: string | null
           break_minutes?: number
+          break_start_time?: string | null
           company_id?: string
           created_at?: string
           effective_from?: string
