@@ -52,7 +52,6 @@ const emptyForm = {
   other_minutes: 0,
   other_label: '',
   break_start_time: '',
-  break_end_time: '',
   is_active: true,
   effective_from: new Date().toISOString().slice(0, 10),
 };
@@ -124,9 +123,21 @@ export function PlannedTimeManager() {
 
   const plannedProductionTime = shiftDurationMinutes != null ? shiftDurationMinutes - totalDeduction : null;
 
+  // Helper to calculate break_end_time from break_start_time + break_minutes
+  const calcBreakEndTime = (startTime: string, breakMin: number): string | null => {
+    if (!startTime) return null;
+    const [h, m] = startTime.split(':').map(Number);
+    const totalMin = h * 60 + m + breakMin;
+    const endH = Math.floor(totalMin / 60) % 24;
+    const endM = totalMin % 60;
+    return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+  };
+
   const upsertMutation = useMutation({
     mutationFn: async (data: typeof formData & { id?: string }) => {
       if (!selectedCompanyId) throw new Error('กรุณาเลือกบริษัทก่อน');
+
+      const breakEndTime = calcBreakEndTime(data.break_start_time, data.break_minutes);
 
       const payload = {
         company_id: selectedCompanyId,
@@ -139,7 +150,7 @@ export function PlannedTimeManager() {
         other_minutes: data.other_minutes,
         other_label: data.other_label || null,
         break_start_time: data.break_start_time || null,
-        break_end_time: data.break_end_time || null,
+        break_end_time: breakEndTime,
         is_active: data.is_active,
         effective_from: data.effective_from,
       };
@@ -286,7 +297,6 @@ export function PlannedTimeManager() {
       other_minutes: t.other_minutes,
       other_label: t.other_label || '',
       break_start_time: t.break_start_time?.slice(0, 5) || '',
-      break_end_time: t.break_end_time?.slice(0, 5) || '',
       is_active: true,
       effective_from: new Date().toISOString().slice(0, 10),
     });
@@ -311,7 +321,6 @@ export function PlannedTimeManager() {
       other_minutes: t.other_minutes,
       other_label: t.other_label || '',
       break_start_time: t.break_start_time?.slice(0, 5) || '',
-      break_end_time: t.break_end_time?.slice(0, 5) || '',
       is_active: t.is_active,
       effective_from: t.effective_from || new Date().toISOString().slice(0, 10),
     });
@@ -332,15 +341,8 @@ export function PlannedTimeManager() {
       toast.error('เวลาหักรวมมากกว่าเวลากะทั้งหมด');
       return;
     }
-    // Validate break time: both must be set or both empty
-    if ((formData.break_start_time && !formData.break_end_time) || (!formData.break_start_time && formData.break_end_time)) {
-      toast.error('กรุณาระบุเวลาเริ่มและสิ้นสุดพักทั้งคู่');
-      return;
-    }
-    if (formData.break_start_time && formData.break_end_time && formData.break_start_time >= formData.break_end_time) {
-      toast.error('เวลาเริ่มพักต้องน้อยกว่าเวลาสิ้นสุดพัก');
-      return;
-    }
+    // Validate break_start_time only if break_minutes > 0
+    // break_end_time is auto-calculated
     upsertMutation.mutate(editingId ? { ...formData, id: editingId } : formData);
   };
 
@@ -452,12 +454,15 @@ export function PlannedTimeManager() {
                   </TableCell>
                   <TableCell className="text-right font-semibold tabular-nums">{ded} นาที</TableCell>
                   <TableCell>
-                    {t.break_start_time && t.break_end_time ? (
-                      <Badge variant="outline" className="gap-1">
-                        <PauseCircle className="h-3 w-3" />
-                        {(t.break_start_time as string).slice(0, 5)}-{(t.break_end_time as string).slice(0, 5)}
-                      </Badge>
-                    ) : (
+                    {t.break_start_time ? (() => {
+                      const endTime = calcBreakEndTime((t.break_start_time as string).slice(0, 5), t.break_minutes);
+                      return (
+                        <Badge variant="outline" className="gap-1">
+                          <PauseCircle className="h-3 w-3" />
+                          {(t.break_start_time as string).slice(0, 5)}-{endTime}
+                        </Badge>
+                      );
+                    })() : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </TableCell>
@@ -628,18 +633,18 @@ export function PlannedTimeManager() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">เวลาสิ้นสุดพัก</Label>
+                  <Label className="text-xs">เวลาสิ้นสุดพัก (คำนวณอัตโนมัติ)</Label>
                   <Input
                     type="time"
-                    value={formData.break_end_time}
-                    onChange={e => setFormData(p => ({ ...p, break_end_time: e.target.value }))}
-                    placeholder="13:00"
+                    value={calcBreakEndTime(formData.break_start_time, formData.break_minutes) || ''}
+                    disabled
+                    className="bg-muted"
                   />
                 </div>
               </div>
-              {formData.break_start_time && formData.break_end_time && (
+              {formData.break_start_time && (
                 <p className="text-xs text-orange-600 dark:text-orange-400">
-                  ⏸ เครื่องจักรทุกเครื่องใน Plant นี้จะถูกหยุดอัตโนมัติ เวลา {formData.break_start_time} น. — User ต้องกด Start เองหลังหมดเวลาพัก
+                  ⏸ เครื่องจักรทุกเครื่องใน Plant นี้จะถูกหยุดอัตโนมัติ เวลา {formData.break_start_time} น. (พัก {formData.break_minutes} นาที ถึง {calcBreakEndTime(formData.break_start_time, formData.break_minutes)} น.) — User ต้องกด Start เองหลังหมดเวลาพัก
                 </p>
               )}
             </div>
