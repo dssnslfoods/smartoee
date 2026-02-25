@@ -165,7 +165,10 @@ export function PlannedTimeManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['planned-time-templates'] });
-      toast.success(editingId ? 'อัปเดตสำเร็จ' : 'สร้างสำเร็จ');
+      const breakInfo = formData.break_start_time
+        ? ` | พักกลางวัน ${formData.break_start_time}-${calcBreakEndTime(formData.break_start_time, formData.break_minutes) || '??:??'} น.`
+        : '';
+      toast.success(`${editingId ? 'อัปเดตสำเร็จ' : 'สร้างสำเร็จ'}${breakInfo}`);
       handleCloseDialog();
     },
     onError: (error: Error) => {
