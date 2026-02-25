@@ -29,10 +29,10 @@ Deno.serve(async (req) => {
     // Find PPT templates that have break_start_time set and current time is within break window
     const { data: templates, error: tplErr } = await supabase
       .from("planned_time_templates")
-      .select("id, plant_id, shift_id, break_start_time, break_minutes")
+      .select("id, plant_id, shift_id, break_start_time, meal_minutes")
       .eq("is_active", true)
       .not("break_start_time", "is", null)
-      .gt("break_minutes", 0);
+      .gt("meal_minutes", 0);
 
     if (tplErr) throw tplErr;
     if (!templates || templates.length === 0) {
@@ -125,9 +125,9 @@ Deno.serve(async (req) => {
       // Close all open RUN events with break_start_time as end_ts
       const breakEndTs = new Date(`${nowDateStr}T${tpl.break_start_time}+07:00`);
 
-      // Calculate break end time from break_start_time + break_minutes
+      // Calculate break end time from break_start_time + meal_minutes
       const breakStartMin = timeToMinutes(tpl.break_start_time as string);
-      const breakEndMin = breakStartMin + (tpl.break_minutes as number);
+      const breakEndMin = breakStartMin + (tpl.meal_minutes as number);
       const breakEndH = String(Math.floor(breakEndMin / 60) % 24).padStart(2, "0");
       const breakEndM = String(breakEndMin % 60).padStart(2, "0");
       const breakEndTimeStr = `${breakEndH}:${breakEndM}`;
