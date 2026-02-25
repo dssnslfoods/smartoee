@@ -508,7 +508,7 @@ export function PlannedTimeManager() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? 'แก้ไข Template' : 'เพิ่ม Planned Production Time'}</DialogTitle>
             <DialogDescription>
