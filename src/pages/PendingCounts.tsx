@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,7 +13,7 @@ import { AddCountsForm } from '@/components/shopfloor/AddCountsForm';
 import { useAuth } from '@/hooks/useAuth';
 import { getDefectReasons, addCountsBackdate } from '@/services';
 import { cn } from '@/lib/utils';
-import { ClipboardList, Play, Package, Clock, ChevronLeft, CheckCircle2, Calendar, Factory, User, Layers, SplitSquareHorizontal, Equal } from 'lucide-react';
+import { ClipboardList, Play, Package, Clock, ChevronLeft, CheckCircle2, Calendar, Factory, User, Layers, SplitSquareHorizontal, Equal, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -78,6 +78,83 @@ function groupEventsByMachineSku(runs: PendingRun[]): PendingGroup[] {
   return [...map.values()].sort((a, b) => b.events.length - a.events.length);
 }
 
+function computeSplit(
+  events: PendingRun[],
+  goodQty: number,
+  rejectQty: number,
+  mode: 'proportional' | 'equal'
+): { eventId: string; startTs: string; endTs: string; good: number; reject: number; minutes: number }[] {
+  const count = events.length;
+  const totalMs = events.reduce((s, e) => s + (new Date(e.end_ts).getTime() - new Date(e.start_ts).getTime()), 0);
+  let remainGood = goodQty;
+  let remainReject = rejectQty;
+
+  return events.map((ev, i) => {
+    const isLast = i === count - 1;
+    const evMs = new Date(ev.end_ts).getTime() - new Date(ev.start_ts).getTime();
+    let good: number, reject: number;
+
+    if (mode === 'equal') {
+      good = isLast ? remainGood : Math.round(goodQty / count);
+      reject = isLast ? remainReject : Math.round(rejectQty / count);
+    } else {
+      const ratio = totalMs > 0 ? evMs / totalMs : 1 / count;
+      good = isLast ? remainGood : Math.round(goodQty * ratio);
+      reject = isLast ? remainReject : Math.round(rejectQty * ratio);
+    }
+    remainGood -= good;
+    remainReject -= reject;
+
+    return { eventId: ev.id, startTs: ev.start_ts, endTs: ev.end_ts, good, reject, minutes: evMs / 60000 };
+  });
+}
+
+function SplitPreview({
+  events,
+  goodQty,
+  rejectQty,
+  splitMode,
+}: {
+  events: PendingRun[];
+  goodQty: number;
+  rejectQty: number;
+  splitMode: 'proportional' | 'equal';
+}) {
+  const splits = computeSplit(events, goodQty, rejectQty, splitMode);
+
+  return (
+    <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+      <div className="flex items-center gap-2 text-xs font-medium text-primary">
+        <Eye className="h-3.5 w-3.5" />
+        Preview การแบ่งจำนวน ({splitMode === 'equal' ? 'เท่ากัน' : 'ตามสัดส่วนเวลา'})
+      </div>
+      <div className="space-y-1.5">
+        {splits.map((s, i) => (
+          <div key={s.eventId} className="flex items-center justify-between text-xs rounded-md bg-card/50 px-2.5 py-1.5 border border-border/50">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <span className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded">#{i + 1}</span>
+              <span className="font-mono">
+                {format(new Date(s.startTs), 'HH:mm')} - {format(new Date(s.endTs), 'HH:mm')}
+              </span>
+              <span className="text-[10px] opacity-60">({formatDuration(s.minutes)})</span>
+            </div>
+            <div className="flex items-center gap-3 font-semibold tabular-nums">
+              <span className="text-green-500">{s.good.toLocaleString()}</span>
+              {s.reject > 0 && <span className="text-red-500">{s.reject.toLocaleString()}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t border-border/30">
+        <span>รวม {events.length} เหตุการณ์</span>
+        <span className="tabular-nums font-medium">
+          ดี: {goodQty.toLocaleString()} {rejectQty > 0 && `• เสีย: ${rejectQty.toLocaleString()}`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function PendingCounts() {
   const queryClient = useQueryClient();
   const { company, isAdmin, hasRole } = useAuth();
@@ -93,6 +170,8 @@ export default function PendingCounts() {
   const [viewMode, setViewMode] = useState<'list' | 'group-select' | 'form'>('list');
   const [splitMode, setSplitMode] = useState<'proportional' | 'equal'>('proportional');
   const [autoSelected, setAutoSelected] = useState(false);
+  const [formGoodQty, setFormGoodQty] = useState(0);
+  const [formRejectQty, setFormRejectQty] = useState(0);
 
   // Fetch all pending RUN events
   const { data: pendingRuns = [], isLoading } = useQuery({
@@ -478,6 +557,15 @@ export default function PendingCounts() {
                   else addCountsMutation.mutate(data);
                 }}
                 isLoading={isBulk ? bulkCountsMutation.isPending : addCountsMutation.isPending}
+                onValuesChange={isBulk ? (g, r) => { setFormGoodQty(g); setFormRejectQty(r); } : undefined}
+                previewSlot={isBulk && (formGoodQty > 0 || formRejectQty > 0) ? (
+                  <SplitPreview
+                    events={eventsInScope}
+                    goodQty={formGoodQty}
+                    rejectQty={formRejectQty}
+                    splitMode={splitMode}
+                  />
+                ) : undefined}
               />
             </CardContent>
           </Card>

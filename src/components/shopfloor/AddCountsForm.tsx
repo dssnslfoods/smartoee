@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,6 +23,9 @@ interface AddCountsFormProps {
   }) => void;
   isLoading?: boolean;
   isLocked?: boolean;
+  onValuesChange?: (goodQty: number, rejectQty: number) => void;
+  /** Rendered between the notes and the submit section */
+  previewSlot?: React.ReactNode;
 }
 
 type ActiveField = 'good' | 'reject';
@@ -34,6 +37,8 @@ export function AddCountsForm({
   onSubmit,
   isLoading = false,
   isLocked = false,
+  onValuesChange,
+  previewSlot,
 }: AddCountsFormProps) {
   const [goodQty, setGoodQty] = useState(0);
   const [rejectQty, setRejectQty] = useState(0);
@@ -42,6 +47,11 @@ export function AddCountsForm({
   const [activeField, setActiveField] = useState<ActiveField>('good');
   const [inputBuffer, setInputBuffer] = useState('0');
   const [isEditing, setIsEditing] = useState(false);
+
+  // Notify parent of value changes
+  useEffect(() => {
+    onValuesChange?.(goodQty, rejectQty);
+  }, [goodQty, rejectQty, onValuesChange]);
 
   const currentValue = activeField === 'good' ? goodQty : rejectQty;
   const setCurrentValue = activeField === 'good' ? setGoodQty : setRejectQty;
@@ -310,6 +320,9 @@ export function AddCountsForm({
           disabled={isLocked}
         />
       </div>
+
+      {/* Preview slot for split distribution */}
+      {previewSlot}
 
       {/* Total Summary + Submit */}
       <div className="rounded-xl border bg-muted/30 p-3">
