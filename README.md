@@ -1,73 +1,65 @@
-# Welcome to your Lovable project
+# PNF OEE System (Overall Equipment Effectiveness)
 
-## Project info
+Dashboard แสดงผลสัมฤทธิ์ของเครื่องจักรในสายการผลิตแบบ Real-Time (OEE) 
+เป็นระบบที่ใช้ติดตามประสิทธิภาพการทำงานของเครื่องจักร, ควบคุม, วิจัยสาเหตุการหยุดทำงาน และเพิ่มประสิทธิภาพของการผลิตโดยรวมอย่างยั่งยืน
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Project Details
+- **Project Name:** PNF OEE System (Manufacturing Dashboard)
+- **Version:** 1.0.0
+- **Author & Lead Developer:** Arnon Arpaket
+- **Technology Stack:** React, TypeScript, Vite, Tailwind CSS, Supabase
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## 🔒 License and Copyright
+**Copyright © 2026 Arnon Arpaket. All Rights Reserved.**
 
-**Use Lovable**
+ระบบ **PNF OEE System** (รวมถึง Source Code, รูปแบบฐานข้อมูล, ดีไซน์ Layout และตรรกะทั้งหมดที่ปรากฏในโปรเจกต์นี้) 
+เป็นทรัพย์สินทางปัญญาและมีลิขสิทธิ์ผูกขาดหรือเป็นสิทธิ์ขาดของ **Arnon Arpaket** แต่เพียงผู้เดียว โดยได้รับการปกป้องภายใต้กฎหมายลิขสิทธิ์แห่งราชอาณาจักรไทยและนานาชาติ
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### Terms of Use (ข้อตกลงการใช้งาน)
+1. ห้ามมิให้ผู้ใดคัดลอก, ทำซ้ำ, ดัดแปลง, แจกจ่าย, วางขาย หรือนำโค้ดในโปรเจกต์นี้ทั้งหมดหรือบางส่วน ไม่ว่าส่วนหนึ่งส่วนใดไปใช้ในทางอื่นใด เว้นแต่จะได้รับ **การอนุญาตเป็นลายลักษณ์อักษร** จากเจ้าของลิขสิทธิ์ (Arnon Arpaket) อย่างเป็นทางการเท่านั้น
+2. รูปแบบโครงสร้าง (Structure), ฐานข้อมูล (Database Schema) ตลอดจนฟังก์ชันการคำนวณ OEE ถูกสร้างและออกแบบโดยตั้งใจเพื่อนำมาใช้งานเป็นการเฉพาะ ห้ามนำไปวิศวกรรมย้อนกลับ (Reverse Engineer) หรือแสวงหาผลประโยชน์ทางการค้าโดยเด็ดขาด
+3. หากฝ่าฝืน ผู้ละเมิดอาจถูกดำเนินการตามกฎหมายทรัพย์สินทางปัญญาสูงสุด
 
-Changes made via Lovable will be committed automatically to this repo.
+*(If you require any special licensing or partnership, please contact the author directly.)*
 
-**Use your preferred IDE**
+---
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Features (ฟังก์ชันการทำงานหลัก)
+- **Real-Time Monitoring:** ติดตามสายการผลิตแบบเรียลไทม์ (Running, Idle, Stopped, Maintenance)
+- **OEE Calculation:** คำนวณค่า OEE (Availability × Performance × Quality) ผ่าน Formula แบบมาตรฐานอุตสาหกรรม
+- **Multi-Role Access Control (RBAC):** ระบบจำกัดสิทธิ์ผู้ใช้ ตั้งแต่ Admin, Executive, MANAGER, SUPERVISOR, OPERATOR จนถึง VIEWER
+- **Audit Logs:** บันทึกทุกความเคลื่อนไหว (Insert, Update, Delete) ไว้ในฐานข้อมูล เพื่อการตรวจสอบย้อนหลังที่แม่นยำ
+- **Shopfloor Interface:** ออกแบบหน้าจอให้พนักงานหน้าเครื่องจักรหรือ Tablet ใช้งานได้ง่ายที่สุด
+- **Data Export & Reports:** สร้างรายงานสรุปประสิทธิภาพรายสัปดาห์ / รายเดือน
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+---
 
-Follow these steps:
+## Getting Started (การรันระบบ)
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Requirements
+- Node.js (v18 หรือสูงกว่า)
+- npm หรือ yarn หรือ pnpm
+- Supabase Project (Database)
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Installation
+1. ติดตั้ง Dependencies
+   ```bash
+   npm install
+   ```
+2. คัดลอกไฟล์ Environment Variables
+   ```bash
+   cp .env.example .env
+   ```
+   *และเข้าไปใส่ค่า Credentials จาก Supabase ของคุณลงไปในไฟล์ .env*
 
-# Step 3: Install the necessary dependencies.
-npm i
+3. สั่งเริ่มต้นเซิร์ฟเวอร์แบบ Local
+   ```bash
+   npm run dev
+   ```
+4. เข้าชมผ่านเว็บบราวเซอร์ที่: `http://localhost:8080` (หรือพอร์ตอื่นที่ระบุใน Terminal)
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+---
 
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+> **Note:** การเข้าใช้ Environment ของ Production เพื่อดูฐานข้อมูลจริง ต้องได้รับการจัดการจากทางทีม Admin โดยตรงเท่านั้น

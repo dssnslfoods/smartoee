@@ -1,0 +1,1847 @@
+arguments;function_definition;function_name;return_type;security_definer
+;"CREATE OR REPLACE FUNCTION public.audit_trail()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+    entity_id_val UUID;
+    before_val JSONB;
+    after_val JSONB;
+BEGIN
+    -- Determine entity_id and before/after values based on operation
+    IF TG_OP = 'INSERT' THEN
+        entity_id_val := NEW.id;
+        before_val := NULL;
+        after_val := to_jsonb(NEW);
+    ELSIF TG_OP = 'UPDATE' THEN
+        entity_id_val := NEW.id;
+        before_val := to_jsonb(OLD);
+        after_val := to_jsonb(NEW);
+    ELSIF TG_OP = 'DELETE' THEN
+        entity_id_val := OLD.id;
+        before_val := to_jsonb(OLD);
+        after_val := NULL;
+    END IF;
+
+    -- Insert audit log entry
+    INSERT INTO public.audit_logs (
+        entity_type,
+        entity_id,
+        action,
+        before_json,
+        after_json,
+        actor_user_id
+    ) VALUES (
+        TG_TABLE_NAME,
+        entity_id_val,
+        TG_OP,
+        before_val,
+        after_val,
+        auth.uid()
+    );
+
+    -- Return appropriate value
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    ELSE
+        RETURN NEW;
+    END IF;
+END;
+$function$
+";audit_trail;trigger;true
+;"CREATE OR REPLACE FUNCTION public.cascade_adjacent_event_times()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  -- Allow bypass when rpc_update_event handles cascade manually
+  IF current_setting('app.skip_cascade', true) = 'true' THEN
+    RETURN NEW;
+  END IF;
+
+  IF pg_trigger_depth() > 1 THEN
+    RETURN NEW;
+  END IF;
+
+  IF OLD.end_ts IS DISTINCT FROM NEW.end_ts AND NEW.end_ts IS NOT NULL THEN
+    UPDATE production_events
+    SET start_ts = NEW.end_ts
+    WHERE id = (
+      SELECT pe.id
+      FROM production_events pe
+      WHERE pe.machine_id = NEW.machine_id
+        AND pe.shift_calendar_id = NEW.shift_calendar_id
+        AND pe.id != NEW.id
+        AND pe.start_ts = OLD.end_ts
+      LIMIT 1
+    );
+  END IF;
+
+  IF OLD.start_ts IS DISTINCT FROM NEW.start_ts THEN
+    UPDATE production_events
+    SET end_ts = NEW.start_ts
+    WHERE id = (
+      SELECT pe.id
+      FROM production_events pe
+      WHERE pe.machine_id = NEW.machine_id
+        AND pe.shift_calendar_id = NEW.shift_calendar_id
+        AND pe.id != NEW.id
+        AND pe.end_ts = OLD.start_ts
+      LIMIT 1
+    );
+  END IF;
+
+  RETURN NEW;
+END;
+$function$
+";cascade_adjacent_event_times;trigger;true
+;"CREATE OR REPLACE FUNCTION public.check_event_overlap()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+    overlap_count INTEGER;
+BEGIN
+    -- Allow bypass when called from rpc_update_event (which handles overlap manually)
+    IF current_setting('app.skip_overlap_check', true) = 'true' THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT COUNT(*) INTO overlap_count
+    FROM public.production_events pe
+    WHERE pe.machine_id = NEW.machine_id
+      AND pe.shift_calendar_id = NEW.shift_calendar_id
+      AND pe.id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::UUID)
+      AND (
+          (NEW.start_ts >= pe.start_ts AND NEW.start_ts < COALESCE(pe.end_ts, 'infinity'::TIMESTAMPTZ))
+          OR
+          (COALESCE(NEW.end_ts, 'infinity'::TIMESTAMPTZ) > pe.start_ts 
+           AND COALESCE(NEW.end_ts, 'infinity'::TIMESTAMPTZ) <= COALESCE(pe.end_ts, 'infinity'::TIMESTAMPTZ))
+          OR
+          (NEW.start_ts <= pe.start_ts 
+           AND COALESCE(NEW.end_ts, 'infinity'::TIMESTAMPTZ) >= COALESCE(pe.end_ts, 'infinity'::TIMESTAMPTZ))
+          OR
+          (NEW.end_ts IS NULL AND pe.end_ts IS NULL)
+      );
+
+    IF overlap_count > 0 THEN
+        RAISE EXCEPTION 'OVERLAP_EVENT: Cannot create overlapping events on the same machine within the same shift'
+            USING ERRCODE = 'P0001';
+    END IF;
+
+    RETURN NEW;
+END;
+$function$
+";check_event_overlap;trigger;true
+;"CREATE OR REPLACE FUNCTION public.check_shift_lock()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+    shift_status public.approval_status;
+    shift_cal_id UUID;
+BEGIN
+    -- Get the shift_calendar_id depending on operation
+    IF TG_OP = 'DELETE' THEN
+        shift_cal_id := OLD.shift_calendar_id;
+    ELSE
+        shift_cal_id := NEW.shift_calendar_id;
+    END IF;
+
+    -- Check if shift is locked
+    SELECT status INTO shift_status
+    FROM public.shift_approvals
+    WHERE shift_calendar_id = shift_cal_id;
+
+    IF shift_status = 'LOCKED' THEN
+        RAISE EXCEPTION 'SHIFT_LOCKED: Cannot modify data for a locked shift'
+            USING ERRCODE = 'P0002';
+    END IF;
+
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    ELSE
+        RETURN NEW;
+    END IF;
+END;
+$function$
+";check_shift_lock;trigger;true
+p_plant_id uuid, p_local_date date, p_local_time time without time zone;"CREATE OR REPLACE FUNCTION public.ensure_shift_calendar(p_plant_id uuid, p_local_date date, p_local_time time without time zone)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_sc_id UUID;
+  v_shift RECORD;
+  v_shift_duration_minutes INTEGER;
+  v_planned_time INTEGER;
+  v_ppt_template RECORD;
+  v_total_deductions INTEGER;
+BEGIN
+  -- 1) Try to find existing shift_calendar entry (same day)
+  SELECT sc.id INTO v_sc_id
+    FROM shift_calendar sc
+    JOIN shifts s ON s.id = sc.shift_id
+   WHERE sc.plant_id = p_plant_id
+     AND s.is_active = true
+     AND sc.shift_date = p_local_date
+     AND (EXTRACT(DOW FROM p_local_date))::int = ANY(s.working_days)
+     AND (
+       (s.start_time <= s.end_time AND p_local_time >= s.start_time AND p_local_time < s.end_time)
+       OR
+       (s.start_time > s.end_time AND (p_local_time >= s.start_time OR p_local_time < s.end_time))
+     )
+   LIMIT 1;
+
+  IF v_sc_id IS NOT NULL THEN
+    RETURN v_sc_id;
+  END IF;
+
+  -- 2) Try previous day for overnight shifts
+  SELECT sc.id INTO v_sc_id
+    FROM shift_calendar sc
+    JOIN shifts s ON s.id = sc.shift_id
+   WHERE sc.plant_id = p_plant_id
+     AND s.is_active = true
+     AND sc.shift_date = (p_local_date - interval '1 day')::date
+     AND (EXTRACT(DOW FROM (p_local_date - interval '1 day')::date))::int = ANY(s.working_days)
+     AND s.start_time > s.end_time
+     AND p_local_time < s.end_time
+   LIMIT 1;
+
+  IF v_sc_id IS NOT NULL THEN
+    RETURN v_sc_id;
+  END IF;
+
+  -- 3) No shift_calendar found — try to auto-create from shifts table
+  -- Check same-day shifts first
+  SELECT s.* INTO v_shift
+    FROM shifts s
+   WHERE s.plant_id = p_plant_id
+     AND s.is_active = true
+     AND (EXTRACT(DOW FROM p_local_date))::int = ANY(s.working_days)
+     AND s.effective_from <= p_local_date
+     AND (
+       (s.start_time <= s.end_time AND p_local_time >= s.start_time AND p_local_time < s.end_time)
+       OR
+       (s.start_time > s.end_time AND (p_local_time >= s.start_time OR p_local_time < s.end_time))
+     )
+   ORDER BY s.effective_from DESC
+   LIMIT 1;
+
+  -- Check previous-day overnight shifts
+  IF v_shift IS NULL THEN
+    SELECT s.* INTO v_shift
+      FROM shifts s
+     WHERE s.plant_id = p_plant_id
+       AND s.is_active = true
+       AND (EXTRACT(DOW FROM (p_local_date - interval '1 day')::date))::int = ANY(s.working_days)
+       AND s.effective_from <= (p_local_date - interval '1 day')::date
+       AND s.start_time > s.end_time
+       AND p_local_time < s.end_time
+     ORDER BY s.effective_from DESC
+     LIMIT 1;
+
+    IF v_shift IS NOT NULL THEN
+      -- For overnight shift, the shift_date is previous day
+      p_local_date := (p_local_date - interval '1 day')::date;
+    END IF;
+  END IF;
+
+  IF v_shift IS NULL THEN
+    RETURN NULL; -- No matching shift configuration
+  END IF;
+
+  -- Check holidays before creating
+  IF EXISTS (
+    SELECT 1 FROM holidays h
+    JOIN plants p ON p.id = p_plant_id
+    WHERE h.company_id = p.company_id
+      AND (h.plant_id IS NULL OR h.plant_id = p_plant_id)
+      AND (
+        h.holiday_date = p_local_date
+        OR (h.is_recurring = true 
+            AND EXTRACT(MONTH FROM h.holiday_date) = EXTRACT(MONTH FROM p_local_date) 
+            AND EXTRACT(DAY FROM h.holiday_date) = EXTRACT(DAY FROM p_local_date))
+      )
+  ) THEN
+    RETURN NULL; -- Holiday, don't create
+  END IF;
+
+  -- Calculate planned_time from PPT template
+  v_shift_duration_minutes := EXTRACT(EPOCH FROM (v_shift.end_time - v_shift.start_time))::int / 60;
+  IF v_shift_duration_minutes <= 0 THEN
+    v_shift_duration_minutes := v_shift_duration_minutes + 1440;
+  END IF;
+
+  SELECT * INTO v_ppt_template
+    FROM planned_time_templates
+   WHERE plant_id = p_plant_id
+     AND shift_id = v_shift.id
+     AND is_active = true
+     AND effective_from <= p_local_date
+   ORDER BY effective_from DESC
+   LIMIT 1;
+
+  IF v_ppt_template IS NOT NULL THEN
+    v_total_deductions := COALESCE(v_ppt_template.break_minutes, 0)
+                        + COALESCE(v_ppt_template.meal_minutes, 0)
+                        + COALESCE(v_ppt_template.meeting_minutes, 0)
+                        + COALESCE(v_ppt_template.maintenance_minutes, 0)
+                        + COALESCE(v_ppt_template.other_minutes, 0);
+    v_planned_time := GREATEST(v_shift_duration_minutes - v_total_deductions, 0);
+  ELSE
+    v_planned_time := v_shift_duration_minutes;
+  END IF;
+
+  -- Auto-create shift_calendar entry
+  INSERT INTO shift_calendar (plant_id, shift_id, shift_date, planned_time_minutes)
+  VALUES (p_plant_id, v_shift.id, p_local_date, v_planned_time)
+  ON CONFLICT DO NOTHING
+  RETURNING id INTO v_sc_id;
+
+  -- If ON CONFLICT hit, fetch existing
+  IF v_sc_id IS NULL THEN
+    SELECT sc.id INTO v_sc_id
+      FROM shift_calendar sc
+     WHERE sc.plant_id = p_plant_id
+       AND sc.shift_id = v_shift.id
+       AND sc.shift_date = p_local_date
+     LIMIT 1;
+  END IF;
+
+  RETURN v_sc_id;
+END;
+$function$
+";ensure_shift_calendar;uuid;true
+_machine_id uuid;"CREATE OR REPLACE FUNCTION public.get_line_from_machine(_machine_id uuid)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+    SELECT line_id FROM public.machines WHERE id = _machine_id
+$function$
+";get_line_from_machine;uuid;true
+_user_id uuid;"CREATE OR REPLACE FUNCTION public.get_user_company(_user_id uuid)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+    SELECT company_id FROM public.user_profiles WHERE user_id = _user_id
+$function$
+";get_user_company;uuid;true
+;"CREATE OR REPLACE FUNCTION public.get_user_permitted_machine_ids()
+ RETURNS SETOF uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  -- Admin: all active machines
+  SELECT m.id FROM machines m
+  WHERE m.is_active = true
+    AND is_admin(auth.uid())
+
+  UNION
+
+  -- Supervisor: all machines in their company
+  SELECT m.id FROM machines m
+  WHERE m.is_active = true
+    AND EXISTS (
+      SELECT 1 FROM user_profiles up
+      WHERE up.user_id = auth.uid()
+      AND up.role = 'SUPERVISOR'
+      AND up.company_id = m.company_id
+    )
+
+  UNION
+
+  -- Staff: direct machine permissions
+  SELECT ump.machine_id FROM user_machine_permissions ump
+  JOIN machines m ON m.id = ump.machine_id AND m.is_active = true
+  WHERE ump.user_id = auth.uid()
+
+  UNION
+
+  -- Staff: group-based machine permissions
+  SELECT gpgm.machine_id 
+  FROM user_permission_groups upg
+  JOIN machine_permission_group_machines gpgm ON gpgm.group_id = upg.group_id
+  JOIN machines m ON m.id = gpgm.machine_id AND m.is_active = true
+  WHERE upg.user_id = auth.uid()
+$function$
+";get_user_permitted_machine_ids;uuid;true
+_user_id uuid;"CREATE OR REPLACE FUNCTION public.get_user_role(_user_id uuid)
+ RETURNS app_role
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+    SELECT role FROM public.user_profiles WHERE user_id = _user_id
+$function$
+";get_user_role;app_role;true
+;"CREATE OR REPLACE FUNCTION public.handle_new_user()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+    INSERT INTO public.user_profiles (user_id, full_name, role, company_id, email)
+    VALUES (
+        NEW.id,
+        COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
+        COALESCE(
+            (NEW.raw_user_meta_data->>'role')::app_role,
+            'STAFF'::app_role
+        ),
+        (NEW.raw_user_meta_data->>'company_id')::uuid,
+        NEW.email
+    );
+    RETURN NEW;
+END;
+$function$
+";handle_new_user;trigger;true
+_user_id uuid, _line_id uuid;"CREATE OR REPLACE FUNCTION public.has_line_permission(_user_id uuid, _line_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+    SELECT EXISTS (
+        SELECT 1 FROM public.user_line_permissions 
+        WHERE user_id = _user_id AND line_id = _line_id
+    ) OR public.is_admin(_user_id)
+$function$
+";has_line_permission;bool;true
+_user_id uuid, _machine_id uuid;"CREATE OR REPLACE FUNCTION public.has_machine_permission(_user_id uuid, _machine_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+    SELECT EXISTS (
+        -- Direct machine permission
+        SELECT 1 FROM public.user_machine_permissions 
+        WHERE user_id = _user_id AND machine_id = _machine_id
+    ) 
+    OR public.is_admin(_user_id)
+    OR EXISTS (
+        -- Supervisor with same company as the machine
+        SELECT 1 
+        FROM public.user_profiles up
+        JOIN public.machines m ON m.company_id = up.company_id
+        WHERE up.user_id = _user_id 
+          AND up.role = 'SUPERVISOR'
+          AND m.id = _machine_id
+    )
+    OR EXISTS (
+        -- Group-based permission
+        SELECT 1 
+        FROM public.user_permission_groups upg
+        JOIN public.machine_permission_group_machines mpgm ON mpgm.group_id = upg.group_id
+        WHERE upg.user_id = _user_id 
+          AND mpgm.machine_id = _machine_id
+    )
+$function$
+";has_machine_permission;bool;true
+_user_id uuid, _plant_id uuid;"CREATE OR REPLACE FUNCTION public.has_plant_permission(_user_id uuid, _plant_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+    SELECT 
+        -- Admin has access to all plants
+        public.is_admin(_user_id)
+        OR
+        -- User has explicit plant permission
+        EXISTS (
+            SELECT 1 FROM public.user_plant_permissions 
+            WHERE user_id = _user_id AND plant_id = _plant_id
+        )
+        OR
+        -- Supervisor has automatic access to all plants in their company
+        EXISTS (
+            SELECT 1 
+            FROM public.user_profiles up
+            JOIN public.plants p ON p.company_id = up.company_id
+            WHERE up.user_id = _user_id 
+              AND up.role IN ('SUPERVISOR', 'EXECUTIVE')
+              AND p.id = _plant_id
+        )
+$function$
+";has_plant_permission;bool;true
+_user_id uuid;"CREATE OR REPLACE FUNCTION public.is_admin(_user_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+    SELECT EXISTS (
+        SELECT 1 FROM public.user_profiles 
+        WHERE user_id = _user_id AND role = 'ADMIN'
+    )
+$function$
+";is_admin;bool;true
+_user_id uuid;"CREATE OR REPLACE FUNCTION public.is_executive(_user_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+    SELECT EXISTS (
+        SELECT 1 FROM public.user_profiles 
+        WHERE user_id = _user_id AND role IN ('EXECUTIVE', 'ADMIN')
+    )
+$function$
+";is_executive;bool;true
+_shift_calendar_id uuid;"CREATE OR REPLACE FUNCTION public.is_shift_locked(_shift_calendar_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+    SELECT EXISTS (
+        SELECT 1 FROM public.shift_approvals 
+        WHERE shift_calendar_id = _shift_calendar_id AND status = 'LOCKED'
+    )
+$function$
+";is_shift_locked;bool;true
+_shift_id uuid, _check_date date;"CREATE OR REPLACE FUNCTION public.is_shift_working_day(_shift_id uuid, _check_date date)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT EXISTS (
+    SELECT 1 FROM public.shifts
+    WHERE id = _shift_id
+      AND (EXTRACT(DOW FROM _check_date))::int = ANY(working_days)
+  )
+$function$
+";is_shift_working_day;bool;true
+_user_id uuid;"CREATE OR REPLACE FUNCTION public.is_supervisor(_user_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+    SELECT EXISTS (
+        SELECT 1 FROM public.user_profiles 
+        WHERE user_id = _user_id AND role IN ('SUPERVISOR', 'ADMIN')
+    )
+$function$
+";is_supervisor;bool;true
+_user_id uuid, _company_id uuid;"CREATE OR REPLACE FUNCTION public.is_supervisor_of_company(_user_id uuid, _company_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+    SELECT EXISTS (
+        SELECT 1 FROM public.user_profiles 
+        WHERE user_id = _user_id 
+          AND role IN ('SUPERVISOR', 'ADMIN')
+          AND (company_id = _company_id OR public.is_admin(_user_id))
+    )
+$function$
+";is_supervisor_of_company;bool;true
+p_machine_id uuid, p_good_qty integer, p_reject_qty integer, p_defect_reason_id uuid, p_notes text;"CREATE OR REPLACE FUNCTION public.rpc_add_counts(p_machine_id uuid, p_good_qty integer, p_reject_qty integer DEFAULT 0, p_defect_reason_id uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text)
+ RETURNS json
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_plant_id uuid;
+  v_sc_id uuid;
+  v_now timestamptz := now();
+  v_local_time time;
+  v_local_date date;
+BEGIN
+  SELECT l.plant_id INTO v_plant_id
+    FROM machines m
+    JOIN lines l ON l.id = m.line_id
+   WHERE m.id = p_machine_id;
+
+  IF v_plant_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'Machine not found');
+  END IF;
+
+  v_local_time := (v_now AT TIME ZONE 'Asia/Bangkok')::time;
+  v_local_date := (v_now AT TIME ZONE 'Asia/Bangkok')::date;
+
+  -- Use ensure_shift_calendar with fallback auto-creation
+  v_sc_id := ensure_shift_calendar(v_plant_id, v_local_date, v_local_time);
+
+  IF v_sc_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'นอกเวลาทำการ ไม่สามารถบันทึกจำนวนผลิตได้ — ตรวจสอบวันและเวลากะทำงาน');
+  END IF;
+
+  IF is_shift_locked(v_sc_id) THEN
+    RETURN json_build_object('ok', false, 'error', 'กะนี้ถูก Lock แล้ว ไม่สามารถแก้ไขได้');
+  END IF;
+
+  INSERT INTO production_counts (
+    machine_id, shift_calendar_id,
+    good_qty, reject_qty, defect_reason_id, notes,
+    created_by
+  ) VALUES (
+    p_machine_id, v_sc_id,
+    p_good_qty, p_reject_qty, p_defect_reason_id, p_notes,
+    v_user_id
+  );
+
+  RETURN json_build_object('ok', true);
+END;
+$function$
+";rpc_add_counts;json;true
+p_machine_id uuid, p_good_qty integer, p_reject_qty integer, p_defect_reason_id uuid, p_notes text, p_shift_calendar_id uuid, p_ts timestamp with time zone;"CREATE OR REPLACE FUNCTION public.rpc_add_counts_backdate(p_machine_id uuid, p_good_qty integer, p_reject_qty integer DEFAULT 0, p_defect_reason_id uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text, p_shift_calendar_id uuid DEFAULT NULL::uuid, p_ts timestamp with time zone DEFAULT NULL::timestamp with time zone)
+ RETURNS json
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_plant_id uuid;
+  v_sc_id uuid;
+  v_ts timestamptz;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'User not authenticated');
+  END IF;
+
+  IF NOT has_machine_permission(v_user_id, p_machine_id) THEN
+    RETURN json_build_object('ok', false, 'error', 'No permission for this machine');
+  END IF;
+
+  IF p_shift_calendar_id IS NOT NULL THEN
+    v_sc_id := p_shift_calendar_id;
+    v_ts := COALESCE(p_ts, now());
+
+    SELECT l.plant_id INTO v_plant_id
+      FROM machines m
+      JOIN lines l ON l.id = m.line_id
+     WHERE m.id = p_machine_id;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM shift_calendar sc WHERE sc.id = v_sc_id AND sc.plant_id = v_plant_id
+    ) THEN
+      RETURN json_build_object('ok', false, 'error', 'Shift calendar ไม่ตรงกับ Plant ของเครื่องจักร');
+    END IF;
+
+    IF is_shift_locked(v_sc_id) THEN
+      RETURN json_build_object('ok', false, 'error', 'กะนี้ถูก Lock แล้ว ไม่สามารถแก้ไขได้');
+    END IF;
+  ELSE
+    v_ts := now();
+    DECLARE
+      v_local_time time;
+      v_local_date date;
+    BEGIN
+      SELECT l.plant_id INTO v_plant_id
+        FROM machines m
+        JOIN lines l ON l.id = m.line_id
+       WHERE m.id = p_machine_id;
+
+      IF v_plant_id IS NULL THEN
+        RETURN json_build_object('ok', false, 'error', 'Machine not found');
+      END IF;
+
+      v_local_time := (v_ts AT TIME ZONE 'Asia/Bangkok')::time;
+      v_local_date := (v_ts AT TIME ZONE 'Asia/Bangkok')::date;
+
+      -- Use ensure_shift_calendar with fallback auto-creation
+      v_sc_id := ensure_shift_calendar(v_plant_id, v_local_date, v_local_time);
+
+      IF v_sc_id IS NULL THEN
+        RETURN json_build_object('ok', false, 'error', 'นอกเวลาทำการ ไม่สามารถบันทึกจำนวนผลิตได้');
+      END IF;
+
+      IF is_shift_locked(v_sc_id) THEN
+        RETURN json_build_object('ok', false, 'error', 'กะนี้ถูก Lock แล้ว ไม่สามารถแก้ไขได้');
+      END IF;
+    END;
+  END IF;
+
+  INSERT INTO production_counts (
+    machine_id, shift_calendar_id,
+    good_qty, reject_qty, defect_reason_id, notes,
+    created_by, ts
+  ) VALUES (
+    p_machine_id, v_sc_id,
+    p_good_qty, p_reject_qty, p_defect_reason_id, p_notes,
+    v_user_id, v_ts
+  );
+
+  RETURN json_build_object('ok', true);
+END;
+$function$
+";rpc_add_counts_backdate;json;true
+p_machine_id uuid, p_good_qty integer, p_reject_qty integer, p_defect_reason_id uuid, p_notes text, p_shift_calendar_id uuid, p_ts timestamp with time zone, p_production_event_id uuid;"CREATE OR REPLACE FUNCTION public.rpc_add_counts_backdate(p_machine_id uuid, p_good_qty integer, p_reject_qty integer DEFAULT 0, p_defect_reason_id uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text, p_shift_calendar_id uuid DEFAULT NULL::uuid, p_ts timestamp with time zone DEFAULT NULL::timestamp with time zone, p_production_event_id uuid DEFAULT NULL::uuid)
+ RETURNS json
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_plant_id uuid;
+  v_sc_id uuid;
+  v_ts timestamptz;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'User not authenticated');
+  END IF;
+
+  IF NOT has_machine_permission(v_user_id, p_machine_id) THEN
+    RETURN json_build_object('ok', false, 'error', 'No permission for this machine');
+  END IF;
+
+  IF p_shift_calendar_id IS NOT NULL THEN
+    v_sc_id := p_shift_calendar_id;
+    v_ts := COALESCE(p_ts, now());
+
+    SELECT l.plant_id INTO v_plant_id
+      FROM machines m
+      JOIN lines l ON l.id = m.line_id
+     WHERE m.id = p_machine_id;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM shift_calendar sc WHERE sc.id = v_sc_id AND sc.plant_id = v_plant_id
+    ) THEN
+      RETURN json_build_object('ok', false, 'error', 'Shift calendar ไม่ตรงกับ Plant ของเครื่องจักร');
+    END IF;
+
+    IF is_shift_locked(v_sc_id) THEN
+      RETURN json_build_object('ok', false, 'error', 'กะนี้ถูก Lock แล้ว ไม่สามารถแก้ไขได้');
+    END IF;
+  ELSE
+    v_ts := now();
+    DECLARE
+      v_local_time time;
+      v_local_date date;
+    BEGIN
+      SELECT l.plant_id INTO v_plant_id
+        FROM machines m
+        JOIN lines l ON l.id = m.line_id
+       WHERE m.id = p_machine_id;
+
+      IF v_plant_id IS NULL THEN
+        RETURN json_build_object('ok', false, 'error', 'Machine not found');
+      END IF;
+
+      v_local_time := (v_ts AT TIME ZONE 'Asia/Bangkok')::time;
+      v_local_date := (v_ts AT TIME ZONE 'Asia/Bangkok')::date;
+
+      v_sc_id := ensure_shift_calendar(v_plant_id, v_local_date, v_local_time);
+
+      IF v_sc_id IS NULL THEN
+        RETURN json_build_object('ok', false, 'error', 'นอกเวลาทำการ ไม่สามารถบันทึกจำนวนผลิตได้');
+      END IF;
+
+      IF is_shift_locked(v_sc_id) THEN
+        RETURN json_build_object('ok', false, 'error', 'กะนี้ถูก Lock แล้ว ไม่สามารถแก้ไขได้');
+      END IF;
+    END;
+  END IF;
+
+  INSERT INTO production_counts (
+    machine_id, shift_calendar_id,
+    good_qty, reject_qty, defect_reason_id, notes,
+    created_by, ts, production_event_id
+  ) VALUES (
+    p_machine_id, v_sc_id,
+    p_good_qty, p_reject_qty, p_defect_reason_id, p_notes,
+    v_user_id, v_ts, p_production_event_id
+  );
+
+  RETURN json_build_object('ok', true);
+END;
+$function$
+";rpc_add_counts_backdate;json;true
+p_shift_calendar_id uuid;"CREATE OR REPLACE FUNCTION public.rpc_approve_shift(p_shift_calendar_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+    v_user_id UUID;
+    v_plant_id UUID;
+    v_current_status public.approval_status;
+BEGIN
+    -- Get current user
+    v_user_id := auth.uid();
+    IF v_user_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'User not authenticated');
+    END IF;
+
+    -- Check if user is supervisor
+    IF NOT public.is_supervisor(v_user_id) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'Only supervisors can approve shifts');
+    END IF;
+
+    -- Get plant_id from shift_calendar
+    SELECT plant_id INTO v_plant_id
+    FROM public.shift_calendar
+    WHERE id = p_shift_calendar_id;
+
+    IF v_plant_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'Shift calendar not found');
+    END IF;
+
+    -- Check plant permission
+    IF NOT public.has_plant_permission(v_user_id, v_plant_id) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'No permission for this plant');
+    END IF;
+
+    -- Check current status
+    SELECT status INTO v_current_status
+    FROM public.shift_approvals
+    WHERE shift_calendar_id = p_shift_calendar_id;
+
+    IF v_current_status = 'LOCKED' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'SHIFT_LOCKED', 'message', 'Shift is already locked');
+    END IF;
+
+    -- Upsert approval
+    INSERT INTO public.shift_approvals (shift_calendar_id, status, approved_by, approved_at)
+    VALUES (p_shift_calendar_id, 'APPROVED', v_user_id, now())
+    ON CONFLICT (shift_calendar_id)
+    DO UPDATE SET
+        status = 'APPROVED',
+        approved_by = v_user_id,
+        approved_at = now(),
+        updated_at = now();
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'shift_calendar_id', p_shift_calendar_id,
+        'status', 'APPROVED',
+        'message', 'Shift approved successfully'
+    );
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', SQLERRM);
+END;
+$function$
+";rpc_approve_shift;jsonb;true
+p_machine_id uuid, p_event_type event_type, p_start_ts timestamp with time zone, p_end_ts timestamp with time zone, p_reason_id uuid, p_product_id uuid, p_notes text;"CREATE OR REPLACE FUNCTION public.rpc_create_manual_event(p_machine_id uuid, p_event_type event_type, p_start_ts timestamp with time zone, p_end_ts timestamp with time zone DEFAULT NULL::timestamp with time zone, p_reason_id uuid DEFAULT NULL::uuid, p_product_id uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_user_id UUID;
+  v_shift_calendar_id UUID;
+  v_machine RECORD;
+  v_event_id UUID;
+  v_is_locked BOOLEAN;
+  v_local_date DATE;
+  v_local_time TIME;
+  v_end_local_time TIME;
+  v_end_local_date DATE;
+  v_sc_check UUID;
+BEGIN
+  v_user_id := auth.uid();
+  IF v_user_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'User not authenticated');
+  END IF;
+
+  IF NOT public.has_machine_permission(v_user_id, p_machine_id) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'No permission for this machine');
+  END IF;
+
+  IF p_end_ts IS NOT NULL AND p_end_ts <= p_start_ts THEN
+    RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'End time must be after start time');
+  END IF;
+
+  SELECT m.*, l.plant_id INTO v_machine
+  FROM public.machines m
+  JOIN public.lines l ON m.line_id = l.id
+  WHERE m.id = p_machine_id AND m.is_active = true;
+
+  IF v_machine IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'Machine not found or inactive');
+  END IF;
+
+  -- Use ensure_shift_calendar with fallback auto-creation for start_ts
+  v_local_date := (p_start_ts AT TIME ZONE 'Asia/Bangkok')::DATE;
+  v_local_time := (p_start_ts AT TIME ZONE 'Asia/Bangkok')::TIME;
+
+  v_shift_calendar_id := ensure_shift_calendar(v_machine.plant_id, v_local_date, v_local_time);
+
+  IF v_shift_calendar_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'นอกเวลาทำการ ไม่สามารถกำหนดเวลาเริ่มต้นนอกช่วงกะได้ — ตรวจสอบวันและเวลากะทำงาน');
+  END IF;
+
+  -- Validate end_ts within shift window
+  IF p_end_ts IS NOT NULL THEN
+    v_end_local_time := (p_end_ts AT TIME ZONE 'Asia/Bangkok')::TIME;
+    v_end_local_date := (p_end_ts AT TIME ZONE 'Asia/Bangkok')::DATE;
+
+    v_sc_check := ensure_shift_calendar(v_machine.plant_id, v_end_local_date, v_end_local_time);
+
+    IF v_sc_check IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'นอกเวลาทำการ ไม่สามารถกำหนดเวลาสิ้นสุดนอกช่วงกะได้ — ตรวจสอบวันและเวลากะทำงาน');
+    END IF;
+  END IF;
+
+  v_is_locked := public.is_shift_locked(v_shift_calendar_id);
+  IF v_is_locked THEN
+    RETURN jsonb_build_object('success', false, 'error', 'SHIFT_LOCKED', 'message', 'กะนี้ถูก Lock แล้ว ไม่สามารถเพิ่มเหตุการณ์ได้');
+  END IF;
+
+  IF p_event_type IN ('DOWNTIME', 'SETUP') AND p_reason_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'Reason is required for DOWNTIME/SETUP events');
+  END IF;
+
+  INSERT INTO public.production_events (
+    plant_id, line_id, machine_id, shift_calendar_id,
+    event_type, reason_id, product_id, start_ts, end_ts, notes, created_by
+  ) VALUES (
+    v_machine.plant_id, v_machine.line_id, p_machine_id, v_shift_calendar_id,
+    p_event_type, p_reason_id, p_product_id, p_start_ts, p_end_ts, p_notes, v_user_id
+  ) RETURNING id INTO v_event_id;
+
+  RETURN jsonb_build_object('success', true, 'event_id', v_event_id, 'message', 'Manual event created successfully');
+
+EXCEPTION
+  WHEN OTHERS THEN
+    IF SQLERRM LIKE 'OVERLAP_EVENT%' THEN
+      RETURN jsonb_build_object('success', false, 'error', 'OVERLAP_EVENT', 'message', 'เหตุการณ์ซ้อนทับกับเหตุการณ์อื่นในช่วงเวลานี้');
+    ELSIF SQLERRM LIKE 'SHIFT_LOCKED%' THEN
+      RETURN jsonb_build_object('success', false, 'error', 'SHIFT_LOCKED', 'message', 'กะนี้ถูก Lock แล้ว ไม่สามารถเพิ่มเหตุการณ์ได้');
+    END IF;
+    RETURN jsonb_build_object('success', false, 'error', 'UNKNOWN', 'message', SQLERRM);
+END;
+$function$
+";rpc_create_manual_event;jsonb;true
+p_shift_calendar_id uuid;"CREATE OR REPLACE FUNCTION public.rpc_lock_shift(p_shift_calendar_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+    v_user_id UUID;
+    v_plant_id UUID;
+    v_current_status public.approval_status;
+BEGIN
+    -- Get current user
+    v_user_id := auth.uid();
+    IF v_user_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'User not authenticated');
+    END IF;
+
+    -- Check if user is supervisor
+    IF NOT public.is_supervisor(v_user_id) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'Only supervisors can lock shifts');
+    END IF;
+
+    -- Get plant_id from shift_calendar
+    SELECT plant_id INTO v_plant_id
+    FROM public.shift_calendar
+    WHERE id = p_shift_calendar_id;
+
+    IF v_plant_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'Shift calendar not found');
+    END IF;
+
+    -- Check plant permission
+    IF NOT public.has_plant_permission(v_user_id, v_plant_id) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'No permission for this plant');
+    END IF;
+
+    -- Check current status (must be APPROVED to lock)
+    SELECT status INTO v_current_status
+    FROM public.shift_approvals
+    WHERE shift_calendar_id = p_shift_calendar_id;
+
+    IF v_current_status IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'Shift must be approved before locking');
+    END IF;
+
+    IF v_current_status = 'LOCKED' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'SHIFT_LOCKED', 'message', 'Shift is already locked');
+    END IF;
+
+    IF v_current_status != 'APPROVED' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'Shift must be approved before locking');
+    END IF;
+
+    -- Lock the shift
+    UPDATE public.shift_approvals
+    SET status = 'LOCKED',
+        locked_by = v_user_id,
+        locked_at = now(),
+        updated_at = now()
+    WHERE shift_calendar_id = p_shift_calendar_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'shift_calendar_id', p_shift_calendar_id,
+        'status', 'LOCKED',
+        'message', 'Shift locked successfully'
+    );
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', SQLERRM);
+END;
+$function$
+";rpc_lock_shift;jsonb;true
+p_shift_calendar_id uuid;"CREATE OR REPLACE FUNCTION public.rpc_recalc_oee_for_shift(p_shift_calendar_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+    v_user_id UUID;
+    v_shift RECORD;
+    v_machine RECORD;
+    v_run_time INTEGER;
+    v_downtime INTEGER;
+    v_planned_time INTEGER;
+    v_good_qty INTEGER;
+    v_reject_qty INTEGER;
+    v_availability NUMERIC(5,2);
+    v_performance NUMERIC(5,2);
+    v_quality NUMERIC(5,2);
+    v_oee NUMERIC(5,2);
+    v_ideal_cycle_time NUMERIC;
+    v_machines_processed INTEGER := 0;
+    v_machines_skipped INTEGER := 0;
+    v_shift_duration_minutes INTEGER;
+    v_total_deductions INTEGER;
+    v_ppt_template RECORD;
+    v_has_events BOOLEAN;
+    v_has_counts BOOLEAN;
+    v_is_holiday BOOLEAN := false;
+    v_holiday_name TEXT;
+BEGIN
+    v_user_id := auth.uid();
+    IF v_user_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'User not authenticated');
+    END IF;
+
+    IF NOT public.is_supervisor(v_user_id) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'Only supervisors can recalculate OEE');
+    END IF;
+
+    SELECT sc.*, s.start_time, s.end_time, s.name as shift_name
+    INTO v_shift
+    FROM public.shift_calendar sc
+    JOIN public.shifts s ON sc.shift_id = s.id
+    WHERE sc.id = p_shift_calendar_id;
+
+    IF v_shift IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'Shift calendar not found');
+    END IF;
+
+    -- Check if this date is a pre-defined holiday
+    SELECT h.name INTO v_holiday_name
+    FROM public.holidays h
+    JOIN public.plants p ON p.id = v_shift.plant_id
+    WHERE h.company_id = p.company_id
+      AND (h.plant_id IS NULL OR h.plant_id = v_shift.plant_id)
+      AND (
+        h.holiday_date = v_shift.shift_date
+        OR (h.is_recurring = true AND EXTRACT(MONTH FROM h.holiday_date) = EXTRACT(MONTH FROM v_shift.shift_date) AND EXTRACT(DAY FROM h.holiday_date) = EXTRACT(DAY FROM v_shift.shift_date))
+      )
+    LIMIT 1;
+
+    IF v_holiday_name IS NOT NULL THEN
+        v_is_holiday := true;
+        -- Remove all existing snapshots for this shift (holiday = no OEE)
+        DELETE FROM public.oee_snapshots 
+        WHERE period = 'SHIFT' AND shift_calendar_id = p_shift_calendar_id;
+
+        RETURN jsonb_build_object(
+            'success', true,
+            'shift_calendar_id', p_shift_calendar_id,
+            'is_holiday', true,
+            'holiday_name', v_holiday_name,
+            'machines_processed', 0,
+            'machines_skipped_holiday', 0,
+            'message', 'วันหยุดพิเศษ: ' || v_holiday_name || ' — ข้ามการคำนวณ OEE'
+        );
+    END IF;
+
+    v_shift_duration_minutes := EXTRACT(EPOCH FROM (v_shift.end_time - v_shift.start_time)) / 60;
+    IF v_shift_duration_minutes <= 0 THEN
+        v_shift_duration_minutes := v_shift_duration_minutes + 1440;
+    END IF;
+
+    SELECT *
+    INTO v_ppt_template
+    FROM public.planned_time_templates
+    WHERE plant_id = v_shift.plant_id
+      AND shift_id = v_shift.shift_id
+      AND is_active = true
+      AND effective_from <= v_shift.shift_date
+    ORDER BY effective_from DESC
+    LIMIT 1;
+
+    IF v_ppt_template IS NOT NULL THEN
+        v_total_deductions := COALESCE(v_ppt_template.break_minutes, 0)
+                            + COALESCE(v_ppt_template.meal_minutes, 0)
+                            + COALESCE(v_ppt_template.meeting_minutes, 0)
+                            + COALESCE(v_ppt_template.maintenance_minutes, 0)
+                            + COALESCE(v_ppt_template.other_minutes, 0);
+        v_planned_time := GREATEST(v_shift_duration_minutes - v_total_deductions, 0);
+    ELSE
+        v_planned_time := v_shift.planned_time_minutes;
+    END IF;
+
+    FOR v_machine IN
+        SELECT m.*
+        FROM public.machines m
+        JOIN public.lines l ON m.line_id = l.id
+        WHERE l.plant_id = v_shift.plant_id AND m.is_active = true
+    LOOP
+        SELECT EXISTS (
+            SELECT 1 FROM public.production_events
+            WHERE machine_id = v_machine.id AND shift_calendar_id = p_shift_calendar_id
+        ) INTO v_has_events;
+
+        SELECT EXISTS (
+            SELECT 1 FROM public.production_counts
+            WHERE machine_id = v_machine.id AND shift_calendar_id = p_shift_calendar_id
+        ) INTO v_has_counts;
+
+        IF NOT v_has_events AND NOT v_has_counts THEN
+            DELETE FROM public.oee_snapshots 
+            WHERE scope = 'MACHINE' AND scope_id = v_machine.id AND period = 'SHIFT' AND shift_calendar_id = p_shift_calendar_id;
+            v_machines_skipped := v_machines_skipped + 1;
+            CONTINUE;
+        END IF;
+
+        SELECT 
+            COALESCE(
+                SUM(COALESCE(ps.ideal_cycle_time_seconds, v_machine.ideal_cycle_time_seconds) *
+                    EXTRACT(EPOCH FROM (COALESCE(pe.end_ts, now()) - pe.start_ts))
+                ) / NULLIF(SUM(EXTRACT(EPOCH FROM (COALESCE(pe.end_ts, now()) - pe.start_ts))), 0),
+                v_machine.ideal_cycle_time_seconds
+            )
+        INTO v_ideal_cycle_time
+        FROM public.production_events pe
+        LEFT JOIN public.production_standards ps 
+            ON ps.machine_id = v_machine.id AND ps.product_id = pe.product_id AND ps.is_active = true
+        WHERE pe.machine_id = v_machine.id AND pe.shift_calendar_id = p_shift_calendar_id AND pe.event_type = 'RUN';
+
+        IF v_ideal_cycle_time IS NULL OR v_ideal_cycle_time <= 0 THEN
+            v_ideal_cycle_time := v_machine.ideal_cycle_time_seconds;
+        END IF;
+
+        SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(end_ts, now()) - start_ts)) / 60), 0)::INTEGER
+        INTO v_run_time
+        FROM public.production_events
+        WHERE machine_id = v_machine.id AND shift_calendar_id = p_shift_calendar_id AND event_type = 'RUN';
+
+        SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(end_ts, now()) - start_ts)) / 60), 0)::INTEGER
+        INTO v_downtime
+        FROM public.production_events
+        WHERE machine_id = v_machine.id AND shift_calendar_id = p_shift_calendar_id AND event_type IN ('DOWNTIME', 'SETUP');
+
+        SELECT COALESCE(SUM(good_qty), 0), COALESCE(SUM(reject_qty), 0)
+        INTO v_good_qty, v_reject_qty
+        FROM public.production_counts
+        WHERE machine_id = v_machine.id AND shift_calendar_id = p_shift_calendar_id;
+
+        IF v_planned_time > 0 THEN
+            v_availability := LEAST((v_run_time::NUMERIC / v_planned_time) * 100, 100);
+        ELSE
+            v_availability := 0;
+        END IF;
+
+        IF v_run_time > 0 AND v_ideal_cycle_time > 0 THEN
+            v_performance := LEAST(((v_good_qty + v_reject_qty) * (v_ideal_cycle_time / 60)::NUMERIC / v_run_time) * 100, 100);
+        ELSE
+            v_performance := 0;
+        END IF;
+
+        IF (v_good_qty + v_reject_qty) > 0 THEN
+            v_quality := (v_good_qty::NUMERIC / (v_good_qty + v_reject_qty)) * 100;
+        ELSE
+            v_quality := 100;
+        END IF;
+
+        v_oee := (v_availability * v_performance * v_quality) / 10000;
+
+        DELETE FROM public.oee_snapshots 
+        WHERE scope = 'MACHINE' AND scope_id = v_machine.id AND period = 'SHIFT' AND shift_calendar_id = p_shift_calendar_id;
+
+        INSERT INTO public.oee_snapshots (
+            scope, scope_id, period, period_start, period_end, shift_calendar_id,
+            availability, performance, quality, oee,
+            run_time_minutes, downtime_minutes, planned_time_minutes, good_qty, reject_qty
+        ) VALUES (
+            'MACHINE', v_machine.id, 'SHIFT',
+            (v_shift.shift_date || ' ' || v_shift.start_time)::TIMESTAMPTZ,
+            (v_shift.shift_date || ' ' || v_shift.end_time)::TIMESTAMPTZ,
+            p_shift_calendar_id,
+            v_availability, v_performance, v_quality, v_oee,
+            v_run_time, v_downtime, v_planned_time, v_good_qty, v_reject_qty
+        );
+
+        v_machines_processed := v_machines_processed + 1;
+    END LOOP;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'shift_calendar_id', p_shift_calendar_id,
+        'machines_processed', v_machines_processed,
+        'machines_skipped_holiday', v_machines_skipped,
+        'planned_time_minutes', v_planned_time,
+        'ppt_source', CASE WHEN v_ppt_template IS NOT NULL THEN 'planned_time_templates' ELSE 'shift_calendar_fallback' END,
+        'message', 'OEE recalculated successfully'
+    );
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', SQLERRM);
+END;
+$function$
+";rpc_recalc_oee_for_shift;jsonb;true
+p_shift_calendar_id uuid, p_force_working_day boolean;"CREATE OR REPLACE FUNCTION public.rpc_recalc_oee_for_shift(p_shift_calendar_id uuid, p_force_working_day boolean DEFAULT false)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+    v_user_id UUID;
+    v_shift RECORD;
+    v_machine RECORD;
+    v_run_time INTEGER;
+    v_downtime INTEGER;
+    v_planned_time INTEGER;
+    v_good_qty INTEGER;
+    v_reject_qty INTEGER;
+    v_availability NUMERIC(5,2);
+    v_performance NUMERIC(5,2);
+    v_quality NUMERIC(5,2);
+    v_oee NUMERIC(5,2);
+    v_ideal_cycle_time NUMERIC;
+    v_machines_processed INTEGER := 0;
+    v_machines_skipped INTEGER := 0;
+    v_shift_duration_minutes INTEGER;
+    v_total_deductions INTEGER;
+    v_ppt_template RECORD;
+    v_has_events BOOLEAN;
+    v_has_counts BOOLEAN;
+    v_is_holiday BOOLEAN := false;
+    v_holiday_name TEXT;
+BEGIN
+    v_user_id := auth.uid();
+    IF v_user_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'User not authenticated');
+    END IF;
+
+    IF NOT public.is_supervisor(v_user_id) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'Only supervisors can recalculate OEE');
+    END IF;
+
+    SELECT sc.*, s.start_time, s.end_time, s.name as shift_name
+    INTO v_shift
+    FROM public.shift_calendar sc
+    JOIN public.shifts s ON sc.shift_id = s.id
+    WHERE sc.id = p_shift_calendar_id;
+
+    IF v_shift IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'Shift calendar not found');
+    END IF;
+
+    SELECT h.name INTO v_holiday_name
+    FROM public.holidays h
+    JOIN public.plants p ON p.id = v_shift.plant_id
+    WHERE h.company_id = p.company_id
+      AND (h.plant_id IS NULL OR h.plant_id = v_shift.plant_id)
+      AND (
+        h.holiday_date = v_shift.shift_date
+        OR (h.is_recurring = true AND EXTRACT(MONTH FROM h.holiday_date) = EXTRACT(MONTH FROM v_shift.shift_date) AND EXTRACT(DAY FROM h.holiday_date) = EXTRACT(DAY FROM v_shift.shift_date))
+      )
+    LIMIT 1;
+
+    IF v_holiday_name IS NOT NULL THEN
+        v_is_holiday := true;
+        DELETE FROM public.oee_snapshots 
+        WHERE period = 'SHIFT' AND shift_calendar_id = p_shift_calendar_id;
+
+        RETURN jsonb_build_object(
+            'success', true,
+            'shift_calendar_id', p_shift_calendar_id,
+            'is_holiday', true,
+            'holiday_name', v_holiday_name,
+            'machines_processed', 0,
+            'machines_skipped_holiday', 0,
+            'message', 'วันหยุดพิเศษ: ' || v_holiday_name || ' — ข้ามการคำนวณ OEE'
+        );
+    END IF;
+
+    v_shift_duration_minutes := EXTRACT(EPOCH FROM (v_shift.end_time - v_shift.start_time)) / 60;
+    IF v_shift_duration_minutes <= 0 THEN
+        v_shift_duration_minutes := v_shift_duration_minutes + 1440;
+    END IF;
+
+    SELECT *
+    INTO v_ppt_template
+    FROM public.planned_time_templates
+    WHERE plant_id = v_shift.plant_id
+      AND shift_id = v_shift.shift_id
+      AND is_active = true
+      AND effective_from <= v_shift.shift_date
+    ORDER BY effective_from DESC
+    LIMIT 1;
+
+    IF v_ppt_template IS NOT NULL THEN
+        v_total_deductions := COALESCE(v_ppt_template.break_minutes, 0)
+                            + COALESCE(v_ppt_template.meal_minutes, 0)
+                            + COALESCE(v_ppt_template.meeting_minutes, 0)
+                            + COALESCE(v_ppt_template.maintenance_minutes, 0)
+                            + COALESCE(v_ppt_template.other_minutes, 0);
+        v_planned_time := GREATEST(v_shift_duration_minutes - v_total_deductions, 0);
+    ELSE
+        v_planned_time := v_shift.planned_time_minutes;
+    END IF;
+
+    FOR v_machine IN
+        SELECT m.*
+        FROM public.machines m
+        JOIN public.lines l ON m.line_id = l.id
+        WHERE l.plant_id = v_shift.plant_id AND m.is_active = true
+    LOOP
+        SELECT EXISTS (
+            SELECT 1 FROM public.production_events
+            WHERE machine_id = v_machine.id AND shift_calendar_id = p_shift_calendar_id
+        ) INTO v_has_events;
+
+        SELECT EXISTS (
+            SELECT 1 FROM public.production_counts
+            WHERE machine_id = v_machine.id AND shift_calendar_id = p_shift_calendar_id
+        ) INTO v_has_counts;
+
+        IF NOT v_has_events AND NOT v_has_counts THEN
+            IF p_force_working_day THEN
+                DELETE FROM public.oee_snapshots 
+                WHERE scope = 'MACHINE' AND scope_id = v_machine.id 
+                  AND period = 'SHIFT' AND shift_calendar_id = p_shift_calendar_id;
+
+                INSERT INTO public.oee_snapshots (
+                    scope, scope_id, period, period_start, period_end,
+                    shift_calendar_id, availability, performance, quality, oee,
+                    run_time_minutes, downtime_minutes, planned_time_minutes,
+                    good_qty, reject_qty
+                ) VALUES (
+                    'MACHINE', v_machine.id, 'SHIFT',
+                    (v_shift.shift_date || ' ' || v_shift.start_time)::timestamptz,
+                    (v_shift.shift_date || ' ' || v_shift.end_time)::timestamptz,
+                    p_shift_calendar_id,
+                    0, 0, 0, 0,
+                    0, v_planned_time, v_planned_time,
+                    0, 0
+                );
+                v_machines_processed := v_machines_processed + 1;
+            ELSE
+                DELETE FROM public.oee_snapshots 
+                WHERE scope = 'MACHINE' AND scope_id = v_machine.id AND period = 'SHIFT' AND shift_calendar_id = p_shift_calendar_id;
+                v_machines_skipped := v_machines_skipped + 1;
+            END IF;
+            CONTINUE;
+        END IF;
+
+        SELECT 
+            COALESCE(
+                SUM(COALESCE(ps.ideal_cycle_time_seconds, v_machine.ideal_cycle_time_seconds) *
+                    EXTRACT(EPOCH FROM (COALESCE(pe.end_ts, now()) - pe.start_ts))
+                ) / NULLIF(SUM(EXTRACT(EPOCH FROM (COALESCE(pe.end_ts, now()) - pe.start_ts))), 0),
+                v_machine.ideal_cycle_time_seconds
+            )
+        INTO v_ideal_cycle_time
+        FROM public.production_events pe
+        LEFT JOIN public.production_standards ps 
+            ON ps.machine_id = v_machine.id AND ps.product_id = pe.product_id AND ps.is_active = true
+        WHERE pe.machine_id = v_machine.id AND pe.shift_calendar_id = p_shift_calendar_id AND pe.event_type = 'RUN';
+
+        IF v_ideal_cycle_time IS NULL OR v_ideal_cycle_time <= 0 THEN
+            v_ideal_cycle_time := v_machine.ideal_cycle_time_seconds;
+        END IF;
+
+        SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(end_ts, now()) - start_ts)) / 60), 0)::INTEGER
+        INTO v_run_time
+        FROM public.production_events
+        WHERE machine_id = v_machine.id AND shift_calendar_id = p_shift_calendar_id AND event_type = 'RUN';
+
+        SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(end_ts, now()) - start_ts)) / 60), 0)::INTEGER
+        INTO v_downtime
+        FROM public.production_events
+        WHERE machine_id = v_machine.id AND shift_calendar_id = p_shift_calendar_id AND event_type IN ('DOWNTIME', 'SETUP');
+
+        SELECT COALESCE(SUM(good_qty), 0), COALESCE(SUM(reject_qty), 0)
+        INTO v_good_qty, v_reject_qty
+        FROM public.production_counts
+        WHERE machine_id = v_machine.id AND shift_calendar_id = p_shift_calendar_id;
+
+        IF v_planned_time > 0 THEN
+            v_availability := LEAST((v_run_time::NUMERIC / v_planned_time) * 100, 100);
+        ELSE
+            v_availability := 0;
+        END IF;
+
+        IF v_run_time > 0 AND v_ideal_cycle_time > 0 THEN
+            v_performance := LEAST(((v_good_qty + v_reject_qty) * v_ideal_cycle_time / (v_run_time * 60.0)) * 100, 100);
+        ELSE
+            v_performance := 0;
+        END IF;
+
+        IF (v_good_qty + v_reject_qty) > 0 THEN
+            v_quality := (v_good_qty::NUMERIC / (v_good_qty + v_reject_qty)) * 100;
+        ELSE
+            v_quality := 0;
+        END IF;
+
+        v_oee := (v_availability * v_performance * v_quality) / 10000;
+
+        DELETE FROM public.oee_snapshots 
+        WHERE scope = 'MACHINE' AND scope_id = v_machine.id 
+          AND period = 'SHIFT' AND shift_calendar_id = p_shift_calendar_id;
+
+        INSERT INTO public.oee_snapshots (
+            scope, scope_id, period, period_start, period_end,
+            shift_calendar_id, availability, performance, quality, oee,
+            run_time_minutes, downtime_minutes, planned_time_minutes,
+            good_qty, reject_qty
+        ) VALUES (
+            'MACHINE', v_machine.id, 'SHIFT',
+            (v_shift.shift_date || ' ' || v_shift.start_time)::timestamptz,
+            (v_shift.shift_date || ' ' || v_shift.end_time)::timestamptz,
+            p_shift_calendar_id,
+            v_availability, v_performance, v_quality, v_oee,
+            v_run_time, v_downtime, v_planned_time,
+            v_good_qty, v_reject_qty
+        );
+
+        v_machines_processed := v_machines_processed + 1;
+    END LOOP;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'shift_calendar_id', p_shift_calendar_id,
+        'machines_processed', v_machines_processed,
+        'machines_skipped', v_machines_skipped,
+        'force_working_day', p_force_working_day,
+        'message', 'คำนวณ OEE สำเร็จ: ' || v_machines_processed || ' เครื่อง' || 
+                   CASE WHEN p_force_working_day THEN ' (ยืนยันวันทำงาน)' ELSE '' END
+    );
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', SQLERRM);
+END;
+$function$
+";rpc_recalc_oee_for_shift;jsonb;true
+p_machine_id uuid, p_event_type event_type, p_reason_id uuid, p_notes text, p_product_id uuid;"CREATE OR REPLACE FUNCTION public.rpc_start_event(p_machine_id uuid, p_event_type event_type, p_reason_id uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text, p_product_id uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_user_id UUID;
+  v_shift_calendar_id UUID;
+  v_machine RECORD;
+  v_event_id UUID;
+  v_is_locked BOOLEAN;
+  v_local_time TIME;
+  v_local_date DATE;
+BEGIN
+  v_user_id := auth.uid();
+  IF v_user_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'User not authenticated');
+  END IF;
+
+  IF NOT public.has_machine_permission(v_user_id, p_machine_id) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'No permission for this machine');
+  END IF;
+
+  SELECT m.*, l.plant_id INTO v_machine
+  FROM public.machines m
+  JOIN public.lines l ON m.line_id = l.id
+  WHERE m.id = p_machine_id AND m.is_active = true;
+
+  IF v_machine IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'Machine not found or inactive');
+  END IF;
+
+  v_local_time := (now() AT TIME ZONE 'Asia/Bangkok')::TIME;
+  v_local_date := (now() AT TIME ZONE 'Asia/Bangkok')::DATE;
+
+  -- Use ensure_shift_calendar with fallback auto-creation
+  v_shift_calendar_id := ensure_shift_calendar(v_machine.plant_id, v_local_date, v_local_time);
+
+  IF v_shift_calendar_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'นอกเวลาทำการ ไม่สามารถรันเครื่องจักรได้ — ตรวจสอบวันและเวลากะทำงาน');
+  END IF;
+
+  v_is_locked := public.is_shift_locked(v_shift_calendar_id);
+  IF v_is_locked THEN
+    RETURN jsonb_build_object('success', false, 'error', 'SHIFT_LOCKED', 'message', 'กะนี้ถูก Lock แล้ว ไม่สามารถแก้ไขได้');
+  END IF;
+
+  IF p_event_type IN ('DOWNTIME', 'SETUP') AND p_reason_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'Reason is required for DOWNTIME/SETUP events');
+  END IF;
+
+  UPDATE public.production_events
+  SET end_ts = now(), updated_at = now()
+  WHERE machine_id = p_machine_id AND end_ts IS NULL;
+
+  INSERT INTO public.production_events (
+    plant_id, line_id, machine_id, shift_calendar_id,
+    event_type, reason_id, product_id, start_ts, notes, created_by
+  ) VALUES (
+    v_machine.plant_id, v_machine.line_id, p_machine_id, v_shift_calendar_id,
+    p_event_type, p_reason_id, p_product_id, now(), p_notes, v_user_id
+  ) RETURNING id INTO v_event_id;
+
+  RETURN jsonb_build_object('success', true, 'event_id', v_event_id, 'message', 'Event started successfully');
+
+EXCEPTION
+  WHEN OTHERS THEN
+    IF SQLERRM LIKE 'OVERLAP_EVENT%' THEN
+      RETURN jsonb_build_object('success', false, 'error', 'OVERLAP_EVENT', 'message', SQLERRM);
+    ELSIF SQLERRM LIKE 'SHIFT_LOCKED%' THEN
+      RETURN jsonb_build_object('success', false, 'error', 'SHIFT_LOCKED', 'message', SQLERRM);
+    ELSE
+      RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', SQLERRM);
+    END IF;
+END;
+$function$
+";rpc_start_event;jsonb;true
+p_machine_id uuid, p_notes text;"CREATE OR REPLACE FUNCTION public.rpc_stop_event(p_machine_id uuid, p_notes text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+    v_user_id UUID;
+    v_event RECORD;
+    v_is_locked BOOLEAN;
+BEGIN
+    -- Get current user
+    v_user_id := auth.uid();
+    IF v_user_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'User not authenticated');
+    END IF;
+
+    -- Check machine permission
+    IF NOT public.has_machine_permission(v_user_id, p_machine_id) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'No permission for this machine');
+    END IF;
+
+    -- Find open event
+    SELECT * INTO v_event
+    FROM public.production_events
+    WHERE machine_id = p_machine_id AND end_ts IS NULL
+    ORDER BY start_ts DESC
+    LIMIT 1;
+
+    IF v_event IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'No open event found for this machine');
+    END IF;
+
+    -- Check if shift is locked
+    v_is_locked := public.is_shift_locked(v_event.shift_calendar_id);
+    IF v_is_locked THEN
+        RETURN jsonb_build_object('success', false, 'error', 'SHIFT_LOCKED', 'message', 'Shift is locked, cannot modify events');
+    END IF;
+
+    -- Stop the event
+    UPDATE public.production_events
+    SET end_ts = now(),
+        notes = COALESCE(p_notes, notes),
+        updated_at = now()
+    WHERE id = v_event.id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'event_id', v_event.id,
+        'duration_minutes', EXTRACT(EPOCH FROM (now() - v_event.start_ts)) / 60,
+        'message', 'Event stopped successfully'
+    );
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', SQLERRM);
+END;
+$function$
+";rpc_stop_event;jsonb;true
+p_shift_calendar_id uuid;"CREATE OR REPLACE FUNCTION public.rpc_unlock_shift(p_shift_calendar_id uuid)
+ RETURNS json
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_approval shift_approvals%ROWTYPE;
+  v_deleted_count integer;
+BEGIN
+  IF NOT is_supervisor(v_user_id) THEN
+    RETURN json_build_object('ok', false, 'error', 'ต้องเป็น Supervisor เท่านั้น');
+  END IF;
+
+  SELECT * INTO v_approval
+  FROM shift_approvals
+  WHERE shift_calendar_id = p_shift_calendar_id;
+
+  IF NOT FOUND THEN
+    RETURN json_build_object('ok', false, 'error', 'ไม่พบข้อมูลการอนุมัติ');
+  END IF;
+
+  IF v_approval.status != 'LOCKED' THEN
+    RETURN json_build_object('ok', false, 'error', 'กะนี้ยังไม่ได้ล็อค');
+  END IF;
+
+  -- Unlock: revert to DRAFT status (reset both approval and lock)
+  UPDATE shift_approvals
+  SET status = 'DRAFT',
+      approved_by = NULL,
+      approved_at = NULL,
+      locked_by = NULL,
+      locked_at = NULL,
+      updated_at = now()
+  WHERE shift_calendar_id = p_shift_calendar_id;
+
+  -- Delete OEE Snapshots for this shift to force recalculation
+  DELETE FROM oee_snapshots
+  WHERE period = 'SHIFT' AND shift_calendar_id = p_shift_calendar_id;
+  GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
+
+  -- Audit log
+  INSERT INTO audit_logs (action, entity_type, entity_id, actor_user_id, after_json)
+  VALUES ('UNLOCK', 'shift_approval', p_shift_calendar_id, v_user_id,
+          json_build_object('shift_calendar_id', p_shift_calendar_id, 'oee_snapshots_deleted', v_deleted_count));
+
+  RETURN json_build_object('ok', true, 'oee_snapshots_deleted', v_deleted_count);
+END;
+$function$
+";rpc_unlock_shift;json;true
+p_event_id uuid, p_event_type event_type, p_start_ts timestamp with time zone, p_end_ts timestamp with time zone, p_notes text;"CREATE OR REPLACE FUNCTION public.rpc_update_event(p_event_id uuid, p_event_type event_type, p_start_ts timestamp with time zone, p_end_ts timestamp with time zone DEFAULT NULL::timestamp with time zone, p_notes text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_user_id UUID;
+  v_old RECORD;
+  v_cascaded_next BOOLEAN := false;
+  v_cascaded_prev BOOLEAN := false;
+  v_delta INTERVAL;
+  v_overlap_count INTEGER;
+  v_affected_count INTEGER;
+  v_start_local_time TIME;
+  v_end_local_time TIME;
+  v_start_local_date DATE;
+  v_end_local_date DATE;
+  v_sc_check UUID;
+BEGIN
+  v_user_id := auth.uid();
+  IF v_user_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'User not authenticated');
+  END IF;
+
+  SELECT * INTO v_old FROM production_events WHERE id = p_event_id;
+  IF v_old IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'NOT_FOUND', 'message', 'Event not found');
+  END IF;
+
+  IF NOT has_machine_permission(v_user_id, v_old.machine_id) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'PERMISSION_DENIED', 'message', 'No permission for this machine');
+  END IF;
+
+  IF is_shift_locked(v_old.shift_calendar_id) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'SHIFT_LOCKED', 'message', 'ไม่สามารถแก้ไขได้ — กะถูกล็อกแล้ว');
+  END IF;
+
+  -- Validate start_ts within shift window + working_days
+  v_start_local_time := (p_start_ts AT TIME ZONE 'Asia/Bangkok')::TIME;
+  v_start_local_date := (p_start_ts AT TIME ZONE 'Asia/Bangkok')::DATE;
+
+  SELECT sc.id INTO v_sc_check
+    FROM shift_calendar sc
+    JOIN shifts s ON s.id = sc.shift_id
+   WHERE sc.plant_id = v_old.plant_id
+     AND s.is_active = true
+     AND sc.shift_date = v_start_local_date
+     AND (EXTRACT(DOW FROM v_start_local_date))::int = ANY(s.working_days)
+     AND (
+       (s.start_time <= s.end_time AND v_start_local_time >= s.start_time AND v_start_local_time < s.end_time)
+       OR
+       (s.start_time > s.end_time AND (v_start_local_time >= s.start_time OR v_start_local_time < s.end_time))
+     )
+   LIMIT 1;
+
+  IF v_sc_check IS NULL THEN
+    SELECT sc.id INTO v_sc_check
+      FROM shift_calendar sc
+      JOIN shifts s ON s.id = sc.shift_id
+     WHERE sc.plant_id = v_old.plant_id
+       AND s.is_active = true
+       AND sc.shift_date = (v_start_local_date - interval '1 day')::date
+       AND (EXTRACT(DOW FROM (v_start_local_date - interval '1 day')::date))::int = ANY(s.working_days)
+       AND s.start_time > s.end_time
+       AND v_start_local_time < s.end_time
+     LIMIT 1;
+  END IF;
+
+  IF v_sc_check IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'นอกเวลาทำการ ไม่สามารถกำหนดเวลาเริ่มต้นนอกช่วงกะได้ — ตรวจสอบวันและเวลากะทำงาน');
+  END IF;
+
+  -- Validate end_ts
+  IF p_end_ts IS NOT NULL THEN
+    v_end_local_time := (p_end_ts AT TIME ZONE 'Asia/Bangkok')::TIME;
+    v_end_local_date := (p_end_ts AT TIME ZONE 'Asia/Bangkok')::DATE;
+    v_sc_check := NULL;
+
+    SELECT sc.id INTO v_sc_check
+      FROM shift_calendar sc
+      JOIN shifts s ON s.id = sc.shift_id
+     WHERE sc.plant_id = v_old.plant_id
+       AND s.is_active = true
+       AND sc.shift_date = v_end_local_date
+       AND (EXTRACT(DOW FROM v_end_local_date))::int = ANY(s.working_days)
+       AND (
+         (s.start_time <= s.end_time AND v_end_local_time >= s.start_time AND v_end_local_time <= s.end_time)
+         OR
+         (s.start_time > s.end_time AND (v_end_local_time >= s.start_time OR v_end_local_time <= s.end_time))
+       )
+     LIMIT 1;
+
+    IF v_sc_check IS NULL THEN
+      SELECT sc.id INTO v_sc_check
+        FROM shift_calendar sc
+        JOIN shifts s ON s.id = sc.shift_id
+       WHERE sc.plant_id = v_old.plant_id
+         AND s.is_active = true
+         AND sc.shift_date = (v_end_local_date - interval '1 day')::date
+         AND (EXTRACT(DOW FROM (v_end_local_date - interval '1 day')::date))::int = ANY(s.working_days)
+         AND s.start_time > s.end_time
+         AND v_end_local_time <= s.end_time
+       LIMIT 1;
+    END IF;
+
+    IF v_sc_check IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'VALIDATION_ERROR', 'message', 'นอกเวลาทำการ ไม่สามารถกำหนดเวลาสิ้นสุดนอกช่วงกะได้ — ตรวจสอบวันและเวลากะทำงาน');
+    END IF;
+  END IF;
+
+  -- Bypass overlap and cascade triggers
+  PERFORM set_config('app.skip_overlap_check', 'true', true);
+  PERFORM set_config('app.skip_cascade', 'true', true);
+
+  -- Cascade to subsequent events
+  IF v_old.end_ts IS NOT NULL AND p_end_ts IS NOT NULL AND v_old.end_ts IS DISTINCT FROM p_end_ts THEN
+    v_delta := p_end_ts - v_old.end_ts;
+    UPDATE production_events
+    SET start_ts = start_ts + v_delta,
+        end_ts = CASE WHEN end_ts IS NOT NULL THEN end_ts + v_delta ELSE NULL END,
+        updated_at = now()
+    WHERE machine_id = v_old.machine_id
+      AND shift_calendar_id = v_old.shift_calendar_id
+      AND id != p_event_id
+      AND start_ts >= v_old.end_ts;
+    GET DIAGNOSTICS v_affected_count = ROW_COUNT;
+    IF v_affected_count > 0 THEN v_cascaded_next := true; END IF;
+  ELSIF v_old.end_ts IS NULL AND p_end_ts IS NOT NULL THEN
+    UPDATE production_events
+    SET start_ts = p_end_ts, updated_at = now()
+    WHERE machine_id = v_old.machine_id
+      AND shift_calendar_id = v_old.shift_calendar_id
+      AND id != p_event_id
+      AND start_ts = v_old.start_ts;
+    GET DIAGNOSTICS v_affected_count = ROW_COUNT;
+    IF v_affected_count > 0 THEN v_cascaded_next := true; END IF;
+  END IF;
+
+  -- Adjust previous event
+  IF v_old.start_ts IS DISTINCT FROM p_start_ts THEN
+    UPDATE production_events
+    SET end_ts = p_start_ts, updated_at = now()
+    WHERE machine_id = v_old.machine_id
+      AND shift_calendar_id = v_old.shift_calendar_id
+      AND id != p_event_id
+      AND end_ts = v_old.start_ts;
+    GET DIAGNOSTICS v_affected_count = ROW_COUNT;
+    IF v_affected_count > 0 THEN v_cascaded_prev := true; END IF;
+  END IF;
+
+  -- Update the event
+  UPDATE production_events
+  SET event_type = p_event_type, start_ts = p_start_ts, end_ts = p_end_ts, notes = p_notes, updated_at = now()
+  WHERE id = p_event_id;
+
+  -- Final overlap validation
+  SELECT COUNT(*) INTO v_overlap_count
+  FROM production_events a
+  JOIN production_events b ON a.id < b.id AND a.machine_id = b.machine_id AND a.shift_calendar_id = b.shift_calendar_id
+  WHERE a.machine_id = v_old.machine_id AND a.shift_calendar_id = v_old.shift_calendar_id
+    AND a.end_ts IS NOT NULL AND b.end_ts IS NOT NULL
+    AND a.start_ts < b.end_ts AND b.start_ts < a.end_ts;
+
+  IF v_overlap_count = 0 THEN
+    SELECT COUNT(*) INTO v_overlap_count
+    FROM production_events a
+    JOIN production_events b ON a.id != b.id AND a.machine_id = b.machine_id AND a.shift_calendar_id = b.shift_calendar_id
+    WHERE a.machine_id = v_old.machine_id AND a.shift_calendar_id = v_old.shift_calendar_id
+      AND a.end_ts IS NULL AND b.end_ts IS NULL;
+  END IF;
+
+  IF v_overlap_count > 0 THEN
+    RAISE EXCEPTION 'OVERLAP_AFTER_CASCADE';
+  END IF;
+
+  RETURN jsonb_build_object('success', true, 'event_id', p_event_id, 'cascaded_next', v_cascaded_next, 'cascaded_prev', v_cascaded_prev, 'message', 'Event updated successfully');
+
+EXCEPTION
+  WHEN OTHERS THEN
+    IF SQLERRM LIKE '%OVERLAP%' THEN
+      RETURN jsonb_build_object('success', false, 'error', 'OVERLAP_EVENT', 'message', 'เหตุการณ์ซ้อนทับกับเหตุการณ์อื่น กรุณาตรวจสอบเวลาอีกครั้ง');
+    END IF;
+    RETURN jsonb_build_object('success', false, 'error', 'UNKNOWN', 'message', SQLERRM);
+END;
+$function$
+";rpc_update_event;jsonb;true
+;"CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$function$
+";update_updated_at_column;trigger;false

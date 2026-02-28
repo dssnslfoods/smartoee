@@ -1,0 +1,254 @@
+character_maximum_length;column_default;column_name;data_type;is_nullable;ordinal_position;section;table_name;udt_name
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: audit_logs;audit_logs;uuid
+;;entity_type;text;NO;2;	-- TABLE: audit_logs;audit_logs;text
+;;entity_id;uuid;NO;3;	-- TABLE: audit_logs;audit_logs;uuid
+;;action;text;NO;4;	-- TABLE: audit_logs;audit_logs;text
+;;before_json;jsonb;YES;5;	-- TABLE: audit_logs;audit_logs;jsonb
+;;after_json;jsonb;YES;6;	-- TABLE: audit_logs;audit_logs;jsonb
+;;actor_user_id;uuid;YES;7;	-- TABLE: audit_logs;audit_logs;uuid
+;now();ts;timestamp with time zone;NO;8;	-- TABLE: audit_logs;audit_logs;timestamptz
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: companies;companies;uuid
+;;name;text;NO;2;	-- TABLE: companies;companies;text
+;;code;text;YES;3;	-- TABLE: companies;companies;text
+;true;is_active;boolean;NO;4;	-- TABLE: companies;companies;bool
+;now();created_at;timestamp with time zone;NO;5;	-- TABLE: companies;companies;timestamptz
+;now();updated_at;timestamp with time zone;NO;6;	-- TABLE: companies;companies;timestamptz
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: defect_reasons;defect_reasons;uuid
+;;code;text;NO;2;	-- TABLE: defect_reasons;defect_reasons;text
+;;name;text;NO;3;	-- TABLE: defect_reasons;defect_reasons;text
+;true;is_active;boolean;NO;4;	-- TABLE: defect_reasons;defect_reasons;bool
+;now();created_at;timestamp with time zone;NO;5;	-- TABLE: defect_reasons;defect_reasons;timestamptz
+;;company_id;uuid;YES;6;	-- TABLE: defect_reasons;defect_reasons;uuid
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: downtime_reasons;downtime_reasons;uuid
+;;code;text;NO;2;	-- TABLE: downtime_reasons;downtime_reasons;text
+;;name;text;NO;3;	-- TABLE: downtime_reasons;downtime_reasons;text
+;;category;USER-DEFINED;NO;4;	-- TABLE: downtime_reasons;downtime_reasons;downtime_category
+;true;is_active;boolean;NO;5;	-- TABLE: downtime_reasons;downtime_reasons;bool
+;now();created_at;timestamp with time zone;NO;6;	-- TABLE: downtime_reasons;downtime_reasons;timestamptz
+;;company_id;uuid;YES;7;	-- TABLE: downtime_reasons;downtime_reasons;uuid
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: holidays;holidays;uuid
+;;company_id;uuid;NO;2;	-- TABLE: holidays;holidays;uuid
+;;plant_id;uuid;YES;3;	-- TABLE: holidays;holidays;uuid
+;;holiday_date;date;NO;4;	-- TABLE: holidays;holidays;date
+;;name;text;NO;5;	-- TABLE: holidays;holidays;text
+;;description;text;YES;6;	-- TABLE: holidays;holidays;text
+;false;is_recurring;boolean;NO;7;	-- TABLE: holidays;holidays;bool
+;;created_by;uuid;YES;8;	-- TABLE: holidays;holidays;uuid
+;now();created_at;timestamp with time zone;NO;9;	-- TABLE: holidays;holidays;timestamptz
+;now();updated_at;timestamp with time zone;NO;10;	-- TABLE: holidays;holidays;timestamptz
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: lines;lines;uuid
+;;plant_id;uuid;NO;2;	-- TABLE: lines;lines;uuid
+;;name;text;NO;3;	-- TABLE: lines;lines;text
+;;code;text;YES;4;	-- TABLE: lines;lines;text
+;true;is_active;boolean;NO;5;	-- TABLE: lines;lines;bool
+;now();created_at;timestamp with time zone;NO;6;	-- TABLE: lines;lines;timestamptz
+;now();updated_at;timestamp with time zone;NO;7;	-- TABLE: lines;lines;timestamptz
+;;company_id;uuid;NO;8;	-- TABLE: lines;lines;uuid
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: machine_permission_group_machines;machine_permission_group_machines;uuid
+;;group_id;uuid;NO;2;	-- TABLE: machine_permission_group_machines;machine_permission_group_machines;uuid
+;;machine_id;uuid;NO;3;	-- TABLE: machine_permission_group_machines;machine_permission_group_machines;uuid
+;now();created_at;timestamp with time zone;NO;4;	-- TABLE: machine_permission_group_machines;machine_permission_group_machines;timestamptz
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: machine_permission_groups;machine_permission_groups;uuid
+;;name;text;NO;2;	-- TABLE: machine_permission_groups;machine_permission_groups;text
+;;description;text;YES;3;	-- TABLE: machine_permission_groups;machine_permission_groups;text
+;;company_id;uuid;NO;4;	-- TABLE: machine_permission_groups;machine_permission_groups;uuid
+;;created_by;uuid;NO;5;	-- TABLE: machine_permission_groups;machine_permission_groups;uuid
+;now();created_at;timestamp with time zone;NO;6;	-- TABLE: machine_permission_groups;machine_permission_groups;timestamptz
+;now();updated_at;timestamp with time zone;NO;7;	-- TABLE: machine_permission_groups;machine_permission_groups;timestamptz
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: machines;machines;uuid
+;;line_id;uuid;NO;2;	-- TABLE: machines;machines;uuid
+;;name;text;NO;3;	-- TABLE: machines;machines;text
+;;code;text;NO;4;	-- TABLE: machines;machines;text
+;60;ideal_cycle_time_seconds;numeric;NO;5;	-- TABLE: machines;machines;numeric
+;true;is_active;boolean;NO;6;	-- TABLE: machines;machines;bool
+;now();created_at;timestamp with time zone;NO;7;	-- TABLE: machines;machines;timestamptz
+;now();updated_at;timestamp with time zone;NO;8;	-- TABLE: machines;machines;timestamptz
+;;company_id;uuid;NO;9;	-- TABLE: machines;machines;uuid
+;85.00;target_oee;numeric;YES;10;	-- TABLE: machines;machines;numeric
+;90.00;target_availability;numeric;YES;11;	-- TABLE: machines;machines;numeric
+;95.00;target_performance;numeric;YES;12;	-- TABLE: machines;machines;numeric
+;99.00;target_quality;numeric;YES;13;	-- TABLE: machines;machines;numeric
+;'seconds'::text;time_unit;text;NO;14;	-- TABLE: machines;machines;text
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: oee_snapshots;oee_snapshots;uuid
+;;scope;USER-DEFINED;NO;2;	-- TABLE: oee_snapshots;oee_snapshots;oee_scope
+;;scope_id;uuid;NO;3;	-- TABLE: oee_snapshots;oee_snapshots;uuid
+;;period;USER-DEFINED;NO;4;	-- TABLE: oee_snapshots;oee_snapshots;oee_period
+;;period_start;timestamp with time zone;NO;5;	-- TABLE: oee_snapshots;oee_snapshots;timestamptz
+;;period_end;timestamp with time zone;NO;6;	-- TABLE: oee_snapshots;oee_snapshots;timestamptz
+;;availability;numeric;YES;7;	-- TABLE: oee_snapshots;oee_snapshots;numeric
+;;performance;numeric;YES;8;	-- TABLE: oee_snapshots;oee_snapshots;numeric
+;;quality;numeric;YES;9;	-- TABLE: oee_snapshots;oee_snapshots;numeric
+;;oee;numeric;YES;10;	-- TABLE: oee_snapshots;oee_snapshots;numeric
+;;run_time_minutes;integer;YES;11;	-- TABLE: oee_snapshots;oee_snapshots;int4
+;;downtime_minutes;integer;YES;12;	-- TABLE: oee_snapshots;oee_snapshots;int4
+;;planned_time_minutes;integer;YES;13;	-- TABLE: oee_snapshots;oee_snapshots;int4
+;;good_qty;integer;YES;14;	-- TABLE: oee_snapshots;oee_snapshots;int4
+;;reject_qty;integer;YES;15;	-- TABLE: oee_snapshots;oee_snapshots;int4
+;now();created_at;timestamp with time zone;NO;16;	-- TABLE: oee_snapshots;oee_snapshots;timestamptz
+;;shift_calendar_id;uuid;YES;17;	-- TABLE: oee_snapshots;oee_snapshots;uuid
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: planned_time_templates;planned_time_templates;uuid
+;;company_id;uuid;NO;2;	-- TABLE: planned_time_templates;planned_time_templates;uuid
+;;plant_id;uuid;NO;3;	-- TABLE: planned_time_templates;planned_time_templates;uuid
+;;shift_id;uuid;NO;4;	-- TABLE: planned_time_templates;planned_time_templates;uuid
+;0;break_minutes;integer;NO;5;	-- TABLE: planned_time_templates;planned_time_templates;int4
+;0;meal_minutes;integer;NO;6;	-- TABLE: planned_time_templates;planned_time_templates;int4
+;0;meeting_minutes;integer;NO;7;	-- TABLE: planned_time_templates;planned_time_templates;int4
+;0;maintenance_minutes;integer;NO;8;	-- TABLE: planned_time_templates;planned_time_templates;int4
+;0;other_minutes;integer;NO;9;	-- TABLE: planned_time_templates;planned_time_templates;int4
+;;other_label;text;YES;10;	-- TABLE: planned_time_templates;planned_time_templates;text
+;true;is_active;boolean;NO;11;	-- TABLE: planned_time_templates;planned_time_templates;bool
+;now();created_at;timestamp with time zone;NO;12;	-- TABLE: planned_time_templates;planned_time_templates;timestamptz
+;now();updated_at;timestamp with time zone;NO;13;	-- TABLE: planned_time_templates;planned_time_templates;timestamptz
+;CURRENT_DATE;effective_from;date;NO;14;	-- TABLE: planned_time_templates;planned_time_templates;date
+;;break_start_time;time without time zone;YES;15;	-- TABLE: planned_time_templates;planned_time_templates;time
+;;break_end_time;time without time zone;YES;16;	-- TABLE: planned_time_templates;planned_time_templates;time
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: plants;plants;uuid
+;;name;text;NO;2;	-- TABLE: plants;plants;text
+;;code;text;YES;3;	-- TABLE: plants;plants;text
+;true;is_active;boolean;NO;4;	-- TABLE: plants;plants;bool
+;now();created_at;timestamp with time zone;NO;5;	-- TABLE: plants;plants;timestamptz
+;now();updated_at;timestamp with time zone;NO;6;	-- TABLE: plants;plants;timestamptz
+;;company_id;uuid;NO;7;	-- TABLE: plants;plants;uuid
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: production_counts;production_counts;uuid
+;;shift_calendar_id;uuid;YES;2;	-- TABLE: production_counts;production_counts;uuid
+;;machine_id;uuid;NO;3;	-- TABLE: production_counts;production_counts;uuid
+;now();ts;timestamp with time zone;NO;4;	-- TABLE: production_counts;production_counts;timestamptz
+;0;good_qty;integer;NO;5;	-- TABLE: production_counts;production_counts;int4
+;0;reject_qty;integer;NO;6;	-- TABLE: production_counts;production_counts;int4
+;;defect_reason_id;uuid;YES;7;	-- TABLE: production_counts;production_counts;uuid
+;;notes;text;YES;8;	-- TABLE: production_counts;production_counts;text
+;;created_by;uuid;NO;9;	-- TABLE: production_counts;production_counts;uuid
+;now();created_at;timestamp with time zone;NO;10;	-- TABLE: production_counts;production_counts;timestamptz
+;;production_event_id;uuid;YES;11;	-- TABLE: production_counts;production_counts;uuid
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: production_events;production_events;uuid
+;;plant_id;uuid;NO;2;	-- TABLE: production_events;production_events;uuid
+;;line_id;uuid;NO;3;	-- TABLE: production_events;production_events;uuid
+;;machine_id;uuid;NO;4;	-- TABLE: production_events;production_events;uuid
+;;shift_calendar_id;uuid;YES;5;	-- TABLE: production_events;production_events;uuid
+;;event_type;USER-DEFINED;NO;6;	-- TABLE: production_events;production_events;event_type
+;;reason_id;uuid;YES;7;	-- TABLE: production_events;production_events;uuid
+;now();start_ts;timestamp with time zone;NO;8;	-- TABLE: production_events;production_events;timestamptz
+;;end_ts;timestamp with time zone;YES;9;	-- TABLE: production_events;production_events;timestamptz
+;;notes;text;YES;10;	-- TABLE: production_events;production_events;text
+;;created_by;uuid;NO;11;	-- TABLE: production_events;production_events;uuid
+;now();created_at;timestamp with time zone;NO;12;	-- TABLE: production_events;production_events;timestamptz
+;now();updated_at;timestamp with time zone;NO;13;	-- TABLE: production_events;production_events;timestamptz
+;;product_id;uuid;YES;14;	-- TABLE: production_events;production_events;uuid
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: production_standards;production_standards;uuid
+;;machine_id;uuid;NO;2;	-- TABLE: production_standards;production_standards;uuid
+;;product_id;uuid;NO;3;	-- TABLE: production_standards;production_standards;uuid
+;;company_id;uuid;NO;4;	-- TABLE: production_standards;production_standards;uuid
+;60;ideal_cycle_time_seconds;numeric;NO;5;	-- TABLE: production_standards;production_standards;numeric
+;0;std_setup_time_seconds;numeric;NO;6;	-- TABLE: production_standards;production_standards;numeric
+;99.00;target_quality;numeric;NO;7;	-- TABLE: production_standards;production_standards;numeric
+;true;is_active;boolean;NO;8;	-- TABLE: production_standards;production_standards;bool
+;now();created_at;timestamp with time zone;NO;9;	-- TABLE: production_standards;production_standards;timestamptz
+;now();updated_at;timestamp with time zone;NO;10;	-- TABLE: production_standards;production_standards;timestamptz
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: products;products;uuid
+;;company_id;uuid;NO;2;	-- TABLE: products;products;uuid
+;;code;text;NO;3;	-- TABLE: products;products;text
+;;name;text;NO;4;	-- TABLE: products;products;text
+;;description;text;YES;5;	-- TABLE: products;products;text
+;true;is_active;boolean;NO;7;	-- TABLE: products;products;bool
+;now();created_at;timestamp with time zone;NO;8;	-- TABLE: products;products;timestamptz
+;now();updated_at;timestamp with time zone;NO;9;	-- TABLE: products;products;timestamptz
+;;line_id;uuid;YES;10;	-- TABLE: products;products;uuid
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: setup_reasons;setup_reasons;uuid
+;;code;text;NO;2;	-- TABLE: setup_reasons;setup_reasons;text
+;;name;text;NO;3;	-- TABLE: setup_reasons;setup_reasons;text
+;;company_id;uuid;YES;4;	-- TABLE: setup_reasons;setup_reasons;uuid
+;true;is_active;boolean;NO;5;	-- TABLE: setup_reasons;setup_reasons;bool
+;now();created_at;timestamp with time zone;NO;6;	-- TABLE: setup_reasons;setup_reasons;timestamptz
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: shift_approvals;shift_approvals;uuid
+;;shift_calendar_id;uuid;NO;2;	-- TABLE: shift_approvals;shift_approvals;uuid
+;'DRAFT'::approval_status;status;USER-DEFINED;NO;3;	-- TABLE: shift_approvals;shift_approvals;approval_status
+;;approved_by;uuid;YES;4;	-- TABLE: shift_approvals;shift_approvals;uuid
+;;approved_at;timestamp with time zone;YES;5;	-- TABLE: shift_approvals;shift_approvals;timestamptz
+;;locked_by;uuid;YES;6;	-- TABLE: shift_approvals;shift_approvals;uuid
+;;locked_at;timestamp with time zone;YES;7;	-- TABLE: shift_approvals;shift_approvals;timestamptz
+;now();created_at;timestamp with time zone;NO;8;	-- TABLE: shift_approvals;shift_approvals;timestamptz
+;now();updated_at;timestamp with time zone;NO;9;	-- TABLE: shift_approvals;shift_approvals;timestamptz
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: shift_calendar;shift_calendar;uuid
+;;shift_id;uuid;NO;2;	-- TABLE: shift_calendar;shift_calendar;uuid
+;;shift_date;date;NO;3;	-- TABLE: shift_calendar;shift_calendar;date
+;;plant_id;uuid;NO;4;	-- TABLE: shift_calendar;shift_calendar;uuid
+;480;planned_time_minutes;integer;NO;5;	-- TABLE: shift_calendar;shift_calendar;int4
+;now();created_at;timestamp with time zone;NO;6;	-- TABLE: shift_calendar;shift_calendar;timestamptz
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: shifts;shifts;uuid
+;;name;text;NO;2;	-- TABLE: shifts;shifts;text
+;;start_time;time without time zone;NO;3;	-- TABLE: shifts;shifts;time
+;;end_time;time without time zone;NO;4;	-- TABLE: shifts;shifts;time
+;true;is_active;boolean;NO;5;	-- TABLE: shifts;shifts;bool
+;now();created_at;timestamp with time zone;NO;6;	-- TABLE: shifts;shifts;timestamptz
+;CURRENT_DATE;effective_from;date;NO;7;	-- TABLE: shifts;shifts;date
+;ARRAY[1, 2, 3, 4, 5, 6];working_days;ARRAY;NO;8;	-- TABLE: shifts;shifts;_int4
+;;plant_id;uuid;NO;9;	-- TABLE: shifts;shifts;uuid
+;;company_id;uuid;NO;10;	-- TABLE: shifts;shifts;uuid
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: user_line_permissions;user_line_permissions;uuid
+;;user_id;uuid;NO;2;	-- TABLE: user_line_permissions;user_line_permissions;uuid
+;;line_id;uuid;NO;3;	-- TABLE: user_line_permissions;user_line_permissions;uuid
+;now();created_at;timestamp with time zone;NO;4;	-- TABLE: user_line_permissions;user_line_permissions;timestamptz
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: user_machine_permissions;user_machine_permissions;uuid
+;;user_id;uuid;NO;2;	-- TABLE: user_machine_permissions;user_machine_permissions;uuid
+;;machine_id;uuid;NO;3;	-- TABLE: user_machine_permissions;user_machine_permissions;uuid
+;now();created_at;timestamp with time zone;NO;4;	-- TABLE: user_machine_permissions;user_machine_permissions;timestamptz
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: user_permission_groups;user_permission_groups;uuid
+;;user_id;uuid;NO;2;	-- TABLE: user_permission_groups;user_permission_groups;uuid
+;;group_id;uuid;NO;3;	-- TABLE: user_permission_groups;user_permission_groups;uuid
+;now();created_at;timestamp with time zone;NO;4;	-- TABLE: user_permission_groups;user_permission_groups;timestamptz
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: user_plant_permissions;user_plant_permissions;uuid
+;;user_id;uuid;NO;2;	-- TABLE: user_plant_permissions;user_plant_permissions;uuid
+;;plant_id;uuid;NO;3;	-- TABLE: user_plant_permissions;user_plant_permissions;uuid
+;now();created_at;timestamp with time zone;NO;4;	-- TABLE: user_plant_permissions;user_plant_permissions;timestamptz
+;gen_random_uuid();id;uuid;NO;1;	-- TABLE: user_profiles;user_profiles;uuid
+;;user_id;uuid;NO;2;	-- TABLE: user_profiles;user_profiles;uuid
+;;full_name;text;NO;3;	-- TABLE: user_profiles;user_profiles;text
+;'STAFF'::app_role;role;USER-DEFINED;NO;4;	-- TABLE: user_profiles;user_profiles;app_role
+;now();created_at;timestamp with time zone;NO;5;	-- TABLE: user_profiles;user_profiles;timestamptz
+;now();updated_at;timestamp with time zone;NO;6;	-- TABLE: user_profiles;user_profiles;timestamptz
+;;company_id;uuid;YES;7;	-- TABLE: user_profiles;user_profiles;uuid
+;;email;text;YES;8;	-- TABLE: user_profiles;user_profiles;text
+;;id;uuid;YES;1;	-- TABLE: v_audit_logs_readable;v_audit_logs_readable;uuid
+;;entity_type;text;YES;2;	-- TABLE: v_audit_logs_readable;v_audit_logs_readable;text
+;;entity_id;uuid;YES;3;	-- TABLE: v_audit_logs_readable;v_audit_logs_readable;uuid
+;;action;text;YES;4;	-- TABLE: v_audit_logs_readable;v_audit_logs_readable;text
+;;before_json;jsonb;YES;5;	-- TABLE: v_audit_logs_readable;v_audit_logs_readable;jsonb
+;;after_json;jsonb;YES;6;	-- TABLE: v_audit_logs_readable;v_audit_logs_readable;jsonb
+;;actor_user_id;uuid;YES;7;	-- TABLE: v_audit_logs_readable;v_audit_logs_readable;uuid
+;;actor_name;text;YES;8;	-- TABLE: v_audit_logs_readable;v_audit_logs_readable;text
+;;ts;timestamp with time zone;YES;9;	-- TABLE: v_audit_logs_readable;v_audit_logs_readable;timestamptz
+;;machine_id;uuid;YES;1;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;uuid
+;;machine_name;text;YES;2;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;text
+;;machine_code;text;YES;3;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;text
+;;line_id;uuid;YES;4;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;uuid
+;;line_name;text;YES;5;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;text
+;;plant_id;uuid;YES;6;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;uuid
+;;plant_name;text;YES;7;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;text
+;;shift_calendar_id;uuid;YES;8;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;uuid
+;;shift_date;date;YES;9;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;date
+;;shift_id;uuid;YES;10;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;uuid
+;;shift_name;text;YES;11;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;text
+;;start_time;time without time zone;YES;12;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;time
+;;end_time;time without time zone;YES;13;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;time
+;;planned_time_minutes;integer;YES;14;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;int4
+;;approval_status;USER-DEFINED;YES;15;	-- TABLE: v_current_shift_by_machine;v_current_shift_by_machine;approval_status
+;;shift_calendar_id;uuid;YES;1;	-- TABLE: v_shift_summary;v_shift_summary;uuid
+;;shift_date;date;YES;2;	-- TABLE: v_shift_summary;v_shift_summary;date
+;;shift_name;text;YES;3;	-- TABLE: v_shift_summary;v_shift_summary;text
+;;plant_id;uuid;YES;4;	-- TABLE: v_shift_summary;v_shift_summary;uuid
+;;plant_name;text;YES;5;	-- TABLE: v_shift_summary;v_shift_summary;text
+;;planned_time_minutes;integer;YES;6;	-- TABLE: v_shift_summary;v_shift_summary;int4
+;;approval_status;USER-DEFINED;YES;7;	-- TABLE: v_shift_summary;v_shift_summary;approval_status
+;;approved_by;uuid;YES;8;	-- TABLE: v_shift_summary;v_shift_summary;uuid
+;;approved_at;timestamp with time zone;YES;9;	-- TABLE: v_shift_summary;v_shift_summary;timestamptz
+;;locked_by;uuid;YES;10;	-- TABLE: v_shift_summary;v_shift_summary;uuid
+;;locked_at;timestamp with time zone;YES;11;	-- TABLE: v_shift_summary;v_shift_summary;timestamptz
+;;avg_availability;numeric;YES;12;	-- TABLE: v_shift_summary;v_shift_summary;numeric
+;;avg_performance;numeric;YES;13;	-- TABLE: v_shift_summary;v_shift_summary;numeric
+;;avg_quality;numeric;YES;14;	-- TABLE: v_shift_summary;v_shift_summary;numeric
+;;avg_oee;numeric;YES;15;	-- TABLE: v_shift_summary;v_shift_summary;numeric
+;;total_run_time;bigint;YES;16;	-- TABLE: v_shift_summary;v_shift_summary;int8
+;;total_downtime;bigint;YES;17;	-- TABLE: v_shift_summary;v_shift_summary;int8
+;;total_good_qty;bigint;YES;18;	-- TABLE: v_shift_summary;v_shift_summary;int8
+;;total_reject_qty;bigint;YES;19;	-- TABLE: v_shift_summary;v_shift_summary;int8
+;;machine_count;bigint;YES;20;	-- TABLE: v_shift_summary;v_shift_summary;int8

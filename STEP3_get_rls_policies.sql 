@@ -1,0 +1,152 @@
+command;permissive;policyname;roles;schemaname;tablename;using_expression;with_check_expression
+SELECT;PERMISSIVE;Admin and Supervisor can view all audit logs;{authenticated};public;audit_logs;is_supervisor(auth.uid());
+SELECT;PERMISSIVE;Staff can view own audit logs;{authenticated};public;audit_logs;(actor_user_id = auth.uid());
+ALL;PERMISSIVE;Admins can manage companies;{public};public;companies;is_admin(auth.uid());is_admin(auth.uid())
+SELECT;PERMISSIVE;Authenticated users can view companies;{public};public;companies;true;
+ALL;PERMISSIVE;Admins can manage defect reasons;{public};public;defect_reasons;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage defect reasons in their company;{public};public;defect_reasons;is_supervisor_of_company(auth.uid(), company_id);is_supervisor_of_company(auth.uid(), company_id)
+SELECT;PERMISSIVE;Users can view defect reasons in their company;{public};public;defect_reasons;((company_id = get_user_company(auth.uid())) OR is_admin(auth.uid()));
+ALL;PERMISSIVE;Admins can manage downtime reasons;{public};public;downtime_reasons;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage downtime reasons in their company;{public};public;downtime_reasons;is_supervisor_of_company(auth.uid(), company_id);is_supervisor_of_company(auth.uid(), company_id)
+SELECT;PERMISSIVE;Users can view downtime reasons in their company;{public};public;downtime_reasons;((company_id = get_user_company(auth.uid())) OR is_admin(auth.uid()));
+ALL;PERMISSIVE;Admins full access to holidays;{public};public;holidays;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage holidays in their company;{public};public;holidays;is_supervisor_of_company(auth.uid(), company_id);is_supervisor_of_company(auth.uid(), company_id)
+SELECT;PERMISSIVE;Users can view holidays in their company;{public};public;holidays;((company_id = get_user_company(auth.uid())) OR is_admin(auth.uid()));
+ALL;PERMISSIVE;Admins and supervisors can manage lines;{public};public;lines;(is_admin(auth.uid()) OR is_supervisor_of_company(auth.uid(), company_id));(is_admin(auth.uid()) OR is_supervisor_of_company(auth.uid(), company_id))
+SELECT;PERMISSIVE;Authenticated users can view lines;{authenticated};public;lines;true;
+ALL;PERMISSIVE;Admins full access to group machines;{public};public;machine_permission_group_machines;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage group machines in their company;{public};public;machine_permission_group_machines;"(EXISTS ( SELECT 1
+   FROM machine_permission_groups g
+  WHERE ((g.id = machine_permission_group_machines.group_id) AND is_supervisor_of_company(auth.uid(), g.company_id))))";"(EXISTS ( SELECT 1
+   FROM machine_permission_groups g
+  WHERE ((g.id = machine_permission_group_machines.group_id) AND is_supervisor_of_company(auth.uid(), g.company_id))))"
+SELECT;PERMISSIVE;Users can view group machines in their company;{public};public;machine_permission_group_machines;"(EXISTS ( SELECT 1
+   FROM machine_permission_groups g
+  WHERE ((g.id = machine_permission_group_machines.group_id) AND (g.company_id = get_user_company(auth.uid())))))";
+ALL;PERMISSIVE;Admins full access to permission groups;{public};public;machine_permission_groups;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage groups in their company;{public};public;machine_permission_groups;is_supervisor_of_company(auth.uid(), company_id);is_supervisor_of_company(auth.uid(), company_id)
+SELECT;PERMISSIVE;Users can view groups in their company;{public};public;machine_permission_groups;(company_id = get_user_company(auth.uid()));
+ALL;PERMISSIVE;Admins and supervisors can manage machines;{public};public;machines;(is_admin(auth.uid()) OR is_supervisor_of_company(auth.uid(), company_id));(is_admin(auth.uid()) OR is_supervisor_of_company(auth.uid(), company_id))
+SELECT;PERMISSIVE;Authenticated users can view machines;{authenticated};public;machines;true;
+ALL;PERMISSIVE;Admins full access to oee_snapshots;{authenticated};public;oee_snapshots;is_admin(auth.uid());is_admin(auth.uid())
+SELECT;PERMISSIVE;Executives can view oee_snapshots;{authenticated};public;oee_snapshots;is_executive(auth.uid());
+SELECT;PERMISSIVE;Users with permissions can view oee_snapshots;{authenticated};public;oee_snapshots;(((scope = 'MACHINE'::oee_scope) AND has_machine_permission(auth.uid(), scope_id)) OR ((scope = 'LINE'::oee_scope) AND has_line_permission(auth.uid(), scope_id)) OR ((scope = 'PLANT'::oee_scope) AND has_plant_permission(auth.uid(), scope_id)));
+ALL;PERMISSIVE;Admins can manage planned_time_templates;{public};public;planned_time_templates;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage planned_time_templates in their company;{public};public;planned_time_templates;is_supervisor_of_company(auth.uid(), company_id);is_supervisor_of_company(auth.uid(), company_id)
+SELECT;PERMISSIVE;Users can view planned_time_templates in their company;{public};public;planned_time_templates;((company_id = get_user_company(auth.uid())) OR is_admin(auth.uid()));
+ALL;PERMISSIVE;Admins and supervisors can manage plants;{public};public;plants;(is_admin(auth.uid()) OR is_supervisor_of_company(auth.uid(), company_id));(is_admin(auth.uid()) OR is_supervisor_of_company(auth.uid(), company_id))
+SELECT;PERMISSIVE;Authenticated users can view plants;{authenticated};public;plants;true;
+ALL;PERMISSIVE;Admins full access to production_counts;{authenticated};public;production_counts;is_admin(auth.uid());is_admin(auth.uid())
+DELETE;PERMISSIVE;Staff can delete own counts if not locked;{authenticated};public;production_counts;((created_by = auth.uid()) AND (NOT is_shift_locked(shift_calendar_id)));
+INSERT;PERMISSIVE;Staff can insert counts for permitted machines;{authenticated};public;production_counts;;(has_machine_permission(auth.uid(), machine_id) AND (NOT is_shift_locked(shift_calendar_id)) AND (created_by = auth.uid()))
+SELECT;PERMISSIVE;Staff can select own machine counts;{authenticated};public;production_counts;has_machine_permission(auth.uid(), machine_id);
+UPDATE;PERMISSIVE;Staff can update own counts if not locked;{authenticated};public;production_counts;((created_by = auth.uid()) AND (NOT is_shift_locked(shift_calendar_id)));((created_by = auth.uid()) AND (NOT is_shift_locked(shift_calendar_id)))
+DELETE;PERMISSIVE;Supervisor can delete counts in company;{authenticated};public;production_counts;"(is_supervisor(auth.uid()) AND (NOT is_shift_locked(shift_calendar_id)) AND (EXISTS ( SELECT 1
+   FROM (machines m
+     JOIN user_profiles up ON ((up.company_id = m.company_id)))
+  WHERE ((m.id = production_counts.machine_id) AND (up.user_id = auth.uid())))))";
+UPDATE;PERMISSIVE;Supervisor can update counts in company;{authenticated};public;production_counts;"(is_supervisor(auth.uid()) AND (NOT is_shift_locked(shift_calendar_id)) AND (EXISTS ( SELECT 1
+   FROM (machines m
+     JOIN user_profiles up ON ((up.company_id = m.company_id)))
+  WHERE ((m.id = production_counts.machine_id) AND (up.user_id = auth.uid())))))";(is_supervisor(auth.uid()) AND (NOT is_shift_locked(shift_calendar_id)))
+ALL;PERMISSIVE;Admins full access to production_events;{authenticated};public;production_events;is_admin(auth.uid());is_admin(auth.uid())
+DELETE;PERMISSIVE;Staff can delete own events if not locked;{authenticated};public;production_events;((created_by = auth.uid()) AND (NOT is_shift_locked(shift_calendar_id)));
+INSERT;PERMISSIVE;Staff can insert events for permitted machines;{authenticated};public;production_events;;(has_machine_permission(auth.uid(), machine_id) AND (NOT is_shift_locked(shift_calendar_id)) AND (created_by = auth.uid()))
+SELECT;PERMISSIVE;Staff can select own machine events;{authenticated};public;production_events;has_machine_permission(auth.uid(), machine_id);
+UPDATE;PERMISSIVE;Staff can update own events if not locked;{authenticated};public;production_events;((created_by = auth.uid()) AND (NOT is_shift_locked(shift_calendar_id)));((created_by = auth.uid()) AND (NOT is_shift_locked(shift_calendar_id)))
+DELETE;PERMISSIVE;Supervisor can delete events in company;{authenticated};public;production_events;"(is_supervisor(auth.uid()) AND (NOT is_shift_locked(shift_calendar_id)) AND (EXISTS ( SELECT 1
+   FROM (machines m
+     JOIN user_profiles up ON ((up.company_id = m.company_id)))
+  WHERE ((m.id = production_events.machine_id) AND (up.user_id = auth.uid())))))";
+UPDATE;PERMISSIVE;Supervisor can update events in company;{authenticated};public;production_events;"(is_supervisor(auth.uid()) AND (NOT is_shift_locked(shift_calendar_id)) AND (EXISTS ( SELECT 1
+   FROM (machines m
+     JOIN user_profiles up ON ((up.company_id = m.company_id)))
+  WHERE ((m.id = production_events.machine_id) AND (up.user_id = auth.uid())))))";(is_supervisor(auth.uid()) AND (NOT is_shift_locked(shift_calendar_id)))
+ALL;PERMISSIVE;Admins can manage production_standards;{public};public;production_standards;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage production_standards in their company;{public};public;production_standards;is_supervisor_of_company(auth.uid(), company_id);is_supervisor_of_company(auth.uid(), company_id)
+SELECT;PERMISSIVE;Users can view production_standards in their company;{public};public;production_standards;((company_id = get_user_company(auth.uid())) OR is_admin(auth.uid()));
+ALL;PERMISSIVE;Admins can manage products;{public};public;products;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage products in their company;{public};public;products;is_supervisor_of_company(auth.uid(), company_id);is_supervisor_of_company(auth.uid(), company_id)
+SELECT;PERMISSIVE;Users can view products in their company;{public};public;products;((company_id = get_user_company(auth.uid())) OR is_admin(auth.uid()));
+ALL;PERMISSIVE;Admins can manage setup reasons;{public};public;setup_reasons;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage setup reasons in their company;{public};public;setup_reasons;is_supervisor_of_company(auth.uid(), company_id);is_supervisor_of_company(auth.uid(), company_id)
+SELECT;PERMISSIVE;Users can view setup reasons in their company;{public};public;setup_reasons;((company_id = get_user_company(auth.uid())) OR is_admin(auth.uid()));
+ALL;PERMISSIVE;Admins full access to shift_approvals;{authenticated};public;shift_approvals;is_admin(auth.uid());is_admin(auth.uid())
+SELECT;PERMISSIVE;Authenticated can view shift_approvals;{authenticated};public;shift_approvals;true;
+INSERT;PERMISSIVE;Supervisors can manage shift_approvals;{authenticated};public;shift_approvals;;"(is_supervisor(auth.uid()) AND has_plant_permission(auth.uid(), ( SELECT shift_calendar.plant_id
+   FROM shift_calendar
+  WHERE (shift_calendar.id = shift_approvals.shift_calendar_id))))"
+UPDATE;PERMISSIVE;Supervisors can update shift_approvals;{authenticated};public;shift_approvals;"(is_supervisor(auth.uid()) AND has_plant_permission(auth.uid(), ( SELECT shift_calendar.plant_id
+   FROM shift_calendar
+  WHERE (shift_calendar.id = shift_approvals.shift_calendar_id))))";is_supervisor(auth.uid())
+ALL;PERMISSIVE;Admins can manage shift calendar;{authenticated};public;shift_calendar;is_admin(auth.uid());is_admin(auth.uid())
+SELECT;PERMISSIVE;Authenticated users can view shift calendar;{authenticated};public;shift_calendar;true;
+ALL;PERMISSIVE;Supervisors can manage shift_calendar in their company;{authenticated};public;shift_calendar;"(EXISTS ( SELECT 1
+   FROM (user_profiles up
+     JOIN plants p ON ((p.company_id = up.company_id)))
+  WHERE ((up.user_id = auth.uid()) AND (up.role = 'SUPERVISOR'::app_role) AND (p.id = shift_calendar.plant_id))))";"(EXISTS ( SELECT 1
+   FROM (user_profiles up
+     JOIN plants p ON ((p.company_id = up.company_id)))
+  WHERE ((up.user_id = auth.uid()) AND (up.role = 'SUPERVISOR'::app_role) AND (p.id = shift_calendar.plant_id))))"
+ALL;PERMISSIVE;Admins can manage shifts;{public};public;shifts;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage shifts in their company;{public};public;shifts;is_supervisor_of_company(auth.uid(), company_id);is_supervisor_of_company(auth.uid(), company_id)
+SELECT;PERMISSIVE;Users can view shifts in their company;{public};public;shifts;((company_id = get_user_company(auth.uid())) OR is_admin(auth.uid()));
+ALL;PERMISSIVE;Admins can manage line permissions;{authenticated};public;user_line_permissions;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage line permissions in their company;{public};public;user_line_permissions;"(EXISTS ( SELECT 1
+   FROM (user_profiles supervisor_profile
+     JOIN user_profiles staff_profile ON ((staff_profile.company_id = supervisor_profile.company_id)))
+  WHERE ((supervisor_profile.user_id = auth.uid()) AND (supervisor_profile.role = 'SUPERVISOR'::app_role) AND (staff_profile.user_id = user_line_permissions.user_id) AND (staff_profile.role = 'STAFF'::app_role))))";"(EXISTS ( SELECT 1
+   FROM ((user_profiles supervisor_profile
+     JOIN user_profiles staff_profile ON ((staff_profile.company_id = supervisor_profile.company_id)))
+     JOIN lines l ON ((l.company_id = supervisor_profile.company_id)))
+  WHERE ((supervisor_profile.user_id = auth.uid()) AND (supervisor_profile.role = 'SUPERVISOR'::app_role) AND (staff_profile.user_id = user_line_permissions.user_id) AND (staff_profile.role = 'STAFF'::app_role) AND (l.id = user_line_permissions.line_id))))"
+SELECT;PERMISSIVE;Supervisors can view line permissions of staff in company;{public};public;user_line_permissions;"(EXISTS ( SELECT 1
+   FROM (user_profiles supervisor_profile
+     JOIN user_profiles staff_profile ON ((staff_profile.company_id = supervisor_profile.company_id)))
+  WHERE ((supervisor_profile.user_id = auth.uid()) AND (supervisor_profile.role = 'SUPERVISOR'::app_role) AND (staff_profile.user_id = user_line_permissions.user_id))))";
+SELECT;PERMISSIVE;Users can view own line permissions;{authenticated};public;user_line_permissions;(user_id = auth.uid());
+ALL;PERMISSIVE;Admins can manage machine permissions;{authenticated};public;user_machine_permissions;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage machine permissions in their company;{public};public;user_machine_permissions;"(EXISTS ( SELECT 1
+   FROM (user_profiles supervisor_profile
+     JOIN user_profiles staff_profile ON ((staff_profile.company_id = supervisor_profile.company_id)))
+  WHERE ((supervisor_profile.user_id = auth.uid()) AND (supervisor_profile.role = 'SUPERVISOR'::app_role) AND (staff_profile.user_id = user_machine_permissions.user_id) AND (staff_profile.role = 'STAFF'::app_role))))";"(EXISTS ( SELECT 1
+   FROM ((user_profiles supervisor_profile
+     JOIN user_profiles staff_profile ON ((staff_profile.company_id = supervisor_profile.company_id)))
+     JOIN machines m ON ((m.company_id = supervisor_profile.company_id)))
+  WHERE ((supervisor_profile.user_id = auth.uid()) AND (supervisor_profile.role = 'SUPERVISOR'::app_role) AND (staff_profile.user_id = user_machine_permissions.user_id) AND (staff_profile.role = 'STAFF'::app_role) AND (m.id = user_machine_permissions.machine_id))))"
+SELECT;PERMISSIVE;Supervisors can view machine permissions of staff in company;{public};public;user_machine_permissions;"(EXISTS ( SELECT 1
+   FROM (user_profiles supervisor_profile
+     JOIN user_profiles staff_profile ON ((staff_profile.company_id = supervisor_profile.company_id)))
+  WHERE ((supervisor_profile.user_id = auth.uid()) AND (supervisor_profile.role = 'SUPERVISOR'::app_role) AND (staff_profile.user_id = user_machine_permissions.user_id))))";
+SELECT;PERMISSIVE;Users can view own machine permissions;{authenticated};public;user_machine_permissions;(user_id = auth.uid());
+ALL;PERMISSIVE;Admins full access to user groups;{public};public;user_permission_groups;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage user groups for staff in their company;{public};public;user_permission_groups;"(EXISTS ( SELECT 1
+   FROM (user_profiles up
+     JOIN machine_permission_groups g ON ((g.company_id = up.company_id)))
+  WHERE ((up.user_id = user_permission_groups.user_id) AND (up.role = 'STAFF'::app_role) AND (g.id = user_permission_groups.group_id) AND is_supervisor_of_company(auth.uid(), up.company_id))))";"(EXISTS ( SELECT 1
+   FROM (user_profiles up
+     JOIN machine_permission_groups g ON ((g.company_id = up.company_id)))
+  WHERE ((up.user_id = user_permission_groups.user_id) AND (up.role = 'STAFF'::app_role) AND (g.id = user_permission_groups.group_id) AND is_supervisor_of_company(auth.uid(), up.company_id))))"
+SELECT;PERMISSIVE;Users can view own group assignments;{public};public;user_permission_groups;(user_id = auth.uid());
+ALL;PERMISSIVE;Admins can manage plant permissions;{authenticated};public;user_plant_permissions;is_admin(auth.uid());is_admin(auth.uid())
+ALL;PERMISSIVE;Supervisors can manage plant permissions in their company;{public};public;user_plant_permissions;"(EXISTS ( SELECT 1
+   FROM (user_profiles supervisor_profile
+     JOIN user_profiles staff_profile ON ((staff_profile.company_id = supervisor_profile.company_id)))
+  WHERE ((supervisor_profile.user_id = auth.uid()) AND (supervisor_profile.role = 'SUPERVISOR'::app_role) AND (staff_profile.user_id = user_plant_permissions.user_id) AND (staff_profile.role = 'STAFF'::app_role))))";"(EXISTS ( SELECT 1
+   FROM ((user_profiles supervisor_profile
+     JOIN user_profiles staff_profile ON ((staff_profile.company_id = supervisor_profile.company_id)))
+     JOIN plants p ON ((p.company_id = supervisor_profile.company_id)))
+  WHERE ((supervisor_profile.user_id = auth.uid()) AND (supervisor_profile.role = 'SUPERVISOR'::app_role) AND (staff_profile.user_id = user_plant_permissions.user_id) AND (staff_profile.role = 'STAFF'::app_role) AND (p.id = user_plant_permissions.plant_id))))"
+SELECT;PERMISSIVE;Supervisors can view plant permissions of staff in company;{public};public;user_plant_permissions;"(EXISTS ( SELECT 1
+   FROM (user_profiles supervisor_profile
+     JOIN user_profiles staff_profile ON ((staff_profile.company_id = supervisor_profile.company_id)))
+  WHERE ((supervisor_profile.user_id = auth.uid()) AND (supervisor_profile.role = 'SUPERVISOR'::app_role) AND (staff_profile.user_id = user_plant_permissions.user_id))))";
+SELECT;PERMISSIVE;Users can view own plant permissions;{authenticated};public;user_plant_permissions;(user_id = auth.uid());
+ALL;PERMISSIVE;Admins can manage all profiles;{public};public;user_profiles;is_admin(auth.uid());is_admin(auth.uid())
+SELECT;PERMISSIVE;Admins can view all profiles;{authenticated};public;user_profiles;is_admin(auth.uid());
+INSERT;PERMISSIVE;Supervisors can create users in their company;{public};public;user_profiles;;(is_supervisor(auth.uid()) AND (role = ANY (ARRAY['STAFF'::app_role, 'SUPERVISOR'::app_role])) AND (company_id = get_user_company(auth.uid())))
+DELETE;PERMISSIVE;Supervisors can delete users in their company;{public};public;user_profiles;(is_supervisor(auth.uid()) AND (role = ANY (ARRAY['STAFF'::app_role, 'SUPERVISOR'::app_role])) AND (company_id = get_user_company(auth.uid())));
+UPDATE;PERMISSIVE;Supervisors can update users in their company;{public};public;user_profiles;(is_supervisor(auth.uid()) AND (role = ANY (ARRAY['STAFF'::app_role, 'SUPERVISOR'::app_role])) AND (company_id = get_user_company(auth.uid())));(is_supervisor(auth.uid()) AND (role = ANY (ARRAY['STAFF'::app_role, 'SUPERVISOR'::app_role])) AND (company_id = get_user_company(auth.uid())))
+SELECT;PERMISSIVE;Supervisors can view staff in their company;{public};public;user_profiles;(is_supervisor(auth.uid()) AND (company_id = get_user_company(auth.uid())));
+UPDATE;PERMISSIVE;Users can update own profile;{authenticated};public;user_profiles;(user_id = auth.uid());(user_id = auth.uid())
+SELECT;PERMISSIVE;Users can view own profile;{authenticated};public;user_profiles;(user_id = auth.uid());
