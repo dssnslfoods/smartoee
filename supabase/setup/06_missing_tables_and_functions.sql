@@ -45,14 +45,14 @@ ALTER TABLE public.holidays ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.planned_time_templates ENABLE ROW LEVEL SECURITY;
 
 -- Policies for Holidays
-CREATE POLICY "Admins full access to holidays" ON public.holidays FOR ALL TO public USING (is_admin(auth.uid())) WITH CHECK (is_admin(auth.uid()));
-CREATE POLICY "Supervisors can manage holidays in their company" ON public.holidays FOR ALL TO public USING (is_supervisor_of_company(auth.uid(), company_id)) WITH CHECK (is_supervisor_of_company(auth.uid(), company_id));
-CREATE POLICY "Users can view holidays in their company" ON public.holidays FOR SELECT TO public USING ((company_id = get_user_company(auth.uid())) OR is_admin(auth.uid()));
+CREATE POLICY "Admins full access to holidays" ON public.holidays FOR ALL TO public USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
+CREATE POLICY "Supervisors can manage holidays in their company" ON public.holidays FOR ALL TO public USING (public.is_supervisor() AND company_id = public.get_user_company_id()) WITH CHECK (public.is_supervisor() AND company_id = public.get_user_company_id());
+CREATE POLICY "Users can view holidays in their company" ON public.holidays FOR SELECT TO public USING ((company_id = public.get_user_company_id()) OR public.is_admin_or_manager());
 
 -- Policies for Templates
-CREATE POLICY "Admins full access to templates" ON public.planned_time_templates FOR ALL TO public USING (is_admin(auth.uid())) WITH CHECK (is_admin(auth.uid()));
-CREATE POLICY "Supervisors can manage templates in their company" ON public.planned_time_templates FOR ALL TO public USING (is_supervisor_of_company(auth.uid(), company_id)) WITH CHECK (is_supervisor_of_company(auth.uid(), company_id));
-CREATE POLICY "Users can view templates in their company" ON public.planned_time_templates FOR SELECT TO public USING ((company_id = get_user_company(auth.uid())) OR is_admin(auth.uid()));
+CREATE POLICY "Admins full access to templates" ON public.planned_time_templates FOR ALL TO public USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
+CREATE POLICY "Supervisors can manage templates in their company" ON public.planned_time_templates FOR ALL TO public USING (public.is_supervisor() AND company_id = public.get_user_company_id()) WITH CHECK (public.is_supervisor() AND company_id = public.get_user_company_id());
+CREATE POLICY "Users can view templates in their company" ON public.planned_time_templates FOR SELECT TO public USING ((company_id = public.get_user_company_id()) OR public.is_admin_or_manager());
 
 -- =============================================
 -- 6.2 SHIFT AUTO-CREATION FUNCTION
