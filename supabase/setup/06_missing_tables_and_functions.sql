@@ -153,7 +153,7 @@ BEGIN
   END IF;
 
   IF v_shift IS NULL THEN
-    RETURN NULL; -- No matching shift configuration
+    RAISE EXCEPTION 'DEBUG_NO_SHIFT: plant=%, date=%, time=%, dow=%', p_plant_id, p_local_date, p_local_time, EXTRACT(DOW FROM p_local_date);
   END IF;
 
   -- Check holidays before creating
@@ -169,7 +169,7 @@ BEGIN
             AND EXTRACT(DAY FROM h.holiday_date) = EXTRACT(DAY FROM p_local_date))
       )
   ) THEN
-    RETURN NULL; -- Holiday, don't create
+    RAISE EXCEPTION 'DEBUG_HOLIDAY: Shift found but it is a holiday today (date=%)', p_local_date;
   END IF;
 
   -- Calculate planned_time from PPT template
@@ -212,6 +212,10 @@ BEGIN
        AND sc.shift_id = v_shift.id
        AND sc.shift_date = p_local_date
      LIMIT 1;
+     
+    IF v_sc_id IS NULL THEN
+      RAISE EXCEPTION 'DEBUG_INSERT_FAILED: Conflict but could not fetch existing row for plant=%, shift_id=%, date=%', p_plant_id, v_shift.id, p_local_date;
+    END IF;
   END IF;
 
   RETURN v_sc_id;
@@ -238,6 +242,7 @@ DECLARE
     v_plant_id UUID;
     v_line_id UUID;
     v_new_event_id UUID;
+    v_local_ts TIMESTAMP;
 BEGIN
     SELECT p.id, m.line_id INTO v_plant_id, v_line_id
     FROM public.machines m
@@ -249,8 +254,11 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', 'NOT_FOUND', 'message', 'Machine not found');
     END IF;
 
+    -- Get current time in local timezone (Thailand)
+    v_local_ts := timezone('Asia/Bangkok', now());
+
     -- Call ensure_shift_calendar to automatically find OR provision the active shift today!
-    v_shift_calendar_id := public.ensure_shift_calendar(v_plant_id, CURRENT_DATE, CURRENT_TIME::time);
+    v_shift_calendar_id := public.ensure_shift_calendar(v_plant_id, v_local_ts::date, v_local_ts::time);
 
     IF v_shift_calendar_id IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', 'NOT_FOUND', 'message', 'No active shift calendar found for today. Please create one.');
@@ -295,6 +303,7 @@ DECLARE
     v_shift_calendar_id UUID;
     v_plant_id UUID;
     v_new_count_id UUID;
+    v_local_ts TIMESTAMP;
 BEGIN
     SELECT p.id INTO v_plant_id
     FROM public.machines m
@@ -302,8 +311,11 @@ BEGIN
     JOIN public.plants p ON l.plant_id = p.id
     WHERE m.id = p_machine_id;
 
+    -- Get current time in local timezone (Thailand)
+    v_local_ts := timezone('Asia/Bangkok', now());
+
     -- Call ensure_shift_calendar to automatically find OR provision the active shift today!
-    v_shift_calendar_id := public.ensure_shift_calendar(v_plant_id, CURRENT_DATE, CURRENT_TIME::time);
+    v_shift_calendar_id := public.ensure_shift_calendar(v_plant_id, v_local_ts::date, v_local_ts::time);
 
     IF v_shift_calendar_id IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', 'NOT_FOUND', 'message', 'No active shift calendar found.');
