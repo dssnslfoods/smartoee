@@ -62,6 +62,22 @@ npx supabase gen types typescript --project-id YOUR_PROJECT_REF --schema public 
 
 เราตั้ง Command ไว้ใน `package.json` แล้วคือ `npm run gen:types` ใช้งานได้เลย
 
+## 6. ตั้งค่าและ Deploy Edge Functions (จำเป็นสำหรับการเพิ่มผู้ใช้)
+ระบบต้องการ Edge Functions ในการทำคำสั่งที่ต้องการสิทธิ์ระดับสูง เช่น การสร้างผู้ใช้ใหม่ หรือ การรีเซ็ตรหัสผ่าน
+
+1. คัดลอก **Reference ID** ของโปรเจกต์ (ได้จาก URL ของ Supabase Dashboard เช่น `https://supabase.com/dashboard/project/abcdefghijk` ค่า ID คือ `abcdefghijk`)
+2. รันคำสั่งต่อไปนี้ใน Terminal เพื่อเชื่อมต่อและ Deploy:
+   ```bash
+   # ล็อกอิน (ถ้ายังไม่ได้ทำ)
+   npx supabase login
+
+   # เชื่อมต่อกับโปรเจกต์ (เปลี่ยน YOUR_PROJECT_REF เป็น ID จริง)
+   npx supabase link --project-ref YOUR_PROJECT_REF
+
+   # ฝังฟังก์ชันขึ้นคลาวด์
+   npx supabase functions deploy
+   ```
+
 ## 6. โครงสร้างไฟล์ในโปรเจกต์ (แนะนำ)
 จัดการ Source Code ใน Frontend ของคุณตามนี้:
 ```
