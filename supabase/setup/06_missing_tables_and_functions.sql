@@ -45,13 +45,23 @@ ALTER TABLE public.holidays ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.planned_time_templates ENABLE ROW LEVEL SECURITY;
 
 -- Policies for Holidays
+DROP POLICY IF EXISTS "Admins full access to holidays" ON public.holidays;
 CREATE POLICY "Admins full access to holidays" ON public.holidays FOR ALL TO public USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
+
+DROP POLICY IF EXISTS "Supervisors can manage holidays in their company" ON public.holidays;
 CREATE POLICY "Supervisors can manage holidays in their company" ON public.holidays FOR ALL TO public USING (public.is_supervisor() AND company_id = public.get_user_company_id()) WITH CHECK (public.is_supervisor() AND company_id = public.get_user_company_id());
+
+DROP POLICY IF EXISTS "Users can view holidays in their company" ON public.holidays;
 CREATE POLICY "Users can view holidays in their company" ON public.holidays FOR SELECT TO public USING ((company_id = public.get_user_company_id()) OR public.is_admin_or_manager());
 
 -- Policies for Templates
+DROP POLICY IF EXISTS "Admins full access to templates" ON public.planned_time_templates;
 CREATE POLICY "Admins full access to templates" ON public.planned_time_templates FOR ALL TO public USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
+
+DROP POLICY IF EXISTS "Supervisors can manage templates in their company" ON public.planned_time_templates;
 CREATE POLICY "Supervisors can manage templates in their company" ON public.planned_time_templates FOR ALL TO public USING (public.is_supervisor() AND company_id = public.get_user_company_id()) WITH CHECK (public.is_supervisor() AND company_id = public.get_user_company_id());
+
+DROP POLICY IF EXISTS "Users can view templates in their company" ON public.planned_time_templates;
 CREATE POLICY "Users can view templates in their company" ON public.planned_time_templates FOR SELECT TO public USING ((company_id = public.get_user_company_id()) OR public.is_admin_or_manager());
 
 -- =============================================
