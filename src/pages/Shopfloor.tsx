@@ -42,8 +42,8 @@ import {
   getSession,
   getPermittedMachineIds,
 } from '@/services';
-import type { 
-  ShiftCalendar, 
+import type {
+  ShiftCalendar,
   EventType,
   Product,
   ProductionStandard,
@@ -52,7 +52,7 @@ import type {
 export default function Shopfloor() {
   const queryClient = useQueryClient();
   const { company, isAdmin, hasRole } = useAuth();
-  
+
   const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
@@ -137,26 +137,26 @@ export default function Shopfloor() {
     // Filter to only active shift definitions
     const activeShifts = shiftCalendar.filter(sc => sc.shift?.is_active !== false);
     if (activeShifts.length === 0) return shiftCalendar[0] as ShiftCalendar | undefined; // fallback to any
-    
+
     const now = new Date();
     const currentHours = now.getHours();
     const currentMinutes = now.getMinutes();
     const currentSeconds = now.getSeconds();
     const currentTimeInSeconds = currentHours * 3600 + currentMinutes * 60 + currentSeconds;
-    
+
     const parseTime = (timeStr: string) => {
       const parts = timeStr.split(':').map(Number);
       return parts[0] * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
     };
-    
+
     const matchedShift = activeShifts.find(sc => {
       const start = sc.shift?.start_time;
       const end = sc.shift?.end_time;
       if (!start || !end) return false;
-      
+
       const startSec = parseTime(start);
       const endSec = parseTime(end);
-      
+
       if (startSec <= endSec) {
         // Normal shift (e.g., 06:00 - 14:00)
         return currentTimeInSeconds >= startSec && currentTimeInSeconds < endSec;
@@ -165,7 +165,7 @@ export default function Shopfloor() {
         return currentTimeInSeconds >= startSec || currentTimeInSeconds < endSec;
       }
     });
-    
+
     return (matchedShift || activeShifts[0]) as ShiftCalendar | undefined;
   }, [shiftCalendar]);
 
@@ -183,7 +183,7 @@ export default function Shopfloor() {
     },
     enabled: !!currentShift?.id,
   });
-  
+
   const isLocked = shiftApproval?.status === 'LOCKED';
 
   const { data: currentEvent } = useQuery({
@@ -246,9 +246,9 @@ export default function Shopfloor() {
   }, [machineStandards]);
 
   // Determine effective cycle time: production_standards > machine default (no product-level CT)
-  const effectiveCycleTime = productionStandard?.ideal_cycle_time_seconds 
+  const effectiveCycleTime = productionStandard?.ideal_cycle_time_seconds
     ?? selectedMachine?.ideal_cycle_time_seconds;
-  
+
   const cycleTimeSource = productionStandard
     ? `from Standard: ${selectedProduct?.code}`
     : 'Machine Default';
@@ -282,21 +282,27 @@ export default function Shopfloor() {
 
   const startEventMutation = useMutation({
     mutationFn: async ({ eventType, reasonId, notes }: { eventType: EventType; reasonId?: string; notes?: string }) => {
-      return startEvent(selectedMachineId!, eventType, reasonId, notes, 
+      return startEvent(selectedMachineId!, eventType, reasonId, notes,
         eventType === 'RUN' ? selectedProductId || undefined : undefined
       );
     },
     onSuccess: (data) => {
       if (data.success) {
-        toast.success(data.message);
+        toast.success(data.message || 'สำเร็จ');
         queryClient.invalidateQueries({ queryKey: ['currentEvent', selectedMachineId] });
         queryClient.invalidateQueries({ queryKey: ['productionEvents', selectedMachineId, currentShift?.id] });
       } else {
-        toast.error(data.message || 'Failed to start event');
+        toast.error(data.message || 'ไม่สามารถบันทึกเหตุการณ์ได้');
       }
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Failed to start event');
+      let errorMessage = error.message || 'ไม่สามารถบันทึกเหตุการณ์ได้';
+      if (error.code === 'NOT_FOUND' && errorMessage.toLowerCase().includes('shift')) {
+        errorMessage = '❌ ไม่สามารถเริ่มงานได้: ไม่พบกะการทำงาน (Shift) ที่เปิดในขณะนี้ หรืออยู่นอกเวลาทำงาน';
+      } else if (error.code === 'SHIFT_LOCKED') {
+        errorMessage = '❌ ไม่สามารถเริ่มงานได้: กะการทำงานปัจจุบันถูกปิดหรือล็อคแล้ว';
+      }
+      toast.error(errorMessage);
     },
   });
 
@@ -319,24 +325,30 @@ export default function Shopfloor() {
   });
 
   const addCountsMutation = useMutation({
-    mutationFn: async ({ goodQty, rejectQty, defectReasonId, notes }: { 
-      goodQty: number; 
-      rejectQty: number; 
-      defectReasonId?: string; 
+    mutationFn: async ({ goodQty, rejectQty, defectReasonId, notes }: {
+      goodQty: number;
+      rejectQty: number;
+      defectReasonId?: string;
       notes?: string;
     }) => {
       return addCounts(selectedMachineId!, goodQty, rejectQty, defectReasonId, notes);
     },
     onSuccess: (data) => {
       if (data.success) {
-        toast.success(data.message);
+        toast.success(data.message || 'บันทึกสำเร็จ');
         queryClient.invalidateQueries({ queryKey: ['productionCounts'] });
       } else {
-        toast.error(data.message || 'Failed to add counts');
+        toast.error(data.message || 'ไม่สามารถบันทึกจำนวนได้');
       }
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Failed to add counts');
+      let errorMessage = error.message || 'ไม่สามารถบันทึกจำนวนได้';
+      if (error.code === 'NOT_FOUND' && errorMessage.toLowerCase().includes('shift')) {
+        errorMessage = '❌ ไม่สามารถบันทึกยอดได้: ไม่พบกะการทำงาน (Shift)';
+      } else if (error.code === 'SHIFT_LOCKED') {
+        errorMessage = '❌ ไม่สามารถบันทึกยอดได้: กะการทำงานปัจจุบันถูกล็อคแล้ว';
+      }
+      toast.error(errorMessage);
     },
   });
 
@@ -427,24 +439,24 @@ export default function Shopfloor() {
   return (
     <AppLayout>
       <div className="page-container space-y-5">
-        <PageHeader 
-          title="Shopfloor" 
+        <PageHeader
+          title="Shopfloor"
           description="บันทึกเหตุการณ์และจำนวนผลิต"
           icon={Factory}
         />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="bg-muted/50 p-1">
-            <TabsTrigger 
-              value="capture" 
+            <TabsTrigger
+              value="capture"
               className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
             >
               <Activity className="h-4 w-4" />
               <span className="hidden sm:inline">บันทึกเหตุการณ์</span>
               <span className="sm:hidden">บันทึก</span>
             </TabsTrigger>
-            <TabsTrigger 
-              value="my-machines" 
+            <TabsTrigger
+              value="my-machines"
               className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
             >
               <Monitor className="h-4 w-4" />
@@ -573,8 +585,8 @@ export default function Shopfloor() {
             )}
 
             {currentShift && (
-              <CurrentShiftBanner 
-                shiftCalendar={currentShift} 
+              <CurrentShiftBanner
+                shiftCalendar={currentShift}
                 isLocked={isLocked}
               />
             )}
@@ -590,7 +602,7 @@ export default function Shopfloor() {
                         </div>
                         สถานะเครื่องจักร
                         {currentEvent && (
-                          <Badge 
+                          <Badge
                             variant={currentEvent.event_type === 'RUN' ? 'default' : 'destructive'}
                             className="font-medium"
                           >
@@ -610,10 +622,10 @@ export default function Shopfloor() {
                         cycleTimeSource={cycleTimeSource}
                         noBenchmarkWarning={noBenchmarkWarning}
                         onStartRun={handleStartRun}
-                        onStartDowntime={(reasonId, notes) => 
+                        onStartDowntime={(reasonId, notes) =>
                           startEventMutation.mutate({ eventType: 'DOWNTIME', reasonId, notes })
                         }
-                        onStartSetup={(reasonId, notes) => 
+                        onStartSetup={(reasonId, notes) =>
                           startEventMutation.mutate({ eventType: 'SETUP', reasonId, notes })
                         }
                         onStop={(notes) => stopEventMutation.mutate(notes)}
@@ -639,7 +651,7 @@ export default function Shopfloor() {
                         isLoading={addCountsMutation.isPending}
                         isLocked={isLocked}
                       />
-                      
+
                       <div className="border-t pt-4">
                         <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                           <Clock className="h-4 w-4" />

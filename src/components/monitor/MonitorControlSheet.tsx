@@ -152,13 +152,21 @@ export function MonitorControlSheet({
     },
     onSuccess: (data) => {
       if (data.success) {
-        toast.success(data.message);
+        toast.success(data.message || 'บันทึกสำเร็จ');
         invalidateQueries();
       } else {
-        toast.error(data.message || 'Failed to start event');
+        toast.error(data.message || 'ไม่สามารถบันทึกเหตุการณ์ได้');
       }
     },
-    onError: (error: any) => toast.error(error.message || 'Failed to start event'),
+    onError: (error: any) => {
+      let errorMessage = error.message || 'ไม่สามารถบันทึกเหตุการณ์ได้';
+      if (error.code === 'NOT_FOUND' && errorMessage.toLowerCase().includes('shift')) {
+        errorMessage = '❌ ไม่สามารถเริ่มงานได้: ไม่พบกะการทำงาน (Shift) ที่เปิดในขณะนี้ หรืออยู่นอกเวลาทำงาน';
+      } else if (error.code === 'SHIFT_LOCKED') {
+        errorMessage = '❌ ไม่สามารถเริ่มงานได้: กะการทำงานปัจจุบันถูกปิดหรือล็อคแล้ว';
+      }
+      toast.error(errorMessage);
+    },
   });
 
   const stopEventMutation = useMutation({
@@ -180,13 +188,21 @@ export function MonitorControlSheet({
     }) => addCounts(machineId!, goodQty, rejectQty, defectReasonId, notes),
     onSuccess: (data) => {
       if (data.success) {
-        toast.success(data.message);
+        toast.success(data.message || 'บันทึกจำนวนสำเร็จ');
         invalidateQueries();
       } else {
-        toast.error(data.message || 'Failed to add counts');
+        toast.error(data.message || 'ไม่สามารถบันทึกจำนวนได้');
       }
     },
-    onError: (error: any) => toast.error(error.message || 'Failed to add counts'),
+    onError: (error: any) => {
+      let errorMessage = error.message || 'ไม่สามารถบันทึกจำนวนได้';
+      if (error.code === 'NOT_FOUND' && errorMessage.toLowerCase().includes('shift')) {
+        errorMessage = '❌ ไม่สามารถบันทึกยอดได้: ไม่พบกะการทำงาน (Shift)';
+      } else if (error.code === 'SHIFT_LOCKED') {
+        errorMessage = '❌ ไม่สามารถบันทึกยอดได้: กะการทำงานปัจจุบันถูกล็อคแล้ว';
+      }
+      toast.error(errorMessage);
+    },
   });
 
   const invalidateQueries = () => {
