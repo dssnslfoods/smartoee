@@ -2,11 +2,12 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { CheckCircle2, Lock, ClipboardCheck, ChevronLeft, ChevronRight, AlertCircle, Palmtree, Factory, HelpCircle, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Lock, ClipboardCheck, ChevronLeft, ChevronRight, AlertCircle, Palmtree, Factory, HelpCircle, RefreshCw, BarChart } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { OEEMetricsPanel } from './OEEMetricsPanel';
@@ -100,21 +101,21 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
 
   // Group summaries by date and compute status per date
   const dateStatusMap = useMemo(() => {
-    const map = new Map<string, { 
-      summaries: typeof allSummaries; 
-      hasUnapproved: boolean; 
-      allLocked: boolean; 
-      isHoliday: boolean; 
-      isPreDefinedHoliday: boolean; 
-      holidayName?: string; 
+    const map = new Map<string, {
+      summaries: typeof allSummaries;
+      hasUnapproved: boolean;
+      allLocked: boolean;
+      isHoliday: boolean;
+      isPreDefinedHoliday: boolean;
+      holidayName?: string;
       isNoActivity: boolean;
       isConfirmedHoliday: boolean;
       isConfirmedWorkingDay: boolean;
     }>();
     for (const s of allSummaries) {
       if (!s.shift_date) continue;
-      const existing = map.get(s.shift_date) || { 
-        summaries: [], hasUnapproved: false, allLocked: true, 
+      const existing = map.get(s.shift_date) || {
+        summaries: [], hasUnapproved: false, allLocked: true,
         isHoliday: false, isPreDefinedHoliday: false, isNoActivity: true,
         isConfirmedHoliday: false, isConfirmedWorkingDay: false,
       };
@@ -303,30 +304,37 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
             </div>
             {/* Day cells */}
             <div className="grid grid-cols-7 gap-1">
-                {calendarDays.map((day, i) => {
+              {calendarDays.map((day, i) => {
                 if (!day) return <div key={`empty-${i}`} />;
                 const info = dateStatusMap.get(day.date);
                 const isFutureDate = day.date > todayStr;
                 const isFuturePreDefinedHoliday = isFutureDate && holidayDateMap.has(day.date);
-                const hasShifts = !!info && !isFutureDate;
-                const hasUnapproved = hasShifts && (info?.hasUnapproved || false);
+                const hasShifts = !!info;
+
+                // If it's a past/present date with no recorded shift and not a pre-defined holiday,
+                // we treat it as an actionable day (to let supervisor mark it as holiday or 0% work).
+                const isActionableNoShift = !isFutureDate && !hasShifts && !isFuturePreDefinedHoliday && !holidayDateMap.has(day.date);
+
+                const hasUnapproved = (hasShifts && (info?.hasUnapproved || false)) || isActionableNoShift;
                 const allLocked = hasShifts && (info?.allLocked || false);
-                const isHoliday = (hasShifts && (info?.isHoliday || false)) || isFuturePreDefinedHoliday;
+                const isHoliday = (hasShifts && (info?.isHoliday || false)) || isFuturePreDefinedHoliday || (!isFutureDate && holidayDateMap.has(day.date));
                 const isNoActivity = hasShifts && (info?.isNoActivity && !info?.isPreDefinedHoliday || false);
                 const isConfirmedHoliday = (hasShifts && (info?.isConfirmedHoliday && !info?.hasUnapproved && !isNoActivity || false)) || isFuturePreDefinedHoliday;
                 const isConfirmedWorkingDay = hasShifts && (info?.isConfirmedWorkingDay && !info?.hasUnapproved && !isNoActivity || false);
-                const showDot = hasShifts || isFuturePreDefinedHoliday;
+
+                const showDot = hasShifts || isFuturePreDefinedHoliday || isActionableNoShift || isHoliday;
                 const isSelected = selectedDate === day.date;
                 const isToday = day.date === todayStr;
+                const canSelect = hasShifts || isFuturePreDefinedHoliday || isActionableNoShift || isHoliday;
 
                 return (
                   <button
                     key={day.date}
                     onClick={() => { setSelectedDate(isSelected ? null : day.date); setHolidayNameInput(''); }}
-                    disabled={!hasShifts && !isFuturePreDefinedHoliday}
+                    disabled={!canSelect}
                     className={cn(
                       'relative flex flex-col items-center justify-center rounded-lg h-10 text-sm transition-all',
-                      (hasShifts || isFuturePreDefinedHoliday) ? 'hover:bg-accent cursor-pointer' : 'text-muted-foreground/40 cursor-default',
+                      canSelect ? 'hover:bg-accent cursor-pointer' : 'text-muted-foreground/40 cursor-default',
                       isSelected && 'bg-primary text-primary-foreground hover:bg-primary/90',
                       isToday && !isSelected && 'ring-1 ring-primary/50',
                       (isHoliday || isConfirmedHoliday) && !isSelected && 'bg-sky-500/10 text-muted-foreground',
@@ -421,11 +429,71 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
               </CardContent>
             </Card>
           ) : selectedSummaries.length === 0 && !holidayDateMap.has(selectedDate) ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <p className="text-muted-foreground">ไม่พบข้อมูลกะสำหรับวันนี้</p>
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">
+                  {format(new Date(selectedDate + 'T00:00:00'), 'EEEE d MMMM yyyy', { locale: th })}
+                </h3>
+              </div>
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-4">
+                    <AlertCircle className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-base font-medium mb-1">ไม่พบข้อมูลคาบการผลิตสำหรับวันนี้</p>
+                  <p className="text-sm text-muted-foreground mb-6">ยังไม่มีการบันทึกเหตุการณ์กะทำงาน หรือการใช้เครื่องจักรในวันนี้</p>
+
+                  {isSupervisor && (
+                    <div className="w-full max-w-sm space-y-3 bg-muted/30 p-4 rounded-lg border">
+                      <p className="text-sm font-medium text-left">คุณสามารถระบุให้วันนี้เป็นวันหยุดได้</p>
+                      <Input
+                        placeholder="ชื่อวันหยุด (เช่น วันหยุดประเพณี)"
+                        value={holidayNameInput}
+                        onChange={(e) => setHolidayNameInput(e.target.value)}
+                        maxLength={100}
+                        className="text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full gap-1.5"
+                        onClick={async () => {
+                          const trimmedName = holidayNameInput.trim();
+                          if (!trimmedName) {
+                            toast({ title: 'กรุณาระบุชื่อวันหยุด', variant: 'destructive' });
+                            return;
+                          }
+                          if (company?.id && selectedDate) {
+                            const { error: insertErr } = await supabase
+                              .from('holidays')
+                              .insert({
+                                company_id: company.id,
+                                plant_id: plantId,
+                                holiday_date: selectedDate,
+                                name: trimmedName,
+                                is_recurring: false,
+                              });
+                            if (insertErr) {
+                              toast({ title: 'ผิดพลาด', description: insertErr.message, variant: 'destructive' });
+                              return;
+                            }
+                            setHolidayNameInput('');
+                            toast({ title: 'สำเร็จ', description: `บันทึกเป็นวันหยุด "${trimmedName}" แล้ว` });
+                            queryClient.invalidateQueries({ queryKey: ['shiftSummaries-calendar'] });
+                            queryClient.invalidateQueries({ queryKey: ['shift-event-counts'] });
+                            queryClient.invalidateQueries({ queryKey: ['holidays-calendar'] });
+                          }
+                        }}
+                        disabled={!holidayNameInput.trim()}
+                      >
+                        <Palmtree className="h-4 w-4" />
+                        ยืนยันเป็นวันหยุด
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           ) : selectedSummaries.length === 0 && holidayDateMap.has(selectedDate) ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -459,6 +527,9 @@ export function ShiftApprovalCalendar({ plantId, isSupervisor }: ShiftApprovalCa
                       <Palmtree className="h-3.5 w-3.5 mr-1" />
                       วันหยุดพิเศษ
                     </Badge>
+                  )}
+                  {selectedSummaries.length > 0 && (
+                    <OEESummaryModal summaries={selectedSummaries} dateStr={selectedDate} />
                   )}
                   <Badge variant="outline" className="text-xs">
                     {selectedSummaries.length} กะ
@@ -684,5 +755,109 @@ function StatusBadge({ status }: { status: string | null }) {
       </Badge>
     );
   }
-  return <Badge variant="outline">{status}</Badge>;
+  return null;
+}
+
+// OEE Summary Modal Component
+function OEESummaryModal({ summaries, dateStr }: { summaries: any[], dateStr: string }) {
+  if (summaries.length === 0) return null;
+
+  const validSummaries = summaries.filter(s => (s.machine_count || 0) > 0 || (s.total_run_time || 0) > 0);
+  const totalShifts = validSummaries.length;
+
+  if (totalShifts === 0) return null;
+
+  // Aggregate quantities
+  let totalRunTime = 0;
+  let totalDowntime = 0;
+  let totalGoodQty = 0;
+  let totalRejectQty = 0;
+
+  // Average OEE metrics across all shifts for the day
+  let sumAvailability = 0;
+  let sumPerformance = 0;
+  let sumQuality = 0;
+  let sumOee = 0;
+
+  validSummaries.forEach(s => {
+    totalRunTime += s.total_run_time || 0;
+    totalDowntime += s.total_downtime || 0;
+    totalGoodQty += s.total_good_qty || 0;
+    totalRejectQty += s.total_reject_qty || 0;
+
+    sumAvailability += s.avg_availability || 0;
+    sumPerformance += s.avg_performance || 0;
+    sumQuality += s.avg_quality || 0;
+    sumOee += s.avg_oee || 0;
+  });
+
+  const avgAvailability = sumAvailability / totalShifts;
+  const avgPerformance = sumPerformance / totalShifts;
+  const avgQuality = sumQuality / totalShifts;
+  const avgOEE = sumOee / totalShifts;
+
+  // Executive Summary Generation
+  let executiveSummary = "";
+  if (avgOEE >= 80) {
+    executiveSummary = `ภาพรวม OEE ของวันที่ ${format(new Date(dateStr + 'T00:00:00'), 'd MMM yyyy', { locale: th })} อยู่ในมาตรฐานที่ยอดเยี่ยม (${avgOEE.toFixed(1)}%) `;
+  } else if (avgOEE >= 60) {
+    executiveSummary = `ภาพรวม OEE ของวันที่ ${format(new Date(dateStr + 'T00:00:00'), 'd MMM yyyy', { locale: th })} จัดอยู่ในระดับที่ทำได้ดี (${avgOEE.toFixed(1)}%) `;
+  } else {
+    executiveSummary = `ภาพรวม OEE ของวันที่ ${format(new Date(dateStr + 'T00:00:00'), 'd MMM yyyy', { locale: th })} อยู่ในเกณฑ์ที่ควรเฝ้าระวัง (${avgOEE.toFixed(1)}%) `;
+  }
+
+  // Find weakest metric
+  if (avgOEE > 0) {
+    const minMetric = Math.min(avgAvailability, avgPerformance, avgQuality);
+    if (minMetric === avgAvailability) {
+      executiveSummary += `โดยพบว่าปัญหาหลักคืออัตราการเดินเครื่องสะสม (Availability: ${avgAvailability.toFixed(1)}%) ควรตรวจสอบสาเหตุการขัดข้องหรือหยุดพักของเครื่องจักรเพิ่มเติม`;
+    } else if (minMetric === avgPerformance) {
+      executiveSummary += `โดยพบว่าปัญหาหลักคือความเร็วหรือประสิทธิภาพการผลิต (Performance: ${avgPerformance.toFixed(1)}%) คาดว่าเครื่องจักรเดินเครื่องช้ากว่ามาตรฐาน หรือมีการติดขัดย่อยตลอดเวลา`;
+    } else {
+      executiveSummary += `โดยพบว่าปัจจัยหลักที่ดึง OEE ให้ลดลงคือคุณภาพสินค้า (Quality: ${avgQuality.toFixed(1)}%) มียอดรีเจ็คท์ส่งผลต่อเวลาการผลิต ควรตรวจสอบมาตรฐานกระบวนการผลิตอย่างใกล้ชิด`;
+    }
+  }
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+          <BarChart className="h-3.5 w-3.5" />
+          สรุป OEE วันนี้
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>รายงานสรุป OEE ประจำวัน (Executive Summary)</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6 pt-4">
+          <div className="bg-muted/50 p-6 rounded-xl border border-border">
+            <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5 text-primary" />
+              สรุปสำหรับผู้บริหาร
+            </h4>
+            <p className="text-sm leading-relaxed text-muted-foreground">{executiveSummary}</p>
+          </div>
+
+          <div className="grid gap-4">
+            <h4 className="font-semibold text-sm flex items-center gap-2">
+              <Factory className="h-4 w-4" />
+              ภาพรวมตัวชี้วัด (เฉลี่ยจาก {totalShifts} กะที่มีเครื่องจักรทำงาน)
+            </h4>
+            <OEEMetricsPanel
+              availability={avgAvailability}
+              performance={avgPerformance}
+              quality={avgQuality}
+              oee={avgOEE}
+              runTime={totalRunTime}
+              downtime={totalDowntime}
+              goodQty={totalGoodQty}
+              rejectQty={totalRejectQty}
+            />
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }

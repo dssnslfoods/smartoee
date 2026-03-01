@@ -14,6 +14,7 @@ import { useFullscreen } from "@/hooks/useFullscreen";
 import { FullscreenToggle, FullscreenContainer } from "@/components/ui/FullscreenToggle";
 import { useQuery } from "@tanstack/react-query";
 import { getLines, getPlants } from "@/services/oeeApi";
+import { ShiftScheduleBanner } from "@/components/monitor/ShiftScheduleBanner";
 import {
   Monitor as MonitorIcon,
   Play,
@@ -216,6 +217,9 @@ export default function MonitorPage() {
           </>
         )}
       </PageHeader>
+
+      {/* Shift & Break Schedule Reminder */}
+      <ShiftScheduleBanner plantId={selectedPlant} />
 
       {/* Quick Stats Bar */}
       <div className="grid grid-cols-4 gap-2 sm:gap-3">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Users, Settings, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,7 +59,7 @@ export function PermissionGroupManager() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { profile, company } = useAuth();
-  
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<PermissionGroup | null>(null);
   const [deleteGroupId, setDeleteGroupId] = useState<string | null>(null);
@@ -73,13 +73,13 @@ export function PermissionGroupManager() {
     queryKey: ['permission-groups', companyId],
     queryFn: async () => {
       if (!companyId) return [];
-      
+
       const { data, error } = await supabase
         .from('machine_permission_groups')
         .select('*')
         .eq('company_id', companyId)
         .order('name');
-      
+
       if (error) throw error;
 
       // Get counts for each group
@@ -95,7 +95,7 @@ export function PermissionGroupManager() {
               .select('id', { count: 'exact', head: true })
               .eq('group_id', group.id),
           ]);
-          
+
           return {
             ...group,
             machine_count: machineResult.count || 0,
@@ -103,7 +103,7 @@ export function PermissionGroupManager() {
           };
         })
       );
-      
+
       return groupsWithCounts as PermissionGroup[];
     },
     enabled: !!companyId,
@@ -114,7 +114,7 @@ export function PermissionGroupManager() {
     queryKey: ['company-machines', companyId],
     queryFn: async () => {
       if (!companyId) return [];
-      
+
       const { data, error } = await supabase
         .from('machines')
         .select(`
@@ -126,7 +126,7 @@ export function PermissionGroupManager() {
         .eq('lines.company_id', companyId)
         .eq('is_active', true)
         .order('name');
-      
+
       if (error) throw error;
       return data.map(m => ({
         id: m.id,
@@ -143,12 +143,12 @@ export function PermissionGroupManager() {
     queryKey: ['group-machines', machineDialogGroup?.id],
     queryFn: async () => {
       if (!machineDialogGroup?.id) return [];
-      
+
       const { data, error } = await supabase
         .from('machine_permission_group_machines')
         .select('machine_id')
         .eq('group_id', machineDialogGroup.id);
-      
+
       if (error) throw error;
       return data.map(d => d.machine_id);
     },
@@ -170,7 +170,7 @@ export function PermissionGroupManager() {
         })
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -192,7 +192,7 @@ export function PermissionGroupManager() {
         .from('machine_permission_groups')
         .delete()
         .eq('id', groupId);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -213,13 +213,13 @@ export function PermissionGroupManager() {
         .from('machine_permission_group_machines')
         .delete()
         .eq('group_id', groupId);
-      
+
       // Insert new
       if (machineIds.length > 0) {
         const { error } = await supabase
           .from('machine_permission_group_machines')
           .insert(machineIds.map(machine_id => ({ group_id: groupId, machine_id })));
-        
+
         if (error) throw error;
       }
     },
@@ -236,22 +236,22 @@ export function PermissionGroupManager() {
 
   const [selectedMachineIds, setSelectedMachineIds] = useState<string[]>([]);
 
-  // Update selectedMachineIds when group machines are loaded
+  // Sync selectedMachineIds when group machines are loaded
+  useEffect(() => {
+    if (machineDialogGroup && groupMachineIds) {
+      setSelectedMachineIds(groupMachineIds);
+    }
+  }, [groupMachineIds, machineDialogGroup]);
+
+  // Update selectedMachineIds when dialog opens
   const handleOpenMachineDialog = (group: PermissionGroup) => {
     setMachineDialogGroup(group);
   };
 
-  // Update selected machines when dialog opens
-  const handleMachineIdsLoaded = () => {
-    if (machineDialogGroup && groupMachineIds.length >= 0) {
-      setSelectedMachineIds(groupMachineIds);
-    }
-  };
-
   // Toggle machine selection
   const toggleMachine = (machineId: string) => {
-    setSelectedMachineIds(prev => 
-      prev.includes(machineId) 
+    setSelectedMachineIds(prev =>
+      prev.includes(machineId)
         ? prev.filter(id => id !== machineId)
         : [...prev, machineId]
     );
@@ -414,8 +414,8 @@ export function PermissionGroupManager() {
       </Dialog>
 
       {/* Machine Assignment Dialog */}
-      <Dialog 
-        open={!!machineDialogGroup} 
+      <Dialog
+        open={!!machineDialogGroup}
         onOpenChange={() => setMachineDialogGroup(null)}
       >
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
@@ -460,7 +460,7 @@ export function PermissionGroupManager() {
             <Button variant="outline" onClick={() => setMachineDialogGroup(null)}>
               ยกเลิก
             </Button>
-            <Button 
+            <Button
               onClick={handleSaveMachines}
               disabled={updateGroupMachinesMutation.isPending}
             >

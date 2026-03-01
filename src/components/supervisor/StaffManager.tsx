@@ -54,7 +54,7 @@ export function StaffManager() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { profile, company } = useAuth();
-  
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [permissionUser, setPermissionUser] = useState<{ userId: string; name: string } | null>(null);
@@ -74,7 +74,7 @@ export function StaffManager() {
     queryKey: ['team-users', companyId],
     queryFn: async () => {
       if (!companyId) return [];
-      
+
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -82,7 +82,7 @@ export function StaffManager() {
         .in('role', ['STAFF', 'SUPERVISOR'])
         .order('role')
         .order('full_name');
-      
+
       if (error) throw error;
       return data as StaffUser[];
     },
@@ -95,14 +95,14 @@ export function StaffManager() {
       if (!companyId) throw new Error('ไม่พบข้อมูลบริษัท');
 
       const response = await supabase.functions.invoke<{ success: boolean; message?: string; error?: string; user?: { id: string; email: string } }>('create-staff-user', {
-        body: { email, password, fullName, role },
+        body: { email, password, fullName, role, companyId },
       });
-      
+
       // Handle edge function errors - check data first as it may contain error info
       if (response.data && !response.data.success) {
         throw new Error(response.data.message || 'ไม่สามารถสร้างผู้ใช้ได้');
       }
-      
+
       if (response.error) {
         // FunctionsHttpError contains error response body
         let errMessage = 'ไม่สามารถสร้างผู้ใช้ได้';
@@ -117,7 +117,7 @@ export function StaffManager() {
         }
         throw new Error(errMessage);
       }
-      
+
       if (!response.data) throw new Error('ไม่ได้รับข้อมูลตอบกลับจากเซิร์ฟเวอร์');
 
       return response.data.user;
@@ -146,7 +146,7 @@ export function StaffManager() {
         .from('user_profiles')
         .update(profileUpdate)
         .eq('user_id', userId);
-      
+
       if (profileError) throw profileError;
 
       // Update password/email if provided
@@ -154,7 +154,7 @@ export function StaffManager() {
         const { data, error } = await supabase.functions.invoke('update-user-password', {
           body: { targetUserId: userId, newPassword: newPassword || undefined, newEmail: newEmail || undefined },
         });
-        
+
         if (error) throw new Error(error.message);
         if (!data.success) throw new Error(data.message || 'ไม่สามารถอัปเดตบัญชีได้');
       }
@@ -177,7 +177,7 @@ export function StaffManager() {
         .from('user_profiles')
         .delete()
         .eq('id', profileId);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -192,7 +192,7 @@ export function StaffManager() {
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!newUserForm.email || !newUserForm.password || !newUserForm.fullName) {
       toast({ title: 'ข้อผิดพลาด', description: 'กรุณากรอกข้อมูลให้ครบถ้วน', variant: 'destructive' });
       return;
@@ -213,7 +213,7 @@ export function StaffManager() {
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!editUser || !editForm.fullName) {
       toast({ title: 'ข้อผิดพลาด', description: 'กรุณากรอกชื่อ-นามสกุล', variant: 'destructive' });
       return;

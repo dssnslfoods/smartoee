@@ -260,6 +260,15 @@ export interface CurrentShiftByMachine {
   approval_status: ApprovalStatus;
 }
 
+export interface ShiftScheduleInfo {
+  shift_id: string;
+  shift_name: string;
+  start_time: string;
+  end_time: string;
+  break_start_time?: string;
+  break_end_time?: string;
+}
+
 export interface ShiftSummary {
   shift_calendar_id: string;
   shift_date: string;
@@ -316,7 +325,7 @@ export interface DashboardData {
 // ERROR TYPES
 // =============================================
 
-export type ErrorCode = 
+export type ErrorCode =
   | 'PERMISSION_DENIED'
   | 'SHIFT_LOCKED'
   | 'OVERLAP_EVENT'
@@ -326,7 +335,7 @@ export type ErrorCode =
 
 export class OeeApiError extends Error {
   code: ErrorCode;
-  
+
   constructor(code: ErrorCode, message: string) {
     super(message);
     this.code = code;

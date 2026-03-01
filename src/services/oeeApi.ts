@@ -175,8 +175,10 @@ export async function addCountsBackdate(
 
   if (error) throw error;
   const result = data as any;
-  // Normalize ok→success for consistency with other RPC responses
-  return { success: result?.ok ?? false, message: result?.error || '' } as AddCountsResponse;
+  return {
+    success: result?.success ?? result?.ok ?? false,
+    message: result?.message || result?.error || ''
+  } as AddCountsResponse;
 }
 
 // =============================================
@@ -392,6 +394,58 @@ export async function getShiftCalendar(
 export async function getTodayShiftCalendar(plantId: string): Promise<ShiftCalendar[]> {
   const today = new Date().toISOString().split('T')[0];
   return getShiftCalendar(plantId, today, today);
+}
+
+/**
+ * Get the current active shift and any planned breaks for a plant
+ */
+export async function getPlantSchedule(plantId: string): Promise<import('./types').ShiftScheduleInfo | null> {
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  const currentTime = now.toTimeString().split(' ')[0];
+
+  // Fetch all active shifts for this plant
+  const { data: shifts, error: shiftsError } = await supabase
+    .from('shifts')
+    .select('*')
+    .eq('plant_id', plantId)
+    .eq('is_active', true);
+
+  if (shiftsError || !shifts) return null;
+
+  // Find the currently active shift
+  // Note: Simple logic, doesn't handle overnight shifts perfectly but fine for most cases
+  const currentShift = shifts.find(s => {
+    if (s.start_time <= s.end_time) {
+      return currentTime >= s.start_time && currentTime <= s.end_time;
+    } else {
+      // Overnight shift
+      return currentTime >= s.start_time || currentTime <= s.end_time;
+    }
+  });
+
+  if (!currentShift) return null;
+
+  // Fetch break template for this shift
+  const { data: template } = await supabase
+    .from('planned_time_templates')
+    .select('*')
+    .eq('plant_id', plantId)
+    .eq('shift_id', currentShift.id)
+    .eq('is_active', true)
+    .lte('effective_from', today)
+    .order('effective_from', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    shift_id: currentShift.id,
+    shift_name: currentShift.name,
+    start_time: currentShift.start_time,
+    end_time: currentShift.end_time,
+    break_start_time: template?.break_start_time,
+    break_end_time: template?.break_end_time,
+  };
 }
 
 // =============================================
@@ -638,14 +692,14 @@ export interface DashboardStats {
 export async function getDashboardOEE(companyId?: string, startDate?: string, endDate?: string): Promise<DashboardOEEData> {
   // Get all machines for the company
   const machines = await getMachines(undefined, companyId);
-  
+
   if (machines.length === 0) {
     return { availability: 0, performance: 0, quality: 0, oee: 0 };
   }
 
   // Get latest OEE snapshot for each machine
   const machineIds = machines.map(m => m.id);
-  
+
   let query = supabase
     .from('oee_snapshots')
     .select('*')
@@ -668,7 +722,7 @@ export async function getDashboardOEE(companyId?: string, startDate?: string, en
   // If date range is specified, average ALL snapshots in the range
   // Otherwise, get latest snapshot per machine (original behavior)
   let relevantSnapshots: OeeSnapshot[];
-  
+
   if (startDate || endDate) {
     // Average all snapshots within the date range
     relevantSnapshots = snapshots || [];
@@ -682,7 +736,7 @@ export async function getDashboardOEE(companyId?: string, startDate?: string, en
     }
     relevantSnapshots = Array.from(latestByMachine.values());
   }
-  
+
   if (relevantSnapshots.length === 0) {
     return { availability: 0, performance: 0, quality: 0, oee: 0 };
   }
@@ -707,11 +761,11 @@ export async function getDashboardOEE(companyId?: string, startDate?: string, en
 export async function getMachinesWithStatus(companyId?: string): Promise<{ machines: MachineWithOEE[]; stats: DashboardStats }> {
   // Get machines with line info
   const machines = await getMachines(undefined, companyId);
-  
+
   if (machines.length === 0) {
-    return { 
-      machines: [], 
-      stats: { running: 0, idle: 0, stopped: 0, maintenance: 0 } 
+    return {
+      machines: [],
+      stats: { running: 0, idle: 0, stopped: 0, maintenance: 0 }
     };
   }
 
@@ -751,13 +805,13 @@ export async function getMachinesWithStatus(companyId?: string): Promise<{ machi
 
   // Build machine list with status
   const stats: DashboardStats = { running: 0, idle: 0, stopped: 0, maintenance: 0 };
-  
+
   const machinesWithStatus: MachineWithOEE[] = machines.map(machine => {
     const currentEvent = eventByMachine.get(machine.id);
     const oee = latestOeeByMachine.get(machine.id) || 0;
-    
+
     let status: 'running' | 'idle' | 'stopped' | 'maintenance';
-    
+
     if (currentEvent) {
       switch (currentEvent.event_type) {
         case 'RUN':
@@ -805,13 +859,13 @@ export async function getMachinesWithStatus(companyId?: string): Promise<{ machi
  */
 export async function getOEETrend(companyId?: string, days: number = 7): Promise<{ date: string; availability: number; performance: number; quality: number; oee: number }[]> {
   const machines = await getMachines(undefined, companyId);
-  
+
   if (machines.length === 0) {
     return [];
   }
 
   const machineIds = machines.map(m => m.id);
-  
+
   // Get snapshots for the specified number of days
   const endDate = new Date();
   const startDate = new Date();
@@ -832,7 +886,7 @@ export async function getOEETrend(companyId?: string, days: number = 7): Promise
   // Group by date (use short date format for <= 14 days, otherwise use MM/DD)
   const useShortFormat = days <= 14;
   const byDate = new Map<string, { availability: number[]; performance: number[]; quality: number[]; oee: number[] }>();
-  
+
   for (const snap of snapshots || []) {
     const d = new Date(snap.period_start);
     const dateKey = useShortFormat
@@ -851,14 +905,14 @@ export async function getOEETrend(companyId?: string, days: number = 7): Promise
   // Calculate averages per day
   const result: { date: string; availability: number; performance: number; quality: number; oee: number }[] = [];
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  
+
   for (let i = 0; i < days; i++) {
     const d = new Date(startDate);
     d.setDate(d.getDate() + i);
     const dateKey = useShortFormat
       ? dayNames[d.getDay()]
       : `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}`;
-    
+
     const entry = byDate.get(dateKey);
     if (entry && entry.oee.length > 0) {
       result.push({
@@ -930,7 +984,7 @@ export async function getMachineDowntimeBreakdown(
 ): Promise<DowntimeBreakdown[]> {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
-  
+
   // Get all downtime/setup events for this machine
   const { data: events, error } = await supabase
     .from('production_events')
@@ -960,16 +1014,16 @@ export async function getMachineDowntimeBreakdown(
 
   // Aggregate by reason
   const breakdownMap = new Map<string, DowntimeBreakdown>();
-  
+
   for (const event of events) {
     if (!event.reason_id) continue;
     const reason = reasonLookup.get(event.reason_id);
     if (!reason) continue;
-    
+
     const endTs = event.end_ts ? new Date(event.end_ts) : new Date();
     const startTs = new Date(event.start_ts);
     const durationMinutes = Math.round((endTs.getTime() - startTs.getTime()) / (1000 * 60));
-    
+
     if (breakdownMap.has(event.reason_id)) {
       const existing = breakdownMap.get(event.reason_id)!;
       existing.total_minutes += durationMinutes;

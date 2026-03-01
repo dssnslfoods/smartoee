@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AddCountsForm } from '@/components/shopfloor/AddCountsForm';
 import { useAuth } from '@/hooks/useAuth';
-import { getDefectReasons, addCountsBackdate } from '@/services';
+import { getDefectReasons, addCountsBackdate, getProductionStandard } from '@/services';
 import { cn } from '@/lib/utils';
 import { ClipboardList, Play, Package, Clock, ChevronLeft, CheckCircle2, Calendar, Factory, User, Layers, SplitSquareHorizontal, Equal, Eye } from 'lucide-react';
 import { format } from 'date-fns';
@@ -28,10 +28,12 @@ interface PendingRun {
   end_ts: string;
   product_name: string | null;
   product_code: string | null;
+  product_id: string | null;
   shift_date: string;
   plant_name: string | null;
   staff_name: string | null;
   shift_calendar_id: string | null;
+  ideal_cycle_time_seconds: number;
 }
 
 interface PendingGroup {
@@ -41,9 +43,11 @@ interface PendingGroup {
   machine_code: string;
   product_name: string | null;
   product_code: string | null;
+  product_id: string | null;
   plant_name: string | null;
   events: PendingRun[];
   totalMinutes: number;
+  ideal_cycle_time_seconds: number;
 }
 
 function formatDuration(minutes: number): string {
@@ -65,9 +69,11 @@ function groupEventsByMachineSku(runs: PendingRun[]): PendingGroup[] {
         machine_code: run.machine_code,
         product_name: run.product_name,
         product_code: run.product_code,
+        product_id: run.product_id,
         plant_name: run.plant_name,
         events: [],
         totalMinutes: 0,
+        ideal_cycle_time_seconds: run.ideal_cycle_time_seconds,
       });
     }
     const group = map.get(key)!;
@@ -179,7 +185,7 @@ export default function PendingCounts() {
     queryFn: async () => {
       let machineQuery = supabase
         .from('machines')
-        .select('id, name, code, line_id, is_active, lines!inner(name, plant_id, plants!inner(name))')
+        .select('id, name, code, line_id, is_active, ideal_cycle_time_seconds, lines!inner(name, plant_id, plants!inner(name))')
         .eq('is_active', true)
         .order('name');
 
@@ -242,10 +248,12 @@ export default function PendingCounts() {
           end_ts: ev.end_ts!,
           product_name: product?.name || null,
           product_code: product?.code || null,
+          product_id: ev.product_id || null,
           shift_date: sc?.shift_date || format(new Date(ev.start_ts), 'yyyy-MM-dd'),
           plant_name: plantName,
           staff_name: profileMap.get(ev.created_by) || null,
           shift_calendar_id: ev.shift_calendar_id,
+          ideal_cycle_time_seconds: machine?.ideal_cycle_time_seconds || 0,
         });
       }
 
@@ -269,6 +277,16 @@ export default function PendingCounts() {
   const { data: defectReasons = [] } = useQuery({
     queryKey: ['defectReasons', companyId],
     queryFn: () => getDefectReasons(companyId),
+  });
+
+  // Fetch production standard for selected machine + product
+  const activeMachineId = selectedEvent?.machine_id || selectedGroup?.machine_id;
+  const activeProductId = selectedEvent?.product_id || selectedGroup?.product_id;
+
+  const { data: prodStandard } = useQuery({
+    queryKey: ['prodStandard', activeMachineId, activeProductId],
+    queryFn: () => getProductionStandard(activeMachineId!, activeProductId!),
+    enabled: !!activeMachineId && !!activeProductId && viewMode === 'form',
   });
 
   // Single event submit
@@ -486,6 +504,34 @@ export default function PendingCounts() {
                         {format(new Date(eventsInScope[0].start_ts), 'HH:mm')} - {format(new Date(eventsInScope[0].end_ts), 'HH:mm')}
                       </span>
                     )}
+                    {(() => {
+                      const cycleTime = prodStandard?.ideal_cycle_time_seconds || (selectedEvent?.ideal_cycle_time_seconds || selectedGroup?.ideal_cycle_time_seconds);
+                      if (!cycleTime) return null;
+
+                      const totalTarget = Math.round((totalMin * 60) / cycleTime);
+                      const targetQuality = prodStandard?.target_quality ?? 100; // Default 100% if not set
+                      const expectedGood = Math.round(totalTarget * (targetQuality / 100));
+                      const maxDefect = totalTarget - expectedGood;
+
+                      return (
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 gap-1.5 px-2.5 py-1">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <span>เป้าหมาย ({Math.round(totalMin)} นาที): <strong>{totalTarget.toLocaleString()}</strong> ชิ้น</span>
+                            <span className="text-[10px] opacity-60 ml-px">({cycleTime.toFixed(2)}s/pc)</span>
+                          </Badge>
+
+                          <Badge variant="outline" className="bg-green-500/5 text-green-600 border-green-500/20 gap-1.5 px-2.5 py-1">
+                            <span>ควรผลิตได้ดี: <strong>{expectedGood.toLocaleString()}</strong> ชิ้น</span>
+                            <span className="text-[10px] opacity-60 ml-px">({targetQuality}%)</span>
+                          </Badge>
+
+                          <Badge variant="outline" className="bg-red-500/5 text-red-600 border-red-500/20 gap-1.5 px-2.5 py-1">
+                            <span>ของเสียไม่ควรเกิน: <strong>{maxDefect.toLocaleString()}</strong> ชิ้น</span>
+                          </Badge>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

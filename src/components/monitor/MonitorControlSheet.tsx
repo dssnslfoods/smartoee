@@ -26,6 +26,7 @@ import {
   addCounts,
   getMachineById,
 } from '@/services';
+import { ShiftScheduleBanner } from './ShiftScheduleBanner';
 import type { EventType, Product } from '@/services/types';
 
 const statusConfig = {
@@ -262,6 +263,12 @@ export function MonitorControlSheet({
             )}
           </SheetDescription>
         </SheetHeader>
+
+        {machine?.line?.plant_id && (
+          <div className="mb-4">
+            <ShiftScheduleBanner plantId={machine.line.plant_id} />
+          </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
           <TabsList className="bg-muted/50 p-1 w-full">
