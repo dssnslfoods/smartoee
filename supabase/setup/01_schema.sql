@@ -20,7 +20,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 DO $$ BEGIN
-    CREATE TYPE public.event_type AS ENUM ('PRODUCTION', 'SETUP', 'DOWNTIME', 'BREAK');
+    CREATE TYPE public.event_type AS ENUM ('RUN', 'SETUP', 'DOWNTIME', 'BREAK');
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 DO $$ BEGIN
