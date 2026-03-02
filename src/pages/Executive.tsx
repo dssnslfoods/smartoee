@@ -15,6 +15,7 @@ import {
   ExecLineRanking,
   ExecLossCategory,
   ExecAttentionPanel,
+  ExecSummaryPanel,
 } from '@/components/executive';
 
 export default function Executive() {
@@ -77,6 +78,21 @@ export default function Executive() {
           </>
         )}
       </PageHeader>
+
+      {/* Section 0: Executive Summary */}
+      <ExecSummaryPanel
+        summary={summary}
+        previousSummary={previousSummary}
+        todaySummary={todaySummary}
+        targets={targets}
+        trendData={trendData}
+        paretoData={paretoData}
+        lineRanking={lineRanking}
+        lossByCategory={lossByCategory}
+        attentionItems={attentionItems}
+        dateRange={dateRange}
+        isLoading={isLoading}
+      />
 
       {/* Section 1: KPI Snapshot */}
       <ExecSnapshot

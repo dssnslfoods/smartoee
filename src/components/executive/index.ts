@@ -4,6 +4,7 @@ export { ExecLossPareto } from './ExecLossPareto';
 export { ExecLineRanking } from './ExecLineRanking';
 export { ExecLossCategory } from './ExecLossCategory';
 export { ExecAttentionPanel } from './ExecAttentionPanel';
+export { ExecSummaryPanel } from './ExecSummaryPanel';
 
 // Legacy exports (kept for compatibility)
 export { SummaryCards } from './SummaryCards';

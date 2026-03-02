@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { CheckCircle2, Lock, ClipboardCheck, ChevronLeft, ChevronRight, AlertCircle, Palmtree, Factory, HelpCircle, RefreshCw, BarChart } from 'lucide-react';
+import { CheckCircle2, Lock, ClipboardCheck, ChevronLeft, ChevronRight, AlertCircle, Palmtree, Factory, HelpCircle, RefreshCw, BarChart, TrendingUp, TrendingDown, Minus, AlertTriangle, Target, Clock, Package, XCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -767,28 +767,28 @@ function OEESummaryModal({ summaries, dateStr }: { summaries: any[], dateStr: st
 
   if (totalShifts === 0) return null;
 
-  // Aggregate quantities
   let totalRunTime = 0;
   let totalDowntime = 0;
   let totalGoodQty = 0;
   let totalRejectQty = 0;
-
-  // Average OEE metrics across all shifts for the day
   let sumAvailability = 0;
   let sumPerformance = 0;
   let sumQuality = 0;
   let sumOee = 0;
+  let totalPlannedTime = 0;
+  let totalMachineCount = 0;
 
   validSummaries.forEach(s => {
     totalRunTime += s.total_run_time || 0;
     totalDowntime += s.total_downtime || 0;
     totalGoodQty += s.total_good_qty || 0;
     totalRejectQty += s.total_reject_qty || 0;
-
     sumAvailability += s.avg_availability || 0;
     sumPerformance += s.avg_performance || 0;
     sumQuality += s.avg_quality || 0;
     sumOee += s.avg_oee || 0;
+    totalPlannedTime += s.planned_time_minutes || 0;
+    totalMachineCount = Math.max(totalMachineCount, s.machine_count || 0);
   });
 
   const avgAvailability = sumAvailability / totalShifts;
@@ -796,66 +796,254 @@ function OEESummaryModal({ summaries, dateStr }: { summaries: any[], dateStr: st
   const avgQuality = sumQuality / totalShifts;
   const avgOEE = sumOee / totalShifts;
 
-  // Executive Summary Generation
-  let executiveSummary = "";
-  if (avgOEE >= 80) {
-    executiveSummary = `ภาพรวม OEE ของวันที่ ${format(new Date(dateStr + 'T00:00:00'), 'd MMM yyyy', { locale: th })} อยู่ในมาตรฐานที่ยอดเยี่ยม (${avgOEE.toFixed(1)}%) `;
-  } else if (avgOEE >= 60) {
-    executiveSummary = `ภาพรวม OEE ของวันที่ ${format(new Date(dateStr + 'T00:00:00'), 'd MMM yyyy', { locale: th })} จัดอยู่ในระดับที่ทำได้ดี (${avgOEE.toFixed(1)}%) `;
-  } else {
-    executiveSummary = `ภาพรวม OEE ของวันที่ ${format(new Date(dateStr + 'T00:00:00'), 'd MMM yyyy', { locale: th })} อยู่ในเกณฑ์ที่ควรเฝ้าระวัง (${avgOEE.toFixed(1)}%) `;
+  const totalProduced = totalGoodQty + totalRejectQty;
+  const rejectRate = totalProduced > 0 ? (totalRejectQty / totalProduced) * 100 : 0;
+
+  // World‑class OEE benchmarks: A ≥85%, P ≥95%, Q ≥99%, OEE ≥85%
+  const OEE_TARGET = 85;
+  const AVAIL_TARGET = 85;
+  const PERF_TARGET = 95;
+  const QUALITY_TARGET = 99;
+
+  // Classify metrics
+  const classify = (val: number, threshold: number) =>
+    val >= threshold ? 'good' : val >= threshold * 0.75 ? 'warn' : 'bad';
+
+  const oeeClass = classify(avgOEE, OEE_TARGET);
+  const availClass = classify(avgAvailability, AVAIL_TARGET);
+  const perfClass = classify(avgPerformance, PERF_TARGET);
+  const qualClass = classify(avgQuality, QUALITY_TARGET);
+
+  // OEE Loss breakdown (theoretical)
+  // Availability Loss = planned - run
+  // Performance Loss = (run - theoretical_ideal) can't compute without cycle time so estimate via 100% - performance
+  // Quality Loss = reject / produced
+  const availLossPct = 100 - avgAvailability;
+  const perfLossPct = 100 - avgPerformance;
+  const qualLossPct = 100 - avgQuality;
+
+  // Find bottleneck
+  const losses = [
+    { name: 'Availability', val: availLossPct, pct: avgAvailability, target: AVAIL_TARGET, cls: availClass },
+    { name: 'Performance', val: perfLossPct, pct: avgPerformance, target: PERF_TARGET, cls: perfClass },
+    { name: 'Quality', val: qualLossPct, pct: avgQuality, target: QUALITY_TARGET, cls: qualClass },
+  ].sort((a, b) => b.val - a.val);
+  const bottleneck = losses[0];
+
+  // Downtime ratio
+  const totalPossibleTime = totalRunTime + totalDowntime;
+  const downtimeRatio = totalPossibleTime > 0 ? (totalDowntime / totalPossibleTime) * 100 : 0;
+
+  // Recommendations
+  const recommendations: { icon: string; text: string; priority: 'high' | 'medium' | 'low' }[] = [];
+  if (availClass !== 'good') {
+    recommendations.push({
+      icon: '🔧',
+      text: `Availability ต่ำกว่าเป้า (${avgAvailability.toFixed(1)}% vs ${AVAIL_TARGET}%) — ตรวจสอบสาเหตุ Downtime ที่เกิดขึ้นบ่อย, วางแผน PM (Preventive Maintenance)`,
+      priority: availClass === 'bad' ? 'high' : 'medium',
+    });
+  }
+  if (perfClass !== 'good') {
+    recommendations.push({
+      icon: '⚡',
+      text: `Performance ต่ำกว่าเป้า (${avgPerformance.toFixed(1)}% vs ${PERF_TARGET}%) — ตรวจสอบ Cycle Time จริงเทียบกับมาตรฐาน, ลด Minor Stops`,
+      priority: perfClass === 'bad' ? 'high' : 'medium',
+    });
+  }
+  if (qualClass !== 'good') {
+    recommendations.push({
+      icon: '✅',
+      text: `Quality ต่ำกว่าเป้า (${avgQuality.toFixed(1)}% vs ${QUALITY_TARGET}%) — วิเคราะห์สาเหตุของเสีย, ตรวจสอบกระบวนการ QC`,
+      priority: qualClass === 'bad' ? 'high' : 'medium',
+    });
+  }
+  if (recommendations.length === 0) {
+    recommendations.push({
+      icon: '🏆',
+      text: 'OEE อยู่ในระดับ World-Class — ดูแลมาตรฐานให้คงต่อเนื่อง',
+      priority: 'low',
+    });
   }
 
-  // Find weakest metric
-  if (avgOEE > 0) {
-    const minMetric = Math.min(avgAvailability, avgPerformance, avgQuality);
-    if (minMetric === avgAvailability) {
-      executiveSummary += `โดยพบว่าปัญหาหลักคืออัตราการเดินเครื่องสะสม (Availability: ${avgAvailability.toFixed(1)}%) ควรตรวจสอบสาเหตุการขัดข้องหรือหยุดพักของเครื่องจักรเพิ่มเติม`;
-    } else if (minMetric === avgPerformance) {
-      executiveSummary += `โดยพบว่าปัญหาหลักคือความเร็วหรือประสิทธิภาพการผลิต (Performance: ${avgPerformance.toFixed(1)}%) คาดว่าเครื่องจักรเดินเครื่องช้ากว่ามาตรฐาน หรือมีการติดขัดย่อยตลอดเวลา`;
-    } else {
-      executiveSummary += `โดยพบว่าปัจจัยหลักที่ดึง OEE ให้ลดลงคือคุณภาพสินค้า (Quality: ${avgQuality.toFixed(1)}%) มียอดรีเจ็คท์ส่งผลต่อเวลาการผลิต ควรตรวจสอบมาตรฐานกระบวนการผลิตอย่างใกล้ชิด`;
-    }
-  }
+  const statusColor = oeeClass === 'good' ? 'text-green-500' : oeeClass === 'warn' ? 'text-yellow-500' : 'text-red-500';
+  const metricColor = (cls: string) => cls === 'good' ? 'text-green-500' : cls === 'warn' ? 'text-yellow-500' : 'text-red-500';
+  const barColor = (cls: string) => cls === 'good' ? 'bg-green-500' : cls === 'warn' ? 'bg-yellow-500' : 'bg-red-500';
 
   return (
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
           <BarChart className="h-3.5 w-3.5" />
-          สรุป OEE วันนี้
+          วิเคราะห์ OEE
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>รายงานสรุป OEE ประจำวัน (Executive Summary)</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <BarChart className="h-5 w-5 text-primary" />
+            รายงานวิเคราะห์ OEE — {format(new Date(dateStr + 'T00:00:00'), 'd MMMM yyyy', { locale: th })}
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 pt-4">
-          <div className="bg-muted/50 p-6 rounded-xl border border-border">
-            <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
-              <ClipboardCheck className="h-5 w-5 text-primary" />
-              สรุปสำหรับผู้บริหาร
-            </h4>
-            <p className="text-sm leading-relaxed text-muted-foreground">{executiveSummary}</p>
+        <div className="space-y-5 pt-2">
+
+          {/* OEE Score Card */}
+          <div className="rounded-xl border bg-muted/30 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">OEE รวมวันนี้</p>
+                <p className={`text-5xl font-bold mt-1 ${statusColor}`}>{avgOEE.toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground mt-1">เป้าหมาย: {OEE_TARGET}%</p>
+              </div>
+              <div className="text-right space-y-1">
+                <p className="text-xs text-muted-foreground">{totalShifts} กะ • {totalMachineCount} เครื่องจักร</p>
+                <p className="text-xs">Run: <span className="font-medium">{totalRunTime.toLocaleString()} นาที</span></p>
+                <p className="text-xs">Downtime: <span className="font-medium text-yellow-500">{totalDowntime} นาที ({downtimeRatio.toFixed(1)}%)</span></p>
+                <p className="text-xs">ผลิตดี: <span className="font-medium text-green-500">{totalGoodQty.toLocaleString()} ชิ้น</span></p>
+                <p className="text-xs">ของเสีย: <span className="font-medium text-red-500">{totalRejectQty.toLocaleString()} ชิ้น ({rejectRate.toFixed(2)}%)</span></p>
+              </div>
+            </div>
+
+            {/* OEE gauge bar */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0%</span><span className="text-primary">{OEE_TARGET}% (เป้า)</span><span>100%</span>
+              </div>
+              <div className="relative h-4 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${barColor(oeeClass)}`}
+                  style={{ width: `${Math.min(avgOEE, 100)}%` }}
+                />
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-primary/80"
+                  style={{ left: `${OEE_TARGET}%` }}
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="grid gap-4">
-            <h4 className="font-semibold text-sm flex items-center gap-2">
-              <Factory className="h-4 w-4" />
-              ภาพรวมตัวชี้วัด (เฉลี่ยจาก {totalShifts} กะที่มีเครื่องจักรทำงาน)
+          {/* Metric Breakdown */}
+          <div>
+            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              วิเคราะห์ตัวชี้วัดหลัก
             </h4>
-            <OEEMetricsPanel
-              availability={avgAvailability}
-              performance={avgPerformance}
-              quality={avgQuality}
-              oee={avgOEE}
-              runTime={totalRunTime}
-              downtime={totalDowntime}
-              goodQty={totalGoodQty}
-              rejectQty={totalRejectQty}
-            />
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Availability', value: avgAvailability, target: AVAIL_TARGET, cls: availClass, lossName: 'เวลาหยุดเครื่อง', lossVal: availLossPct },
+                { label: 'Performance', value: avgPerformance, target: PERF_TARGET, cls: perfClass, lossName: 'ผลิตช้ากว่ามาตรฐาน', lossVal: perfLossPct },
+                { label: 'Quality', value: avgQuality, target: QUALITY_TARGET, cls: qualClass, lossName: 'ของเสีย', lossVal: qualLossPct },
+              ].map(m => (
+                <div key={m.label} className="rounded-lg border bg-card p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">{m.label}</span>
+                    {m.cls === 'good'
+                      ? <TrendingUp className="h-3.5 w-3.5 text-green-500" />
+                      : m.cls === 'warn'
+                        ? <Minus className="h-3.5 w-3.5 text-yellow-500" />
+                        : <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+                    }
+                  </div>
+                  <p className={`text-2xl font-bold tabular-nums ${metricColor(m.cls)}`}>{m.value.toFixed(1)}%</p>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${barColor(m.cls)}`} style={{ width: `${Math.min(m.value, 100)}%` }} />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">เป้า: {m.target}% • สูญเสีย: {m.lossVal.toFixed(1)}%</p>
+                  <p className="text-[10px] text-muted-foreground font-medium">{m.lossName}</p>
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* Bottleneck Analysis */}
+          <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-4">
+            <h4 className="text-sm font-semibold mb-2 flex items-center gap-2 text-orange-600 dark:text-orange-400">
+              <AlertTriangle className="h-4 w-4" />
+              จุดคอขวดหลัก (Biggest Loss)
+            </h4>
+            <p className="text-sm">
+              <span className="font-bold">{bottleneck.name}</span> มีการสูญเสียสูงสุด {bottleneck.val.toFixed(1)}%
+              {' '}({bottleneck.pct.toFixed(1)}% vs เป้า {bottleneck.target}%)
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {bottleneck.name === 'Availability'
+                ? 'เครื่องจักรหยุดทำงาน/รอการซ่อม ส่งผลให้เสียเวลาการผลิตสูง — ควรวิเคราะห์ Downtime Log และ Pareto สาเหตุ'
+                : bottleneck.name === 'Performance'
+                  ? 'เครื่องจักรทำงานช้ากว่ามาตรฐาน หรือมีการหยุดสั้นๆ บ่อยครั้ง — ตรวจสอบ Cycle Time และ Minor Stops'
+                  : 'ของเสียสูงกว่าที่ยอมรับได้ — ตรวจสอบมาตรฐานกระบวนการ, ปรับ SOP, เพิ่มความถี่ QC'
+              }
+            </p>
+          </div>
+
+          {/* Loss Waterfall */}
+          <div>
+            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <XCircle className="h-4 w-4 text-red-500" />
+              สัดส่วนการสูญเสีย OEE
+            </h4>
+            <div className="space-y-2">
+              {losses.map((l, i) => (
+                <div key={l.name} className="flex items-center gap-3">
+                  <span className="text-sm w-24 text-right text-muted-foreground shrink-0">{l.name}</span>
+                  <div className="flex-1 h-6 bg-muted rounded overflow-hidden relative">
+                    <div
+                      className={`h-full ${barColor(l.cls)} opacity-80`}
+                      style={{ width: `${Math.min(l.val * 2, 100)}%` }}
+                    />
+                    <span className="absolute inset-0 flex items-center px-2 text-xs font-medium">
+                      สูญเสีย {l.val.toFixed(1)}%
+                    </span>
+                  </div>
+                  <span className={`text-sm font-bold tabular-nums w-14 text-right ${metricColor(l.cls)}`}>{l.pct.toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recommendations */}
+          <div>
+            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              ข้อเสนอแนะสำหรับผู้บริหาร
+            </h4>
+            <div className="space-y-2">
+              {recommendations.map((r, i) => (
+                <div
+                  key={i}
+                  className={`rounded-lg border p-3 text-sm flex gap-3 items-start ${r.priority === 'high' ? 'border-red-500/30 bg-red-500/5' :
+                      r.priority === 'medium' ? 'border-yellow-500/30 bg-yellow-500/5' :
+                        'border-green-500/30 bg-green-500/5'
+                    }`}
+                >
+                  <span className="text-lg shrink-0">{r.icon}</span>
+                  <p className="leading-relaxed text-muted-foreground">{r.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Shift breakdown */}
+          {validSummaries.length > 1 && (
+            <div>
+              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                รายละเอียดตามกะ
+              </h4>
+              <div className="space-y-2">
+                {validSummaries.map((s, i) => (
+                  <div key={s.shift_calendar_id} className="flex items-center justify-between rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+                    <span className="font-medium">{s.shift_name}</span>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground tabular-nums">
+                      <span>A: <span className={metricColor(classify(s.avg_availability || 0, AVAIL_TARGET))}>{(s.avg_availability || 0).toFixed(1)}%</span></span>
+                      <span>P: <span className={metricColor(classify(s.avg_performance || 0, PERF_TARGET))}>{(s.avg_performance || 0).toFixed(1)}%</span></span>
+                      <span>Q: <span className={metricColor(classify(s.avg_quality || 0, QUALITY_TARGET))}>{(s.avg_quality || 0).toFixed(1)}%</span></span>
+                      <span className="font-bold">OEE: <span className={metricColor(classify(s.avg_oee || 0, OEE_TARGET))}>{(s.avg_oee || 0).toFixed(1)}%</span></span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

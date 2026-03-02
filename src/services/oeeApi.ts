@@ -537,7 +537,7 @@ export async function getProductionEvents(
     .from('production_events')
     .select('*, machine:machines(*), product:products(*)')
     .eq('machine_id', machineId)
-    .order('start_ts', { ascending: false });
+    .order('start_ts', { ascending: true });
 
   if (shiftCalendarId) {
     query = query.eq('shift_calendar_id', shiftCalendarId);
