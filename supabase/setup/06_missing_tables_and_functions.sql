@@ -153,7 +153,7 @@ BEGIN
   END IF;
 
   IF v_shift IS NULL THEN
-    RAISE EXCEPTION 'DEBUG_NO_SHIFT: plant=%, date=%, time=%, dow=%', p_plant_id, p_local_date, p_local_time, EXTRACT(DOW FROM p_local_date);
+    RETURN NULL;
   END IF;
 
   -- Check holidays before creating
@@ -169,7 +169,7 @@ BEGIN
             AND EXTRACT(DAY FROM h.holiday_date) = EXTRACT(DAY FROM p_local_date))
       )
   ) THEN
-    RAISE EXCEPTION 'DEBUG_HOLIDAY: Shift found but it is a holiday today (date=%)', p_local_date;
+    RETURN NULL;
   END IF;
 
   -- Calculate planned_time from PPT template
