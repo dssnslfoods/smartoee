@@ -18,7 +18,7 @@ interface AddCountsFormProps {
   onSubmit: (data: {
     goodQty: number;
     rejectQty: number;
-    defectReasonId?: string;
+    defectBreakdowns?: { reasonId: string; qty: number }[];
     notes?: string;
   }) => void;
   isLoading?: boolean;
@@ -42,7 +42,7 @@ export function AddCountsForm({
 }: AddCountsFormProps) {
   const [goodQty, setGoodQty] = useState(0);
   const [rejectQty, setRejectQty] = useState(0);
-  const [defectReasonId, setDefectReasonId] = useState<string>('');
+  const [defectBreakdowns, setDefectBreakdowns] = useState<{ id: string; reasonId: string; qty: number }[]>([]);
   const [notes, setNotes] = useState('');
   const [activeField, setActiveField] = useState<ActiveField>('good');
   const [inputBuffer, setInputBuffer] = useState('0');
@@ -52,6 +52,36 @@ export function AddCountsForm({
   useEffect(() => {
     onValuesChange?.(goodQty, rejectQty);
   }, [goodQty, rejectQty, onValuesChange]);
+
+  // Auto-initialize breakdowns when rejectQty becomes > 0
+  useEffect(() => {
+    if (rejectQty > 0 && defectBreakdowns.length === 0) {
+      setDefectBreakdowns([{ id: crypto.randomUUID(), reasonId: '', qty: rejectQty }]);
+    } else if (rejectQty === 0 && defectBreakdowns.length > 0) {
+      setDefectBreakdowns([]);
+    }
+  }, [rejectQty, defectBreakdowns.length]);
+
+  const totalBreakdownQty = defectBreakdowns.reduce((sum, item) => sum + (item.qty || 0), 0);
+  const isBreakdownValid = rejectQty === 0 || (totalBreakdownQty === rejectQty && defectBreakdowns.every(b => b.reasonId && b.qty > 0));
+
+  const addBreakdownRow = () => {
+    if (isLocked) return;
+    const remaining = Math.max(0, rejectQty - totalBreakdownQty);
+    setDefectBreakdowns([...defectBreakdowns, { id: crypto.randomUUID(), reasonId: '', qty: remaining }]);
+  };
+
+  const removeBreakdownRow = (id: string) => {
+    if (isLocked) return;
+    setDefectBreakdowns(defectBreakdowns.filter(b => b.id !== id));
+  };
+
+  const updateBreakdown = (id: string, field: 'reasonId' | 'qty', value: string | number) => {
+    if (isLocked) return;
+    setDefectBreakdowns(defectBreakdowns.map(b =>
+      b.id === id ? { ...b, [field]: value } : b
+    ));
+  };
 
   const currentValue = activeField === 'good' ? goodQty : rejectQty;
   const setCurrentValue = activeField === 'good' ? setGoodQty : setRejectQty;
@@ -120,18 +150,18 @@ export function AddCountsForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (goodQty === 0 && rejectQty === 0) return;
-    
+
     onSubmit({
       goodQty,
       rejectQty,
-      defectReasonId: defectReasonId || undefined,
+      defectBreakdowns: rejectQty > 0 ? defectBreakdowns : undefined,
       notes: notes || undefined,
     });
 
     // Reset form
     setGoodQty(0);
     setRejectQty(0);
-    setDefectReasonId('');
+    setDefectBreakdowns([]);
     setNotes('');
     setInputBuffer('0');
     setActiveField('good');
@@ -291,20 +321,68 @@ export function AddCountsForm({
 
       {/* Defect Reason (required if reject > 0) */}
       {rejectQty > 0 && (
-        <div className="space-y-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
-          <Label className="text-sm font-medium text-red-400">สาเหตุของเสีย *</Label>
-          <Select value={defectReasonId} onValueChange={setDefectReasonId}>
-            <SelectTrigger className="border-red-500/30">
-              <SelectValue placeholder="เลือกสาเหตุ" />
-            </SelectTrigger>
-            <SelectContent>
-              {defectReasons.map((reason) => (
-                <SelectItem key={reason.id} value={reason.id}>
-                  {reason.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="space-y-3 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-medium text-red-500">รายละเอียดของเสีย *</Label>
+            <div className={cn("text-xs font-semibold", totalBreakdownQty === rejectQty ? "text-green-500" : "text-red-500")}>
+              ยอดรวม: {totalBreakdownQty} / {rejectQty}
+            </div>
+          </div>
+          <div className="space-y-2">
+            {defectBreakdowns.map((breakdown) => (
+              <div key={breakdown.id} className="flex gap-2 items-start">
+                <Select
+                  value={breakdown.reasonId}
+                  onValueChange={(val) => updateBreakdown(breakdown.id, 'reasonId', val)}
+                >
+                  <SelectTrigger className="border-red-500/30 flex-1 h-10 bg-background">
+                    <SelectValue placeholder="เลือกสาเหตุ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {defectReasons.map((reason) => (
+                      <SelectItem key={reason.id} value={reason.id}>
+                        {reason.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <input
+                  type="number"
+                  min={1}
+                  className="flex h-10 w-20 rounded-md border border-red-500/30 bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={breakdown.qty === 0 ? '' : breakdown.qty}
+                  onChange={(e) => updateBreakdown(breakdown.id, 'qty', parseInt(e.target.value) || 0)}
+                  disabled={isLocked}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 text-muted-foreground hover:text-destructive shrink-0"
+                  onClick={() => removeBreakdownRow(breakdown.id)}
+                  disabled={isLocked || defectBreakdowns.length <= 1}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full border-dashed border-red-500/30 text-red-500 hover:text-red-600 hover:bg-red-500/10 bg-background/50"
+            onClick={addBreakdownRow}
+            disabled={isLocked || totalBreakdownQty >= rejectQty}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            เพิ่มสาเหตุ
+          </Button>
+          {totalBreakdownQty !== rejectQty && (
+            <p className="text-xs text-red-500 mt-1">
+              * ต้องระบุสาเหตุให้ครบตามจำนวนของเสียทั้งหมด ({rejectQty} ชิ้น)
+            </p>
+          )}
         </div>
       )}
 
@@ -336,10 +414,10 @@ export function AddCountsForm({
           type="submit"
           className="w-full h-12 text-base font-medium"
           disabled={
-            isLoading || 
-            isLocked || 
+            isLoading ||
+            isLocked ||
             (goodQty === 0 && rejectQty === 0) ||
-            (rejectQty > 0 && !defectReasonId)
+            (rejectQty > 0 && !isBreakdownValid)
           }
         >
           {isLoading ? (

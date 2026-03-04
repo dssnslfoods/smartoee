@@ -325,13 +325,29 @@ export default function Shopfloor() {
   });
 
   const addCountsMutation = useMutation({
-    mutationFn: async ({ goodQty, rejectQty, defectReasonId, notes }: {
+    mutationFn: async ({ goodQty, rejectQty, defectBreakdowns, notes }: {
       goodQty: number;
       rejectQty: number;
-      defectReasonId?: string;
+      defectBreakdowns?: { reasonId: string; qty: number }[];
       notes?: string;
     }) => {
-      return addCounts(selectedMachineId!, goodQty, rejectQty, defectReasonId, notes);
+      if (rejectQty > 0 && defectBreakdowns && defectBreakdowns.length > 0) {
+        const promises = defectBreakdowns.map((breakdown, index) =>
+          addCounts(
+            selectedMachineId!,
+            index === 0 ? goodQty : 0,
+            breakdown.qty,
+            breakdown.reasonId,
+            notes
+          )
+        );
+        const results = await Promise.all(promises);
+        const failed = results.find(r => !r.success);
+        if (failed) return failed;
+        return results[0];
+      } else {
+        return addCounts(selectedMachineId!, goodQty, rejectQty, undefined, notes);
+      }
     },
     onSuccess: (data) => {
       if (data.success) {

@@ -27,7 +27,7 @@ interface PendingCountsSheetProps {
   onSubmitCounts: (data: {
     goodQty: number;
     rejectQty: number;
-    defectReasonId?: string;
+    defectBreakdowns?: { reasonId: string; qty: number }[];
     notes?: string;
   }) => void;
   isSubmitting?: boolean;
@@ -67,7 +67,7 @@ export function PendingCountsSheet({
   const handleSubmit = (data: {
     goodQty: number;
     rejectQty: number;
-    defectReasonId?: string;
+    defectBreakdowns?: { reasonId: string; qty: number }[];
     notes?: string;
   }) => {
     onSubmitCounts(data);

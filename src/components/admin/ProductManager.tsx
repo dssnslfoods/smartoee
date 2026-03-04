@@ -51,6 +51,7 @@ interface Line {
 const PRODUCT_COLUMNS = [
   { key: 'code', header: 'Code', type: 'string' as const },
   { key: 'name', header: 'Name', type: 'string' as const },
+  { key: 'line', header: 'Line', type: 'string' as const },
   { key: 'description', header: 'Description', type: 'string' as const },
   { key: 'is_active', header: 'Status', type: 'boolean' as const },
 ];
@@ -158,15 +159,18 @@ export function ProductManager() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const bulkInsertMutation = useMutation({
+  const bulkUpsertMutation = useMutation({
     mutationFn: async (rows: any[]) => {
-      const { error } = await supabase.from('products').insert(rows as any);
+      // Use comma-separated columns WITHOUT spaces for PostgREST onConflict
+      const { error } = await supabase.from('products').upsert(rows as any, {
+        onConflict: 'company_id,code'
+      });
       if (error) throw error;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-products'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success(`นำเข้าข้อมูลสำเร็จ ${variables.length} รายการ`);
+      toast.success(`นำเข้าและอัปเดตข้อมูลสำเร็จ ${variables.length} รายการ`);
     },
     onError: (error: Error) => toast.error(`นำเข้าข้อมูลล้มเหลว: ${error.message}`),
   });
@@ -209,14 +213,22 @@ export function ProductManager() {
   const handleExportExcel = async () => {
     if (!products || products.length === 0) { toast.error('ไม่มีข้อมูลให้ export'); return; }
     const companyName = company?.name || 'All';
-    await exportMasterDataToExcel(products, PRODUCT_COLUMNS, `products_${companyName}`, 'Products');
+    const productsWithLine = products.map(p => ({
+      ...p,
+      line: p.line_id ? lineMap.get(p.line_id)?.name || '' : '',
+    }));
+    await exportMasterDataToExcel(productsWithLine, PRODUCT_COLUMNS, `products_${companyName}`, 'Products');
     toast.success('Export Excel สำเร็จ');
   };
 
   const handleExportCSV = () => {
     if (!products || products.length === 0) { toast.error('ไม่มีข้อมูลให้ export'); return; }
     const companyName = company?.name || 'All';
-    exportMasterDataToCSV(products, PRODUCT_COLUMNS, `products_${companyName}`);
+    const productsWithLine = products.map(p => ({
+      ...p,
+      line: p.line_id ? lineMap.get(p.line_id)?.name || '' : '',
+    }));
+    exportMasterDataToCSV(productsWithLine, PRODUCT_COLUMNS, `products_${companyName}`);
     toast.success('Export CSV สำเร็จ');
   };
 
@@ -228,17 +240,48 @@ export function ProductManager() {
     try {
       const parsed = await parseImportFile(file);
       if (parsed.length === 0) { toast.error('ไม่พบข้อมูลในไฟล์'); return; }
-      const rows = parsed
-        .filter(row => row.code && row.name)
-        .map(row => ({
-          code: row.code, name: row.name,
-          description: row.description || null,
-          is_active: row.status ? row.status.toLowerCase() === 'active' : true,
-          company_id: selectedCompanyId,
-        }));
-      if (rows.length === 0) { toast.error('ไม่พบข้อมูลที่ถูกต้อง'); return; }
-      await bulkInsertMutation.mutateAsync(rows);
-    } catch { toast.error('ไม่สามารถอ่านไฟล์ได้'); }
+
+      const processedRows = parsed
+        .filter(row => {
+          const code = (row.code || '').trim();
+          const name = (row.name || '').trim();
+          return code && name;
+        })
+        .map(row => {
+          // Find matching line by name or code
+          const lineVal = (row.line || row.line_id || row.production_line || '').trim();
+          let foundLineId = null;
+          if (lineVal && lines) {
+            const matched = lines.find(l =>
+              l.name.toLowerCase() === lineVal.toLowerCase() ||
+              (l.code && l.code.toLowerCase() === lineVal.toLowerCase())
+            );
+            if (matched) foundLineId = matched.id;
+          }
+
+          return {
+            code: (row.code || '').trim(),
+            name: (row.name || '').trim(),
+            description: row.description || null,
+            is_active: row.status ? row.status.toLowerCase() === 'active' : true,
+            company_id: selectedCompanyId,
+            line_id: foundLineId,
+          };
+        });
+
+      // Deduplicate rows by code within the batch to avoid PostgREST bulk upsert issues
+      const uniqueRowsMap = new Map();
+      processedRows.forEach(row => {
+        uniqueRowsMap.set(row.code, row);
+      });
+      const rows = Array.from(uniqueRowsMap.values());
+
+      if (rows.length === 0) { toast.error('ไม่พบข้อมูลที่ถูกต้อง (ต้องมี Code และ Name)'); return; }
+      await bulkUpsertMutation.mutateAsync(rows);
+    } catch (err: any) {
+      console.error('Import error:', err);
+      toast.error(`ไม่สามารถอ่านไฟล์ได้: ${err?.message || 'รูปแบบไฟล์ไม่ถูกต้อง'}`);
+    }
     finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

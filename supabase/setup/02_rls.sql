@@ -166,6 +166,16 @@ CREATE POLICY "Users can view groups in company" ON public.machine_permission_gr
 DROP POLICY IF EXISTS "Admins can manage group machines" ON public.machine_permission_group_machines;
 CREATE POLICY "Admins can manage group machines" ON public.machine_permission_group_machines FOR ALL TO authenticated USING (public.is_admin_or_manager());
 
+DROP POLICY IF EXISTS "Supervisors can manage group machines in company" ON public.machine_permission_group_machines;
+CREATE POLICY "Supervisors can manage group machines in company" ON public.machine_permission_group_machines FOR ALL TO authenticated 
+USING (
+    public.is_supervisor() AND 
+    EXISTS (
+        SELECT 1 FROM public.machine_permission_groups g 
+        WHERE g.id = group_id AND g.company_id = public.get_user_company_id()
+    )
+);
+
 DROP POLICY IF EXISTS "Users can view their group machines" ON public.machine_permission_group_machines;
 CREATE POLICY "Users can view their group machines" ON public.machine_permission_group_machines FOR SELECT TO authenticated USING (true);
 

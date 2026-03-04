@@ -106,24 +106,35 @@ export interface ParsedRow {
 }
 
 export async function parseExcelFile(file: File): Promise<ParsedRow[]> {
-  const rows = await readXlsxFile(file);
-  if (rows.length < 2) return [];
+  try {
+    const rows = await readXlsxFile(file);
+    if (rows.length < 2) return [];
 
-  const headers = rows[0].map(h => String(h ?? '').trim().toLowerCase());
-  const result: ParsedRow[] = [];
+    // Normalize headers: lowercase and replace spaces with underscores to match expected keys like 'line_id'
+    const headers = rows[0].map(h =>
+      String(h ?? '').trim().toLowerCase().replace(/[\s\W]+/g, '_').replace(/^_+|_+$/g, '')
+    );
 
-  for (let i = 1; i < rows.length; i++) {
-    const values = rows[i];
-    if (!values || values.every(v => !v && v !== 0)) continue;
+    const result: ParsedRow[] = [];
 
-    const row: ParsedRow = {};
-    headers.forEach((header, idx) => {
-      row[header] = String(values[idx] ?? '').trim();
-    });
-    result.push(row);
+    for (let i = 1; i < rows.length; i++) {
+      const values = rows[i];
+      if (!values || values.every(v => !v && v !== 0)) continue;
+
+      const row: ParsedRow = {};
+      headers.forEach((header, idx) => {
+        if (header) {
+          row[header] = String(values[idx] ?? '').trim();
+        }
+      });
+      result.push(row);
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error parsing Excel file:', error);
+    throw error;
   }
-
-  return result;
 }
 
 export async function parseImportFile(file: File): Promise<ParsedRow[]> {

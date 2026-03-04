@@ -321,18 +321,38 @@ export default function PendingCounts() {
 
   // Single event submit
   const addCountsMutation = useMutation({
-    mutationFn: async (data: { goodQty: number; rejectQty: number; defectReasonId?: string; notes?: string }) => {
+    mutationFn: async (data: { goodQty: number; rejectQty: number; defectBreakdowns?: { reasonId: string; qty: number }[]; notes?: string }) => {
       if (!selectedEvent) throw new Error('No event selected');
-      return addCountsBackdate(
-        selectedEvent.machine_id,
-        data.goodQty,
-        data.rejectQty,
-        data.defectReasonId,
-        data.notes,
-        selectedEvent.shift_calendar_id || undefined,
-        selectedEvent.end_ts,
-        selectedEvent.id
-      );
+
+      if (data.rejectQty > 0 && data.defectBreakdowns && data.defectBreakdowns.length > 0) {
+        const promises = data.defectBreakdowns.map((breakdown, index) =>
+          addCountsBackdate(
+            selectedEvent.machine_id,
+            index === 0 ? data.goodQty : 0,
+            breakdown.qty,
+            breakdown.reasonId,
+            data.notes,
+            selectedEvent.shift_calendar_id || undefined,
+            selectedEvent.end_ts,
+            selectedEvent.id
+          )
+        );
+        const results = await Promise.all(promises);
+        const failed = results.find(r => !r.success);
+        if (failed) return failed;
+        return results[0];
+      } else {
+        return addCountsBackdate(
+          selectedEvent.machine_id,
+          data.goodQty,
+          data.rejectQty,
+          undefined,
+          data.notes,
+          selectedEvent.shift_calendar_id || undefined,
+          selectedEvent.end_ts,
+          selectedEvent.id
+        );
+      }
     },
     onSuccess: (data) => {
       if (data.success) {
@@ -350,7 +370,7 @@ export default function PendingCounts() {
 
   // Bulk submit for grouped events
   const bulkCountsMutation = useMutation({
-    mutationFn: async (data: { goodQty: number; rejectQty: number; defectReasonId?: string; notes?: string }) => {
+    mutationFn: async (data: { goodQty: number; rejectQty: number; defectBreakdowns?: { reasonId: string; qty: number }[]; notes?: string }) => {
       if (!selectedGroup || selectedEventIds.size === 0) throw new Error('No events selected');
 
       const eventsToRecord = selectedGroup.events.filter(e => selectedEventIds.has(e.id));
@@ -361,6 +381,7 @@ export default function PendingCounts() {
       const results: any[] = [];
       let remainGood = data.goodQty;
       let remainReject = data.rejectQty;
+      const remainBreakdowns = data.defectBreakdowns ? data.defectBreakdowns.map(b => ({ ...b })) : [];
 
       for (let i = 0; i < eventsToRecord.length; i++) {
         const ev = eventsToRecord[i];
@@ -368,30 +389,60 @@ export default function PendingCounts() {
 
         let goodForThis: number;
         let rejectForThis: number;
+        let ratio: number = 0;
 
         if (splitMode === 'equal') {
           goodForThis = isLast ? remainGood : Math.round(data.goodQty / count);
           rejectForThis = isLast ? remainReject : Math.round(data.rejectQty / count);
+          ratio = 1 / count;
         } else {
           const evMs = new Date(ev.end_ts).getTime() - new Date(ev.start_ts).getTime();
-          const ratio = totalMs > 0 ? evMs / totalMs : 1 / count;
+          ratio = totalMs > 0 ? evMs / totalMs : 1 / count;
           goodForThis = isLast ? remainGood : Math.round(data.goodQty * ratio);
           rejectForThis = isLast ? remainReject : Math.round(data.rejectQty * ratio);
         }
         remainGood -= goodForThis;
         remainReject -= rejectForThis;
 
-        const result = await addCountsBackdate(
-          ev.machine_id,
-          goodForThis,
-          rejectForThis,
-          data.defectReasonId,
-          data.notes,
-          ev.shift_calendar_id || undefined,
-          ev.end_ts,
-          ev.id
-        );
-        results.push(result);
+        if (rejectForThis > 0 && data.defectBreakdowns && data.defectBreakdowns.length > 0) {
+          for (let bIndex = 0; bIndex < remainBreakdowns.length; bIndex++) {
+            const currentRemain = remainBreakdowns[bIndex];
+            const originalQty = data.defectBreakdowns[bIndex].qty;
+            const breakdownQtyForThis = isLast
+              ? currentRemain.qty
+              : Math.round(originalQty * ratio);
+
+            currentRemain.qty -= breakdownQtyForThis;
+
+            if (breakdownQtyForThis > 0 || (bIndex === 0 && goodForThis > 0)) {
+              const result = await addCountsBackdate(
+                ev.machine_id,
+                bIndex === 0 ? goodForThis : 0,
+                breakdownQtyForThis,
+                data.defectBreakdowns[bIndex].reasonId,
+                data.notes,
+                ev.shift_calendar_id || undefined,
+                ev.end_ts,
+                ev.id
+              );
+              results.push(result);
+            }
+          }
+        } else {
+          if (goodForThis > 0 || rejectForThis > 0) {
+            const result = await addCountsBackdate(
+              ev.machine_id,
+              goodForThis,
+              rejectForThis,
+              undefined,
+              data.notes,
+              ev.shift_calendar_id || undefined,
+              ev.end_ts,
+              ev.id
+            );
+            results.push(result);
+          }
+        }
       }
 
       const failures = results.filter(r => !r.success);

@@ -215,11 +215,7 @@ export async function unlockShift(
   });
 
   if (error) throw error;
-  const result = data as unknown as { ok: boolean; error?: string };
-  if (!result.ok) {
-    throw new Error(result.error || 'Unknown error');
-  }
-  return result;
+  return handleRpcError(data as any) as any;
 }
 
 export async function recalcOeeForShift(

@@ -59,13 +59,19 @@ interface MachineOption {
   ideal_cycle_time_seconds: number;
   time_unit?: string;
   plant_id?: string | null;
-  lines?: { name: string; plant_id?: string | null; plants?: { id: string; name: string } | null } | null;
+  line_id: string;
+  target_oee: number;
+  target_availability: number;
+  target_performance: number;
+  target_quality: number;
+  lines?: { id: string; name: string; plant_id?: string | null; plants?: { id: string; name: string } | null } | null;
 }
 
 interface ProductOption {
   id: string;
   name: string;
   code: string;
+  line_id: string | null;
 }
 
 export function ProductionStandardsManager() {
@@ -112,7 +118,7 @@ export function ProductionStandardsManager() {
     queryFn: async () => {
       let query = supabase
         .from('machines')
-        .select('id, name, code, ideal_cycle_time_seconds, time_unit, lines(name, plant_id, plants(id, name))')
+        .select('id, name, code, ideal_cycle_time_seconds, time_unit, line_id, target_oee, target_availability, target_performance, target_quality, lines(id, name, plant_id, plants(id, name))')
         .eq('is_active', true)
         .order('name');
       if (selectedCompanyId) query = query.eq('company_id', selectedCompanyId);
@@ -134,7 +140,7 @@ export function ProductionStandardsManager() {
     queryFn: async () => {
       let query = supabase
         .from('products')
-        .select('id, name, code')
+        .select('id, name, code, line_id')
         .eq('is_active', true)
         .order('name');
       if (selectedCompanyId) query = query.eq('company_id', selectedCompanyId);
@@ -195,7 +201,16 @@ export function ProductionStandardsManager() {
     );
   }, [standards, formData.machine_id, editingStandard]);
 
-  const availableProducts = products.filter(p => !assignedProductIds.has(p.id));
+  const availableProducts = useMemo(() => {
+    let filtered = products.filter(p => !assignedProductIds.has(p.id));
+
+    // Filter by machine's line if a machine is selected
+    if (formData.machine_id && selectedMachine) {
+      filtered = filtered.filter(p => p.line_id === selectedMachine.line_id);
+    }
+
+    return filtered;
+  }, [products, assignedProductIds, formData.machine_id, selectedMachine]);
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -614,7 +629,16 @@ export function ProductionStandardsManager() {
               <Label>Machine *</Label>
               <Select
                 value={formData.machine_id}
-                onValueChange={(v) => setFormData({ ...formData, machine_id: v, product_id: '' })}
+                onValueChange={(v) => {
+                  const m = filteredMachines.find(item => item.id === v);
+                  setFormData({
+                    ...formData,
+                    machine_id: v,
+                    product_id: '',
+                    ideal_cycle_time_seconds: m?.ideal_cycle_time_seconds || 60,
+                    target_quality: m?.target_quality || 99
+                  });
+                }}
                 disabled={!!editingStandard}
               >
                 <SelectTrigger>
@@ -659,7 +683,14 @@ export function ProductionStandardsManager() {
                 const unitLabel = TIME_UNIT_SHORT[unit];
                 return (
                   <>
-                    <Label className="text-sm font-semibold">📊 Performance Benchmarks</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-semibold">📊 Performance Benchmarks</Label>
+                      {selectedMachine && (
+                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          Machine Default: {Math.round(toOutputRate(selectedMachine.ideal_cycle_time_seconds))} ชิ้น/นาที | Q: {selectedMachine.target_quality}%
+                        </span>
+                      )}
+                    </div>
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Std. Setup Time ({unitLabel})</Label>
