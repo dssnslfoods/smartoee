@@ -281,9 +281,10 @@ export default function Shopfloor() {
   };
 
   const startEventMutation = useMutation({
-    mutationFn: async ({ eventType, reasonId, notes }: { eventType: EventType; reasonId?: string; notes?: string }) => {
+    mutationFn: async ({ eventType, reasonId, notes, stdSetupTimeSeconds }: { eventType: EventType; reasonId?: string; notes?: string; stdSetupTimeSeconds?: number | null }) => {
       return startEvent(selectedMachineId!, eventType, reasonId, notes,
-        eventType === 'RUN' ? selectedProductId || undefined : undefined
+        eventType === 'RUN' ? selectedProductId || undefined : undefined,
+        stdSetupTimeSeconds ?? null
       );
     },
     onSuccess: (data) => {
@@ -637,12 +638,13 @@ export default function Shopfloor() {
                         effectiveCycleTime={effectiveCycleTime}
                         cycleTimeSource={cycleTimeSource}
                         noBenchmarkWarning={noBenchmarkWarning}
+                        defaultStdSetupTimeSeconds={productionStandard?.std_setup_time_seconds ?? 0}
                         onStartRun={handleStartRun}
-                        onStartDowntime={(reasonId, notes) =>
-                          startEventMutation.mutate({ eventType: 'DOWNTIME', reasonId, notes })
+                        onStartDowntime={(reasonId, notes, stdSetupTimeSeconds) =>
+                          startEventMutation.mutate({ eventType: 'DOWNTIME', reasonId, notes, stdSetupTimeSeconds })
                         }
-                        onStartSetup={(reasonId, notes) =>
-                          startEventMutation.mutate({ eventType: 'SETUP', reasonId, notes })
+                        onStartSetup={(reasonId, notes, stdSetupTimeSeconds) =>
+                          startEventMutation.mutate({ eventType: 'SETUP', reasonId, notes, stdSetupTimeSeconds })
                         }
                         onStop={(notes) => stopEventMutation.mutate(notes)}
                         isLoading={startEventMutation.isPending || stopEventMutation.isPending}

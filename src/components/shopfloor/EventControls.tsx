@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -33,11 +35,12 @@ interface EventControlsProps {
   cycleTimeSource?: string;
   noBenchmarkWarning?: string | null;
   onStartRun: () => void;
-  onStartDowntime: (reasonId: string, notes?: string) => void;
-  onStartSetup: (reasonId: string, notes?: string) => void;
+  onStartDowntime: (reasonId: string, notes?: string, stdSetupTimeSeconds?: number | null) => void;
+  onStartSetup: (reasonId: string, notes?: string, stdSetupTimeSeconds?: number | null) => void;
   onStop: (notes?: string) => void;
   isLoading?: boolean;
   isLocked?: boolean;
+  defaultStdSetupTimeSeconds?: number;
 }
 
 export function EventControls({
@@ -55,6 +58,7 @@ export function EventControls({
   onStop,
   isLoading = false,
   isLocked = false,
+  defaultStdSetupTimeSeconds = 0,
 }: EventControlsProps) {
   // Use passed-in effective values, fallback to machine default only
   const effectiveCycleTime = propEffectiveCycleTime ?? machineCycleTime;
@@ -64,22 +68,44 @@ export function EventControls({
   const [showStopDialog, setShowStopDialog] = useState(false);
   const [selectedReasonId, setSelectedReasonId] = useState<string>('');
   const [notes, setNotes] = useState('');
+  // เวลามาตรฐานเป็น "นาที" — ผู้ใช้กรอกง่ายกว่า เก็บลง DB เป็นวินาที
+  const [stdSetupMinutes, setStdSetupMinutes] = useState<string>('');
+
+  const selectedReason = downtimeReasons.find(r => r.id === selectedReasonId);
+  const isChangeoverReason = selectedReason?.category === 'CHANGEOVER';
+
+  // Pre-fill std จากค่า default (production_standards) เมื่อ user เปิด dialog หรือเลือก reason CHANGEOVER
+  useEffect(() => {
+    if ((showSetupDialog || (showDowntimeDialog && isChangeoverReason)) && defaultStdSetupTimeSeconds > 0) {
+      setStdSetupMinutes((defaultStdSetupTimeSeconds / 60).toString());
+    }
+  }, [showSetupDialog, showDowntimeDialog, isChangeoverReason, defaultStdSetupTimeSeconds]);
+
+  const parseStdSetupSeconds = (): number | null => {
+    const minutes = parseFloat(stdSetupMinutes);
+    if (isNaN(minutes) || minutes <= 0) return null;
+    return Math.round(minutes * 60);
+  };
 
   const handleDowntimeSubmit = () => {
     if (selectedReasonId) {
-      onStartDowntime(selectedReasonId, notes || undefined);
+      const std = isChangeoverReason ? parseStdSetupSeconds() : null;
+      onStartDowntime(selectedReasonId, notes || undefined, std);
       setShowDowntimeDialog(false);
       setSelectedReasonId('');
       setNotes('');
+      setStdSetupMinutes('');
     }
   };
 
   const handleSetupSubmit = () => {
     if (selectedReasonId) {
-      onStartSetup(selectedReasonId, notes || undefined);
+      const std = parseStdSetupSeconds();
+      onStartSetup(selectedReasonId, notes || undefined, std);
       setShowSetupDialog(false);
       setSelectedReasonId('');
       setNotes('');
+      setStdSetupMinutes('');
     }
   };
 
@@ -239,6 +265,23 @@ export function EventControls({
                 ))}
               </SelectContent>
             </Select>
+            {isChangeoverReason && (
+              <div className="space-y-1.5 rounded-md border border-yellow-500/30 bg-yellow-500/5 p-3">
+                <Label htmlFor="std-co" className="text-sm font-medium">
+                  เวลามาตรฐาน Changeover (นาที)
+                  <span className="ml-2 text-xs text-muted-foreground">— ส่วนที่เกินจะลด Availability</span>
+                </Label>
+                <Input
+                  id="std-co"
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  placeholder="เช่น 30"
+                  value={stdSetupMinutes}
+                  onChange={(e) => setStdSetupMinutes(e.target.value)}
+                />
+              </div>
+            )}
             <Textarea
               placeholder="หมายเหตุ (ถ้ามี)"
               value={notes}
@@ -249,8 +292,8 @@ export function EventControls({
             <Button variant="outline" onClick={() => setShowDowntimeDialog(false)}>
               ยกเลิก
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={handleDowntimeSubmit}
               disabled={!selectedReasonId}
             >
@@ -282,6 +325,21 @@ export function EventControls({
                 ))}
               </SelectContent>
             </Select>
+            <div className="space-y-1.5 rounded-md border border-yellow-500/30 bg-yellow-500/5 p-3">
+              <Label htmlFor="std-setup" className="text-sm font-medium">
+                เวลามาตรฐาน Setup (นาที)
+                <span className="ml-2 text-xs text-muted-foreground">— ส่วนที่เกินจะลด Availability</span>
+              </Label>
+              <Input
+                id="std-setup"
+                type="number"
+                step="0.5"
+                min="0"
+                placeholder="เช่น 30"
+                value={stdSetupMinutes}
+                onChange={(e) => setStdSetupMinutes(e.target.value)}
+              />
+            </div>
             <Textarea
               placeholder="หมายเหตุ (ถ้ามี)"
               value={notes}
@@ -292,7 +350,7 @@ export function EventControls({
             <Button variant="outline" onClick={() => setShowSetupDialog(false)}>
               ยกเลิก
             </Button>
-            <Button 
+            <Button
               onClick={handleSetupSubmit}
               disabled={!selectedReasonId}
               className="bg-yellow-600 hover:bg-yellow-700"

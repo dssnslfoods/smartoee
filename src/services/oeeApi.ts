@@ -49,7 +49,8 @@ export async function startEvent(
   eventType: EventType,
   reasonId?: string,
   notes?: string,
-  productId?: string
+  productId?: string,
+  stdSetupTimeSeconds?: number | null
 ): Promise<StartEventResponse> {
   const { data, error } = await supabase.rpc('rpc_start_event', {
     p_machine_id: machineId,
@@ -57,10 +58,24 @@ export async function startEvent(
     p_reason_id: reasonId || null,
     p_notes: notes || null,
     p_product_id: productId || null,
-  });
+    p_std_setup_time_seconds: stdSetupTimeSeconds ?? null,
+  } as any);
 
   if (error) throw error;
   return handleRpcError(data as unknown as StartEventResponse) as StartEventResponse;
+}
+
+// Helper: ดึง std setup time จาก production_standards (ใช้เป็น default ใน UI)
+export async function getStdSetupTimeSeconds(
+  machineId: string,
+  productId: string
+): Promise<number> {
+  const { data, error } = await supabase.rpc('rpc_get_std_setup_time' as any, {
+    p_machine_id: machineId,
+    p_product_id: productId,
+  });
+  if (error) return 0;
+  return Number(data) || 0;
 }
 
 // =============================================
