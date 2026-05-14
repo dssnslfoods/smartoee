@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPages } from '@/lib/fetchAllPages';
 import type {
   EventType,
   DowntimeCategory,
@@ -696,24 +697,18 @@ export async function getDashboardOEE(companyId?: string, startDate?: string, en
   // Get latest OEE snapshot for each machine
   const machineIds = machines.map(m => m.id);
 
-  let query = supabase
-    .from('oee_snapshots')
-    .select('*')
-    .eq('scope', 'MACHINE')
-    .in('scope_id', machineIds)
-    .order('period_start', { ascending: false });
-
-  // Apply date range filter if provided
-  if (startDate) {
-    query = query.gte('period_start', startDate);
-  }
-  if (endDate) {
-    query = query.lte('period_start', endDate);
-  }
-
-  const { data: snapshots, error } = await query;
-
-  if (error) throw error;
+  const snapshots = await fetchAllPages<OeeSnapshot>((from, to) => {
+    let query = supabase
+      .from('oee_snapshots')
+      .select('*')
+      .eq('scope', 'MACHINE')
+      .in('scope_id', machineIds)
+      .order('period_start', { ascending: false })
+      .range(from, to);
+    if (startDate) query = query.gte('period_start', startDate);
+    if (endDate)   query = query.lte('period_start', endDate);
+    return query;
+  });
 
   // If date range is specified, average ALL snapshots in the range
   // Otherwise, get latest snapshot per machine (original behavior)
@@ -768,14 +763,15 @@ export async function getMachinesWithStatus(companyId?: string): Promise<{ machi
   const machineIds = machines.map(m => m.id);
 
   // Get latest OEE snapshots for all machines
-  const { data: snapshots, error: snapshotError } = await supabase
-    .from('oee_snapshots')
-    .select('*')
-    .eq('scope', 'MACHINE')
-    .in('scope_id', machineIds)
-    .order('period_start', { ascending: false });
-
-  if (snapshotError) throw snapshotError;
+  const snapshots = await fetchAllPages<OeeSnapshot>((from, to) =>
+    supabase
+      .from('oee_snapshots')
+      .select('*')
+      .eq('scope', 'MACHINE')
+      .in('scope_id', machineIds)
+      .order('period_start', { ascending: false })
+      .range(from, to)
+  );
 
   // Get current production events (open events)
   const { data: events, error: eventError } = await supabase
@@ -867,17 +863,18 @@ export async function getOEETrend(companyId?: string, days: number = 7): Promise
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - (days - 1));
 
-  const { data: snapshots, error } = await supabase
-    .from('oee_snapshots')
-    .select('*')
-    .eq('scope', 'MACHINE')
-    .eq('period', 'SHIFT')
-    .in('scope_id', machineIds)
-    .gte('period_start', startDate.toISOString())
-    .lte('period_start', endDate.toISOString())
-    .order('period_start');
-
-  if (error) throw error;
+  const snapshots = await fetchAllPages<OeeSnapshot>((from, to) =>
+    supabase
+      .from('oee_snapshots')
+      .select('*')
+      .eq('scope', 'MACHINE')
+      .eq('period', 'SHIFT')
+      .in('scope_id', machineIds)
+      .gte('period_start', startDate.toISOString())
+      .lte('period_start', endDate.toISOString())
+      .order('period_start')
+      .range(from, to)
+  );
 
   // Group by date (use short date format for <= 14 days, otherwise use MM/DD)
   const useShortFormat = days <= 14;
@@ -946,19 +943,20 @@ export async function getMachineOEEHistory(machineId: string, days: number = 7):
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
 
-  const { data: snapshots, error } = await supabase
-    .from('oee_snapshots')
-    .select('*')
-    .eq('scope', 'MACHINE')
-    .eq('scope_id', machineId)
-    .gte('period_start', startDate.toISOString())
-    .order('period_start', { ascending: false });
-
-  if (error) throw error;
+  const snapshots = await fetchAllPages<OeeSnapshot>((from, to) =>
+    supabase
+      .from('oee_snapshots')
+      .select('*')
+      .eq('scope', 'MACHINE')
+      .eq('scope_id', machineId)
+      .gte('period_start', startDate.toISOString())
+      .order('period_start', { ascending: false })
+      .range(from, to)
+  );
 
   return {
     machine,
-    snapshots: snapshots || [],
+    snapshots,
   };
 }
 
@@ -1060,28 +1058,17 @@ export async function getShiftSummaries(
   endDate?: string,
   companyId?: string
 ): Promise<ShiftSummary[]> {
-  let query = supabase
-    .from('v_shift_summary')
-    .select('*')
-    .order('shift_date', { ascending: false });
-
-  if (plantId) {
-    query = query.eq('plant_id', plantId);
-  }
-  if (startDate) {
-    query = query.gte('shift_date', startDate);
-  }
-  if (endDate) {
-    query = query.lte('shift_date', endDate);
-  }
-
-  // Filter by company through plant relationship if companyId is provided
-  // Note: v_shift_summary would need to include company_id for direct filtering
-  // For now, we'll filter by fetching plants first if needed
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return data || [];
+  return await fetchAllPages<ShiftSummary>((from, to) => {
+    let query = supabase
+      .from('v_shift_summary')
+      .select('*')
+      .order('shift_date', { ascending: false })
+      .range(from, to);
+    if (plantId)  query = query.eq('plant_id', plantId);
+    if (startDate) query = query.gte('shift_date', startDate);
+    if (endDate)   query = query.lte('shift_date', endDate);
+    return query;
+  });
 }
 
 // =============================================

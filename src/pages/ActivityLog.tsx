@@ -4,6 +4,7 @@ import { format, subDays } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { History, RefreshCw, ChevronDown, ChevronRight, Search, Calendar, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPages } from '@/lib/fetchAllPages';
 import { useAuth } from '@/hooks/useAuth';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -127,24 +128,19 @@ export default function ActivityLog() {
   const { data: logs = [], isLoading, refetch } = useQuery({
     queryKey: ['activityLogs', dateFrom, dateTo, entityTypeFilter, actionFilter, profile?.user_id],
     queryFn: async () => {
-      let query = supabase
-        .from('v_audit_logs_readable')
-        .select('*')
-        .gte('ts', `${dateFrom}T00:00:00`)
-        .lte('ts', `${dateTo}T23:59:59`)
-        .order('ts', { ascending: false })
-        .limit(500);
-
-      if (entityTypeFilter !== 'all') {
-        query = query.eq('entity_type', entityTypeFilter);
-      }
-      if (actionFilter !== 'all') {
-        query = query.eq('action', actionFilter);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data || []) as AuditLog[];
+      const rows = await fetchAllPages<AuditLog>((from, to) => {
+        let query = supabase
+          .from('v_audit_logs_readable')
+          .select('*')
+          .gte('ts', `${dateFrom}T00:00:00`)
+          .lte('ts', `${dateTo}T23:59:59`)
+          .order('ts', { ascending: false })
+          .range(from, to);
+        if (entityTypeFilter !== 'all') query = query.eq('entity_type', entityTypeFilter);
+        if (actionFilter !== 'all')     query = query.eq('action', actionFilter);
+        return query;
+      }, { maxRows: 5000 });
+      return rows;
     },
     enabled: !!profile,
   });

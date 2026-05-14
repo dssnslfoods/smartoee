@@ -4,6 +4,7 @@ import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { ScrollText, RefreshCw, Search, CalendarDays, Cpu, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPages } from '@/lib/fetchAllPages';
 import { useAuth } from '@/hooks/useAuth';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,25 +51,22 @@ export default function RecentActivity() {
   const { data: events = [], isLoading, refetch } = useQuery({
     queryKey: ['recentActivity', 'events', companyId, dateFilter, profile?.user_id],
     queryFn: async () => {
-      let query = supabase
-        .from('production_events')
-        .select(`
-          id, event_type, start_ts, end_ts, notes, machine_id, product_id, reason_id, created_by,
-          machines!production_events_machine_id_fkey ( name, code ),
-          products!production_events_product_id_fkey ( name, code )
-        `)
-        .gte('start_ts', dateRange.from.toISOString())
-        .lte('start_ts', dateRange.to.toISOString())
-        .order('start_ts', { ascending: false })
-        .limit(500);
-
-      // Staff: show only own events
-      if (isStaff) {
-        query = query.eq('created_by', profile!.user_id);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
+      const data = await fetchAllPages<any>((from, to) => {
+        let query = supabase
+          .from('production_events')
+          .select(`
+            id, event_type, start_ts, end_ts, notes, machine_id, product_id, reason_id, created_by,
+            machines!production_events_machine_id_fkey ( name, code ),
+            products!production_events_product_id_fkey ( name, code )
+          `)
+          .gte('start_ts', dateRange.from.toISOString())
+          .lte('start_ts', dateRange.to.toISOString())
+          .order('start_ts', { ascending: false })
+          .range(from, to);
+        // Staff: show only own events
+        if (isStaff) query = query.eq('created_by', profile!.user_id);
+        return query;
+      }, { maxRows: 5000 });
 
       // Fetch reason names from both downtime_reasons and setup_reasons
       const reasonIds = [...new Set((data || []).map(e => e.reason_id).filter(Boolean))] as string[];

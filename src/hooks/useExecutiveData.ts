@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { subDays, startOfDay, format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPages } from '@/lib/fetchAllPages';
 
 export interface ExecMetrics {
   oee: number;
@@ -115,15 +116,16 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
     queryFn: async () => {
       if (!machines?.length) return [];
       const machineIds = machines.map(m => m.id);
-      const { data, error } = await supabase
-        .from('oee_snapshots')
-        .select('*')
-        .eq('scope', 'MACHINE')
-        .in('scope_id', machineIds)
-        .gte('period_start', dates.previousPeriodStartISO)
-        .order('period_start');
-      if (error) throw error;
-      return data || [];
+      return await fetchAllPages<any>((from, to) =>
+        supabase
+          .from('oee_snapshots')
+          .select('*')
+          .eq('scope', 'MACHINE')
+          .in('scope_id', machineIds)
+          .gte('period_start', dates.previousPeriodStartISO)
+          .order('period_start')
+          .range(from, to)
+      );
     },
     enabled: !!machines?.length,
     refetchInterval: isAutoRefresh ? 30000 : false,
@@ -133,14 +135,16 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
   const { data: downtimeEvents } = useQuery({
     queryKey: ['exec-downtime', dateRange],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('production_events')
-        .select('id, event_type, start_ts, end_ts, reason_id, line_id')
-        .in('event_type', ['DOWNTIME', 'SETUP'])
-        .gte('start_ts', dates.periodStartISO)
-        .not('end_ts', 'is', null);
-      if (error) throw error;
-      const events = data || [];
+      const events = await fetchAllPages<any>((from, to) =>
+        supabase
+          .from('production_events')
+          .select('id, event_type, start_ts, end_ts, reason_id, line_id')
+          .in('event_type', ['DOWNTIME', 'SETUP'])
+          .gte('start_ts', dates.periodStartISO)
+          .not('end_ts', 'is', null)
+          .order('start_ts', { ascending: false })
+          .range(from, to)
+      );
       
       // Fetch reason names from both tables
       const reasonIds = [...new Set(events.map(e => e.reason_id).filter(Boolean))] as string[];
