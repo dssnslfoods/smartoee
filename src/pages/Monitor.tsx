@@ -14,6 +14,7 @@ import { useFullscreen } from "@/hooks/useFullscreen";
 import { FullscreenToggle, FullscreenContainer } from "@/components/ui/FullscreenToggle";
 import { useQuery } from "@tanstack/react-query";
 import { getLines, getPlants } from "@/services/oeeApi";
+import { supabase } from "@/integrations/supabase/client";
 import { ShiftScheduleBanner } from "@/components/monitor/ShiftScheduleBanner";
 import {
   Monitor as MonitorIcon,
@@ -30,8 +31,9 @@ import {
 type StatusFilter = "all" | "running" | "idle" | "stopped" | "maintenance";
 
 export default function MonitorPage() {
-  const { company, isAdmin } = useAuth();
-  const { data, isLoading } = useMonitorData();
+  const { company, isAdmin, hasRole } = useAuth();
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(company?.id ?? null);
+  const { data, isLoading } = useMonitorData(selectedCompanyId);
   const { isFullscreen, isKiosk, toggleFullscreen, enterKiosk, enterFullscreen } = useFullscreen();
   const [selectedPlant, setSelectedPlant] = useState<string>("all");
   const [selectedLine, setSelectedLine] = useState<string>("all");
@@ -39,7 +41,34 @@ export default function MonitorPage() {
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
   const [controlSheetOpen, setControlSheetOpen] = useState(false);
 
-  const companyId = company?.id;
+  const companyId = selectedCompanyId ?? company?.id;
+  // ADMIN และ EXECUTIVE สามารถสลับ company ได้
+  const canSwitchCompany = isAdmin() || hasRole('EXECUTIVE');
+
+  // Default to user's own company on mount
+  useEffect(() => {
+    if (!selectedCompanyId && company?.id) setSelectedCompanyId(company.id);
+  }, [company?.id, selectedCompanyId]);
+
+  // Companies list for switcher
+  const { data: companies = [] } = useQuery({
+    queryKey: ['monitor-companies-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: canSwitchCompany,
+  });
+
+  // Reset plant/line when company changes
+  useEffect(() => {
+    setSelectedPlant("all");
+    setSelectedLine("all");
+  }, [selectedCompanyId]);
 
   const { data: plants } = useQuery({
     queryKey: ["plants", companyId],
@@ -172,6 +201,24 @@ export default function MonitorPage() {
 
         {!isKiosk && (
           <>
+            {/* Company switcher — เฉพาะ ADMIN/EXECUTIVE และต้องมี > 1 บริษัท */}
+            {canSwitchCompany && companies.length > 1 && (
+              <Select
+                value={selectedCompanyId ?? ''}
+                onValueChange={(v) => setSelectedCompanyId(v || null)}
+              >
+                <SelectTrigger className="w-full sm:w-[200px] bg-background border-border/50">
+                  <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="เลือกบริษัท" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
               <SelectTrigger className="w-full sm:w-[140px] bg-background border-border/50">
                 <SelectValue placeholder="สถานะ" />

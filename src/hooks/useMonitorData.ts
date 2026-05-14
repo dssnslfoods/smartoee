@@ -134,10 +134,10 @@ async function fetchMonitorData(companyId?: string): Promise<{ machines: Monitor
   return { machines: result, stats };
 }
 
-export function useMonitorData() {
+export function useMonitorData(overrideCompanyId?: string | null) {
   const { company, hasRole, isAdmin } = useAuth();
   const queryClient = useQueryClient();
-  const companyId = company?.id;
+  const companyId = overrideCompanyId ?? company?.id;
   const isStaff = hasRole('STAFF') && !isAdmin() && !hasRole('SUPERVISOR');
 
   const query = useQuery({
