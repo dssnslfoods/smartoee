@@ -9,11 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AddCountsForm } from '@/components/shopfloor/AddCountsForm';
 import { useAuth } from '@/hooks/useAuth';
 import { getDefectReasons, addCountsBackdate, getProductionStandard, getProductionEvents, getProductionStandardsForMachine } from '@/services';
 import { cn } from '@/lib/utils';
-import { ClipboardList, Play, Package, Clock, ChevronLeft, CheckCircle2, Calendar, Factory, User, Layers, SplitSquareHorizontal, Equal, Eye, History } from 'lucide-react';
+import { ClipboardList, Play, Package, Clock, ChevronLeft, CheckCircle2, Calendar, Factory, User, Layers, SplitSquareHorizontal, Equal, Eye, History, Building2 } from 'lucide-react';
 import { EventTimeline } from '@/components/shopfloor/EventTimeline';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { format } from 'date-fns';
@@ -171,10 +172,31 @@ function SplitPreview({
 export default function PendingCounts() {
   const queryClient = useQueryClient();
   const { company, isAdmin, hasRole } = useAuth();
-  const companyId = company?.id;
+  const canSwitchCompany = isAdmin() || hasRole('EXECUTIVE');
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(company?.id ?? null);
+  const companyId = selectedCompanyId ?? company?.id;
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const filterMachineId = searchParams.get('machine_id');
+
+  // sync default เมื่อ auth company โหลดเสร็จ
+  useEffect(() => {
+    if (!selectedCompanyId && company?.id) setSelectedCompanyId(company.id);
+  }, [company?.id, selectedCompanyId]);
+
+  // Companies dropdown สำหรับ ADMIN/EXECUTIVE
+  const { data: companies = [] } = useQuery({
+    queryKey: ['pending-counts-companies'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: canSwitchCompany,
+  });
 
   // View modes: 'list' (default), 'group-select' (selecting events in a group), 'form' (entering counts)
   const [selectedEvent, setSelectedEvent] = useState<PendingRun | null>(null);
@@ -727,14 +749,32 @@ export default function PendingCounts() {
   const renderListView = () => {
     return (
       <div className="space-y-5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <PageHeader title="รอบันทึกจำนวนผลิต" description="เหตุการณ์ RUN ที่จบแล้วแต่ยังไม่ได้บันทึกจำนวนผลิต" icon={ClipboardList} />
-          {filterMachineId && (
-            <Button variant="outline" size="sm" onClick={() => navigate('/supervisor')} className="gap-2 shrink-0">
-              <ChevronLeft className="h-4 w-4" />
-              กลับหน้า Supervisor
-            </Button>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {canSwitchCompany && companies.length > 1 && (
+              <Select
+                value={selectedCompanyId ?? ''}
+                onValueChange={(v) => setSelectedCompanyId(v || null)}
+              >
+                <SelectTrigger className="w-[200px] bg-background">
+                  <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="เลือกบริษัท" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {filterMachineId && (
+              <Button variant="outline" size="sm" onClick={() => navigate('/supervisor')} className="gap-2">
+                <ChevronLeft className="h-4 w-4" />
+                กลับหน้า Supervisor
+              </Button>
+            )}
+          </div>
         </div>
         <div className="space-y-4">
           {totalPending > 0 && (
