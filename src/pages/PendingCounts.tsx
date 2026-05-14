@@ -209,102 +209,32 @@ export default function PendingCounts() {
     return map;
   }, [machineStandards]);
 
-  // Fetch all pending RUN events
+  // Fetch all pending RUN events ผ่าน RPC (server-side filter, no row limit)
   const { data: pendingRuns = [], isLoading } = useQuery({
     queryKey: ['pending-counts-all', companyId],
-    queryFn: async () => {
-      let machineQuery = supabase
-        .from('machines')
-        .select('id, name, code, line_id, is_active, ideal_cycle_time_seconds, lines!inner(name, plant_id, plants!inner(name))')
-        .eq('is_active', true)
-        .order('name');
+    queryFn: async (): Promise<PendingRun[]> => {
+      const { data, error } = await supabase.rpc('rpc_get_pending_run_events' as any, {
+        p_company_id: companyId ?? null,
+      });
+      if (error) throw error;
 
-      if (companyId) {
-        machineQuery = machineQuery.eq('company_id', companyId);
-      }
-
-      const { data: machines, error: mErr } = await machineQuery;
-      if (mErr) throw mErr;
-      if (!machines?.length) return [];
-
-      const machineIds = machines.map(m => m.id);
-      const machineMap = new Map(machines.map(m => [m.id, m]));
-
-      const { data: runEvents, error: eErr } = await supabase
-        .from('production_events')
-        .select('id, machine_id, event_type, start_ts, end_ts, product_id, shift_calendar_id, created_by, products(name, code), shift_calendar!inner(shift_date)')
-        .in('machine_id', machineIds)
-        .eq('event_type', 'RUN')
-        .not('end_ts', 'is', null)
-        .order('start_ts', { ascending: false });
-
-      if (eErr) throw eErr;
-      if (!runEvents?.length) return [];
-
-      const creatorIds = [...new Set(runEvents.map(e => e.created_by).filter(Boolean))];
-      const { data: profiles } = creatorIds.length > 0
-        ? await supabase.from('user_profiles').select('user_id, full_name').in('user_id', creatorIds)
-        : { data: [] };
-      const profileMap = new Map((profiles || []).map(p => [p.user_id, p.full_name]));
-
-      const eventIds = runEvents.map(e => e.id);
-      const shiftIds = [...new Set(runEvents.map(e => e.shift_calendar_id).filter(Boolean))] as string[];
-
-      // ดึง counts ที่เกี่ยวข้องทั้งหมด — ทั้งที่ link ตรง event และที่อยู่ใน shift+machine เดียวกัน
-      const [{ data: linkedCounts }, { data: shiftCounts }] = await Promise.all([
-        supabase
-          .from('production_counts')
-          .select('production_event_id')
-          .in('production_event_id', eventIds)
-          .not('production_event_id', 'is', null),
-        shiftIds.length > 0
-          ? supabase
-              .from('production_counts')
-              .select('machine_id, shift_calendar_id')
-              .in('machine_id', machineIds)
-              .in('shift_calendar_id', shiftIds)
-          : Promise.resolve({ data: [] as { machine_id: string; shift_calendar_id: string }[] }),
-      ]);
-
-      const linkedSet = new Set<string>(
-        (linkedCounts || []).map((c: any) => c.production_event_id).filter(Boolean)
-      );
-      // Fallback: ถ้ามี count ใดๆ ใน machine+shift เดียวกัน → ถือว่าเครื่องนี้ในกะนี้บันทึกแล้ว
-      const shiftMachineSet = new Set<string>(
-        (shiftCounts || []).map((c: any) => `${c.machine_id}|${c.shift_calendar_id}`)
-      );
-
-      const results: PendingRun[] = [];
-      for (const ev of runEvents) {
-        if (linkedSet.has(ev.id)) continue;
-        if (ev.shift_calendar_id && shiftMachineSet.has(`${ev.machine_id}|${ev.shift_calendar_id}`)) continue;
-
-        const machine = machineMap.get(ev.machine_id);
-        const product = ev.products as { name: string; code: string } | null;
-        const sc = ev.shift_calendar as { shift_date: string } | null;
-        const lineData = machine?.lines as any;
-        const plantName = lineData?.plants?.name || null;
-
-        results.push({
-          id: ev.id,
-          machine_id: ev.machine_id,
-          machine_name: machine?.name || '',
-          machine_code: machine?.code || '',
-          event_type: ev.event_type,
-          start_ts: ev.start_ts,
-          end_ts: ev.end_ts!,
-          product_name: product?.name || null,
-          product_code: product?.code || null,
-          product_id: ev.product_id || null,
-          shift_date: sc?.shift_date || format(new Date(ev.start_ts), 'yyyy-MM-dd'),
-          plant_name: plantName,
-          staff_name: profileMap.get(ev.created_by) || null,
-          shift_calendar_id: ev.shift_calendar_id,
-          ideal_cycle_time_seconds: machine?.ideal_cycle_time_seconds || 0,
-        });
-      }
-
-      return results;
+      return ((data as any[]) || []).map((row): PendingRun => ({
+        id: row.id,
+        machine_id: row.machine_id,
+        machine_name: row.machine_name || '',
+        machine_code: row.machine_code || '',
+        event_type: 'RUN',
+        start_ts: row.start_ts,
+        end_ts: row.end_ts,
+        product_name: row.product_name ?? null,
+        product_code: row.product_code ?? null,
+        product_id: row.product_id ?? null,
+        shift_date: row.shift_date || format(new Date(row.start_ts), 'yyyy-MM-dd'),
+        plant_name: row.plant_name ?? null,
+        staff_name: row.staff_name ?? null,
+        shift_calendar_id: row.shift_calendar_id,
+        ideal_cycle_time_seconds: Number(row.ideal_cycle_time_seconds) || 0,
+      }));
     },
     refetchInterval: 15000,
   });
