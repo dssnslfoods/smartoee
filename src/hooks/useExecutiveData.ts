@@ -66,7 +66,12 @@ interface MachineInfo {
   target_quality: number | null;
 }
 
-export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: boolean) {
+export function useExecutiveData(
+  dateRange: '7' | '14' | '30',
+  isAutoRefresh: boolean,
+  companyId?: string | null,
+  plantId?: string | null
+) {
   const days = parseInt(dateRange);
 
   // Stabilize date calculations - only recompute when dateRange changes
@@ -86,16 +91,18 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
     };
   }, [days]);
 
-  // Machines with line/plant hierarchy
+  // Machines with line/plant hierarchy — filter by company / plant if provided
   const { data: machines } = useQuery({
-    queryKey: ['exec-machines'],
+    queryKey: ['exec-machines', companyId ?? null, plantId ?? null],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('machines')
-        .select('id, name, line_id, target_oee, target_availability, target_performance, target_quality, line:lines!inner(id, name, plant_id, plant:plants!inner(id, name))')
+        .select('id, name, line_id, company_id, target_oee, target_availability, target_performance, target_quality, line:lines!inner(id, name, plant_id, plant:plants!inner(id, name))')
         .eq('is_active', true);
+      if (companyId) q = q.eq('company_id', companyId);
+      const { data, error } = await q;
       if (error) throw error;
-      return (data || []).map((m: any) => ({
+      let mapped = (data || []).map((m: any) => ({
         id: m.id,
         name: m.name,
         line_id: m.line_id,
@@ -107,6 +114,8 @@ export function useExecutiveData(dateRange: '7' | '14' | '30', isAutoRefresh: bo
         target_performance: m.target_performance,
         target_quality: m.target_quality,
       })) as MachineInfo[];
+      if (plantId) mapped = mapped.filter(m => m.plant_id === plantId);
+      return mapped;
     },
   });
 
