@@ -248,19 +248,36 @@ export default function PendingCounts() {
       const profileMap = new Map((profiles || []).map(p => [p.user_id, p.full_name]));
 
       const eventIds = runEvents.map(e => e.id);
-      const { data: countsData } = await supabase
-        .from('production_counts')
-        .select('production_event_id')
-        .in('production_event_id', eventIds)
-        .not('production_event_id', 'is', null);
+      const shiftIds = [...new Set(runEvents.map(e => e.shift_calendar_id).filter(Boolean))] as string[];
 
-      const hasCountsSet = new Set<string>(
-        (countsData || []).map((c: any) => c.production_event_id).filter(Boolean)
+      // ดึง counts ที่เกี่ยวข้องทั้งหมด — ทั้งที่ link ตรง event และที่อยู่ใน shift+machine เดียวกัน
+      const [{ data: linkedCounts }, { data: shiftCounts }] = await Promise.all([
+        supabase
+          .from('production_counts')
+          .select('production_event_id')
+          .in('production_event_id', eventIds)
+          .not('production_event_id', 'is', null),
+        shiftIds.length > 0
+          ? supabase
+              .from('production_counts')
+              .select('machine_id, shift_calendar_id')
+              .in('machine_id', machineIds)
+              .in('shift_calendar_id', shiftIds)
+          : Promise.resolve({ data: [] as { machine_id: string; shift_calendar_id: string }[] }),
+      ]);
+
+      const linkedSet = new Set<string>(
+        (linkedCounts || []).map((c: any) => c.production_event_id).filter(Boolean)
+      );
+      // Fallback: ถ้ามี count ใดๆ ใน machine+shift เดียวกัน → ถือว่าเครื่องนี้ในกะนี้บันทึกแล้ว
+      const shiftMachineSet = new Set<string>(
+        (shiftCounts || []).map((c: any) => `${c.machine_id}|${c.shift_calendar_id}`)
       );
 
       const results: PendingRun[] = [];
       for (const ev of runEvents) {
-        if (hasCountsSet.has(ev.id)) continue;
+        if (linkedSet.has(ev.id)) continue;
+        if (ev.shift_calendar_id && shiftMachineSet.has(`${ev.machine_id}|${ev.shift_calendar_id}`)) continue;
 
         const machine = machineMap.get(ev.machine_id);
         const product = ev.products as { name: string; code: string } | null;

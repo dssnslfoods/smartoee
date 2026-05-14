@@ -22,7 +22,7 @@ export function usePendingCountsBadge() {
       // Get completed RUN events (must have shift_calendar_id)
       const { data: events } = await supabase
         .from("production_events")
-        .select("id")
+        .select("id, machine_id, shift_calendar_id")
         .eq("event_type", "RUN")
         .not("end_ts", "is", null)
         .not("shift_calendar_id", "is", null)
@@ -31,20 +31,35 @@ export function usePendingCountsBadge() {
       if (!events?.length) return 0;
 
       const eventIds = events.map(e => e.id);
+      const shiftIds = [...new Set(events.map(e => e.shift_calendar_id).filter(Boolean))] as string[];
 
-      // Get event IDs that already have counts (per-event tracking)
-      const { data: countedEvents } = await supabase
-        .from("production_counts")
-        .select("production_event_id")
-        .in("production_event_id", eventIds)
-        .not("production_event_id", "is", null);
+      // Two-way check: (a) counts linked via production_event_id, (b) any count for same machine+shift
+      const [{ data: linkedCounts }, { data: shiftCounts }] = await Promise.all([
+        supabase
+          .from("production_counts")
+          .select("production_event_id")
+          .in("production_event_id", eventIds)
+          .not("production_event_id", "is", null),
+        shiftIds.length > 0
+          ? supabase
+              .from("production_counts")
+              .select("machine_id, shift_calendar_id")
+              .in("machine_id", machineIds)
+              .in("shift_calendar_id", shiftIds)
+          : Promise.resolve({ data: [] as { machine_id: string; shift_calendar_id: string }[] }),
+      ]);
 
-      const countedSet = new Set(
-        (countedEvents || []).map((c: any) => c.production_event_id).filter(Boolean)
+      const linkedSet = new Set(
+        (linkedCounts || []).map((c: any) => c.production_event_id).filter(Boolean)
+      );
+      const shiftMachineSet = new Set(
+        (shiftCounts || []).map((c: any) => `${c.machine_id}|${c.shift_calendar_id}`)
       );
 
-      // Count events that don't have counts yet
-      return events.filter(e => !countedSet.has(e.id)).length;
+      return events.filter(e =>
+        !linkedSet.has(e.id) &&
+        !(e.shift_calendar_id && shiftMachineSet.has(`${e.machine_id}|${e.shift_calendar_id}`))
+      ).length;
     },
     enabled: !!user && !!company,
     refetchInterval: 60_000,
