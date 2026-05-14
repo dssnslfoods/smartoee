@@ -239,26 +239,34 @@ export function useExecutiveData(
   }, [machines]);
 
   // Trend data (daily averages across all machines)
+  // ตัดวันที่ยังไม่มี OEE จริงออก เพื่อไม่ให้กราฟ drop ลงมา 0
   const trendData = useMemo<ExecTrendPoint[]>(() => {
     if (!machineSnapshots?.length) return [];
     const current = machineSnapshots.filter(s => new Date(s.period_start).getTime() >= dates.periodStartMs);
-    const dateMap = new Map<string, { a: number[]; p: number[]; q: number[]; o: number[] }>();
-    current.forEach(snap => {
+    type Bucket = { a: number[]; p: number[]; q: number[]; o: number[]; hasProduction: boolean };
+    const dateMap = new Map<string, Bucket>();
+    current.forEach((snap: any) => {
       const date = format(new Date(snap.period_start), 'MM/dd');
-      if (!dateMap.has(date)) dateMap.set(date, { a: [], p: [], q: [], o: [] });
+      if (!dateMap.has(date)) dateMap.set(date, { a: [], p: [], q: [], o: [], hasProduction: false });
       const e = dateMap.get(date)!;
       if (snap.availability) e.a.push(snap.availability);
       if (snap.performance) e.p.push(snap.performance);
       if (snap.quality) e.q.push(snap.quality);
       if (snap.oee) e.o.push(snap.oee);
+      // วันที่ "มีข้อมูลผลิตจริง" เมื่อมี count หรือ OEE > 0 อย่างน้อย 1 เครื่อง
+      if (((snap.good_qty ?? 0) + (snap.reject_qty ?? 0) > 0) || (snap.oee ?? 0) > 0) {
+        e.hasProduction = true;
+      }
     });
-    return Array.from(dateMap.entries()).map(([date, v]) => ({
-      date,
-      availability: v.a.length ? v.a.reduce((a, b) => a + b, 0) / v.a.length : 0,
-      performance: v.p.length ? v.p.reduce((a, b) => a + b, 0) / v.p.length : 0,
-      quality: v.q.length ? v.q.reduce((a, b) => a + b, 0) / v.q.length : 0,
-      oee: v.o.length ? v.o.reduce((a, b) => a + b, 0) / v.o.length : 0,
-    }));
+    return Array.from(dateMap.entries())
+      .filter(([, v]) => v.hasProduction)
+      .map(([date, v]) => ({
+        date,
+        availability: v.a.length ? v.a.reduce((a, b) => a + b, 0) / v.a.length : 0,
+        performance: v.p.length ? v.p.reduce((a, b) => a + b, 0) / v.p.length : 0,
+        quality: v.q.length ? v.q.reduce((a, b) => a + b, 0) / v.q.length : 0,
+        oee: v.o.length ? v.o.reduce((a, b) => a + b, 0) / v.o.length : 0,
+      }));
   }, [machineSnapshots, dates.periodStartMs]);
 
   // Pareto data (top 5)
