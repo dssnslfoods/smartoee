@@ -45,6 +45,7 @@ export default function Executive() {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 30 * 60_000,
   });
 
   // Plants under selected company
@@ -58,6 +59,7 @@ export default function Executive() {
       return data || [];
     },
     enabled: !!selectedCompanyId,
+    staleTime: 5 * 60_000,
   });
 
   // Reset plant when company changes

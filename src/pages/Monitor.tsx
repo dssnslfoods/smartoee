@@ -62,6 +62,7 @@ export default function MonitorPage() {
       return data || [];
     },
     enabled: canSwitchCompany,
+    staleTime: 30 * 60_000,
   });
 
   // Reset plant/line when company changes
@@ -74,12 +75,14 @@ export default function MonitorPage() {
     queryKey: ["plants", companyId],
     queryFn: () => getPlants(companyId),
     enabled: !!companyId || !isAdmin(),
+    staleTime: 5 * 60_000,
   });
 
   const { data: lines } = useQuery({
     queryKey: ["lines", companyId],
     queryFn: () => getLines(undefined, companyId),
     enabled: !!companyId || !isAdmin(),
+    staleTime: 5 * 60_000,
   });
 
   // Filter lines based on selected plant

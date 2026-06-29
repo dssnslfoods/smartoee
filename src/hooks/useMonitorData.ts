@@ -144,6 +144,7 @@ export function useMonitorData(overrideCompanyId?: string | null) {
     queryKey: ['monitor-machines', companyId],
     queryFn: () => fetchMonitorData(companyId),
     refetchInterval: 15000, // Fallback polling every 15s
+    staleTime: 15000,
   });
 
   // Fetch permitted machine IDs for STAFF
@@ -151,6 +152,7 @@ export function useMonitorData(overrideCompanyId?: string | null) {
     queryKey: ['permittedMachineIds'],
     queryFn: () => getPermittedMachineIds(),
     enabled: isStaff,
+    staleTime: 5 * 60_000,
   });
 
   // Filter machines for STAFF role

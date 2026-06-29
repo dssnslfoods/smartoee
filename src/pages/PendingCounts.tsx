@@ -196,6 +196,7 @@ export default function PendingCounts() {
       return data || [];
     },
     enabled: canSwitchCompany,
+    staleTime: 30 * 60_000,
   });
 
   // View modes: 'list' (default), 'group-select' (selecting events in a group), 'form' (entering counts)
@@ -223,6 +224,7 @@ export default function PendingCounts() {
     queryKey: ['machine-standards', timelineMachineId],
     queryFn: () => getProductionStandardsForMachine(timelineMachineId!),
     enabled: timelineOpen && !!timelineMachineId,
+    staleTime: 5 * 60_000,
   });
 
   const standardsMap = useMemo(() => {
@@ -276,6 +278,7 @@ export default function PendingCounts() {
   const { data: defectReasons = [] } = useQuery({
     queryKey: ['defectReasons', companyId],
     queryFn: () => getDefectReasons(companyId),
+    staleTime: 10 * 60_000,
   });
 
   // Fetch production standard for selected machine + product
@@ -286,6 +289,7 @@ export default function PendingCounts() {
     queryKey: ['prodStandard', activeMachineId, activeProductId],
     queryFn: () => getProductionStandard(activeMachineId!, activeProductId!),
     enabled: !!activeMachineId && !!activeProductId && viewMode === 'form',
+    staleTime: 5 * 60_000,
   });
 
   // Single event submit

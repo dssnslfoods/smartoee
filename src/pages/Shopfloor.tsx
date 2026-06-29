@@ -49,6 +49,11 @@ import type {
   ProductionStandard,
 } from '@/services/types';
 
+const parseTimeToSeconds = (timeStr: string): number => {
+  const [h, m, s] = timeStr.split(':').map(Number);
+  return h * 3600 + (m || 0) * 60 + (s || 0);
+};
+
 export default function Shopfloor() {
   const queryClient = useQueryClient();
   const { company, isAdmin, hasRole } = useAuth();
@@ -95,18 +100,21 @@ export default function Shopfloor() {
     queryKey: ['plants', companyId],
     queryFn: () => getPlants(companyId),
     enabled: !isStaff && isAuthenticated === true,
+    staleTime: 5 * 60_000,
   });
 
   const { data: lines = [], isLoading: linesLoading } = useQuery({
     queryKey: ['lines', selectedPlantId, companyId],
     queryFn: () => getLines(selectedPlantId!, companyId),
     enabled: !isStaff && !!selectedPlantId,
+    staleTime: 5 * 60_000,
   });
 
   const { data: machines = [], isLoading: machinesLoading } = useQuery({
     queryKey: ['machines', selectedLineId, companyId],
     queryFn: () => getMachines(selectedLineId!, companyId),
     enabled: !isStaff && !!selectedLineId,
+    staleTime: 5 * 60_000,
   });
 
   // Determine the effective plant ID for shift calendar
@@ -123,6 +131,7 @@ export default function Shopfloor() {
     queryKey: ['products', companyId],
     queryFn: () => getProducts(companyId),
     enabled: isAuthenticated === true,
+    staleTime: 5 * 60_000,
   });
 
   const { data: shiftCalendar = [] } = useQuery({
@@ -130,6 +139,7 @@ export default function Shopfloor() {
     queryFn: () => getTodayShiftCalendar(effectivePlantId!),
     enabled: !!effectivePlantId,
     refetchInterval: 60000,
+    staleTime: 30_000,
   });
 
   // Find the shift that matches current time — only consider ACTIVE shifts
@@ -139,23 +149,15 @@ export default function Shopfloor() {
     if (activeShifts.length === 0) return shiftCalendar[0] as ShiftCalendar | undefined; // fallback to any
 
     const now = new Date();
-    const currentHours = now.getHours();
-    const currentMinutes = now.getMinutes();
-    const currentSeconds = now.getSeconds();
-    const currentTimeInSeconds = currentHours * 3600 + currentMinutes * 60 + currentSeconds;
-
-    const parseTime = (timeStr: string) => {
-      const parts = timeStr.split(':').map(Number);
-      return parts[0] * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
-    };
+    const currentTimeInSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
 
     const matchedShift = activeShifts.find(sc => {
       const start = sc.shift?.start_time;
       const end = sc.shift?.end_time;
       if (!start || !end) return false;
 
-      const startSec = parseTime(start);
-      const endSec = parseTime(end);
+      const startSec = parseTimeToSeconds(start);
+      const endSec = parseTimeToSeconds(end);
 
       if (startSec <= endSec) {
         // Normal shift (e.g., 06:00 - 14:00)
@@ -182,6 +184,7 @@ export default function Shopfloor() {
       return data;
     },
     enabled: !!currentShift?.id,
+    staleTime: 30_000,
   });
 
   const isLocked = shiftApproval?.status === 'LOCKED';
@@ -205,18 +208,21 @@ export default function Shopfloor() {
     queryKey: ['downtimeReasons', company?.id],
     queryFn: () => getDowntimeReasons(undefined, company?.id),
     enabled: isAuthenticated === true,
+    staleTime: 10 * 60_000,
   });
 
   const { data: setupReasons = [] } = useQuery({
     queryKey: ['setupReasons', company?.id],
     queryFn: () => getSetupReasons(company?.id),
     enabled: isAuthenticated === true,
+    staleTime: 10 * 60_000,
   });
 
   const { data: defectReasons = [] } = useQuery({
     queryKey: ['defectReasons', company?.id],
     queryFn: () => getDefectReasons(company?.id),
     enabled: isAuthenticated === true,
+    staleTime: 10 * 60_000,
   });
 
   // selectedMachine is already defined above based on role
@@ -227,6 +233,7 @@ export default function Shopfloor() {
     queryKey: ['productionStandard', selectedMachineId, selectedProductId],
     queryFn: () => getProductionStandard(selectedMachineId!, selectedProductId!),
     enabled: !!selectedMachineId && !!selectedProductId,
+    staleTime: 5 * 60_000,
   });
 
   // Fetch ALL standards for the selected machine (for timeline warnings)
@@ -234,6 +241,7 @@ export default function Shopfloor() {
     queryKey: ['machineStandards', selectedMachineId],
     queryFn: () => getProductionStandardsForMachine(selectedMachineId!),
     enabled: !!selectedMachineId,
+    staleTime: 5 * 60_000,
   });
 
   // Build a map of product_id -> ProductionStandard for the timeline

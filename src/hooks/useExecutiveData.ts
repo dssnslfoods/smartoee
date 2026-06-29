@@ -94,6 +94,7 @@ export function useExecutiveData(
   // Machines with line/plant hierarchy — filter by company / plant if provided
   const { data: machines } = useQuery({
     queryKey: ['exec-machines', companyId ?? null, plantId ?? null],
+    staleTime: 5 * 60_000,
     queryFn: async () => {
       let q = supabase
         .from('machines')
@@ -138,6 +139,7 @@ export function useExecutiveData(
     },
     enabled: !!machines?.length,
     refetchInterval: isAutoRefresh ? 30000 : false,
+    staleTime: isAutoRefresh ? 30000 : 2 * 60_000,
   });
 
   // Downtime events with reasons
@@ -173,6 +175,7 @@ export function useExecutiveData(
       }));
     },
     refetchInterval: isAutoRefresh ? 30000 : false,
+    staleTime: isAutoRefresh ? 30000 : 2 * 60_000,
   });
 
   // Build machine → line/plant lookup
